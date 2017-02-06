@@ -20,18 +20,33 @@ class DepGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#dependEL.
-    def visitDependEL(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#dependELatom.
+    def visitDependELatom(self, ctx):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#choice.
-    def visitChoice(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#dependELcondition.
+    def visitDependELcondition(self, ctx):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#condition.
-    def visitCondition(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#dependELor.
+    def visitDependELor(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependELxor_or_max.
+    def visitDependELxor_or_max(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependELparen.
+    def visitDependELparen(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#use_flag.
+    def visitUse_flag(self, ctx):
         return self.visitChildren(ctx)
 
 
@@ -42,6 +57,11 @@ class DepGrammarVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DepGrammarParser#conditionOP.
     def visitConditionOP(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#choice.
+    def visitChoice(self, ctx):
         return self.visitChildren(ctx)
 
 
@@ -57,6 +77,11 @@ class DepGrammarVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DepGrammarParser#atom.
     def visitAtom(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#selection_comma_list.
+    def visitSelection_comma_list(self, ctx):
         return self.visitChildren(ctx)
 
 

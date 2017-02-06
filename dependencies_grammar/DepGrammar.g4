@@ -12,7 +12,7 @@ required: requiredEL* ;
 
 requiredEL:
     NOT? use                                          
-  | condition LPAREN requiredEL* RPAREN   
+  | NOT? use_flag  LPAREN requiredEL* RPAREN
   | choice LPAREN requiredEL* RPAREN                   
   | LPAREN requiredEL* RPAREN             
   ;
@@ -20,17 +20,18 @@ requiredEL:
 depend: dependEL* ;
 
 dependEL:
-    (NOT | BLOCK)? atom                                          
-  | condition LPAREN dependEL* RPAREN   
-  | choice LPAREN dependEL* RPAREN                   
-  | LPAREN dependEL* RPAREN             
+    (NOT | BLOCK)? atom                     #dependELatom
+  | NOT? use_flag LPAREN dependEL+ RPAREN       #dependELcondition
+  | OR LPAREN dependEL* RPAREN              #dependELor
+  | (ONEMAX | XOR) LPAREN dependEL* RPAREN          #dependELxor_or_max
+  | LPAREN dependEL* RPAREN                 #dependELparen
   ;
 
-choice: OR | ONEMAX | XOR ;
-
-condition: NOT? use (LBRACE conditionAttribute* RBRACE)? IMPLIES;
+use_flag: use (LBRACE conditionAttribute* RBRACE)? IMPLIES;
 conditionAttribute: attribute=use conditionOP value ;
 conditionOP: LEQ | LT | GT | GEQ | EQ | NEQ ;
+
+choice: OR | ONEMAX | XOR ;
 
 use: (ABlock | SBlock) ( (MINUS | AT)? (ABlock | SBlock))*;
 value: (ABlock | SBlock | VBlock) (MINUS (ABlock | SBlock | VBlock))*;
@@ -39,9 +40,12 @@ value: (ABlock | SBlock | VBlock) (MINUS (ABlock | SBlock | VBlock))*;
 // ATOM
 
 atom:
-    catpackage (COLON slotSPEC)? (LBRACKET selection (COMMA selection)* RBRACKET)?
-  | versionOP catpackage MINUS version (COLON slotSPEC)? (LBRACKET selection (COMMA selection)* RBRACKET)?
+    catpackage (COLON slotSPEC)? (LBRACKET selection_comma_list RBRACKET)?
+  | versionOP catpackage MINUS version (COLON slotSPEC)? (LBRACKET selection_comma_list RBRACKET)?
   ;
+
+selection_comma_list:
+    selection (COMMA selection)* ;
 
 versionOP: LEQ | LT | GT | GEQ | EQ | NEQ | REV ;
 catpackage: category DIV package;
