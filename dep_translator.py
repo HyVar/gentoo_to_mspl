@@ -142,9 +142,11 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
                     else:
                         c += " and " + settings.get_hyvar_flag(self.map_name_id["flag"][package][flag]) + " = 1"
                 else: # use the def_dep setting
-                    if not def_dep:
-                        logging.warning("Flag " + flag + " does not belong to the flags of package " + package +
-                                        " and no default value is given. Ignoring")
+                    if not def_dep: # in this case the default is not set and the flag is not set
+                        if "-" not in pre: # non selectable flag is required to be selected
+                            return "false"
+                        # flag that can not be set is required to be deselected
+                        # we allow that -> no need to add an additional constraint
                     elif "-" in pre and "+" in def_dep:
                         return "false"
                     elif "-" not in pre and "-" in def_dep:
@@ -152,20 +154,28 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
                     # remaining cases (-,-) and (+,+) are true and no constraint need to be added
             return c
 
-        def get_cond_expression(package_target, slot, subslot, flag_name, flags, flag_set):
+        def get_cond_expression(package_targets, slot, subslot, flag_name, flags, flag_set):
             """
             Used to print the constraint string in the compact form.
             Flags is a list of pairs (pre,use) with at most one element
             """
 
+            if flag_name not in self.map_name_id["flag"][self.package]:
+                logging.error("Flag " + flag_name + " not declared for package " + self.package + ". Ignoring the constraint")
+                return "true"
             flag_representation = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][flag_name])
+            ls = []
+            for i in package_targets:
+                ls.append(get_expression(i,slot,subslot,flags))
             if flag_set:
-                return flag_representation + "= 1 impl " + get_expression(package_target,slot,subslot,flags)
+                return flag_representation + " = 1 impl " + settings.get_hyvar_or(ls)
             else:
-                return flag_representation + "= 0 impl " + get_expression(package_target,slot,subslot,flags)
+                return flag_representation + " = 0 impl " + settings.get_hyvar_or(ls)
 
         package = ctx.catpackage().getText()
-        assert self.mspl[package]["implementations"]
+        if package not in self.mspl:
+            logging.warning("Package " + package + " in dependency of package " + self.package + " does not exits.")
+            return "false"
         packages = []
 
         # if version is specified
@@ -199,33 +209,29 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
                 ls.append(settings.get_hyvar_or([get_expression(x, slot, subslot, simple_list) for x in packages ]))
             # handle the compact representations
             for (pre,flag_name,dep_def) in compact_list:
-                for j in packages:
-                    if len(packages) > 1:
-                        logging.warning("Warning. For compact form, flag " + flag_name +
-                                        ", more than one package found: " + unicode(packages))
-                    if "?" in pre and "!" in pre: # app-misc/foo[!bar?]    bar? (app-misc/foo) !bar? (app-misc/foo[-bar])
-                        ls.append( settings.get_hyvar_and( [
-                            get_cond_expression(j, slot, subslot, flag_name, [],True),
-                            get_cond_expression(j, slot, subslot, flag_name, [("-", flag_name,dep_def)], False)
-                        ]))
-                    elif "?" in pre: # app-misc/foo[bar?] -> bar? (app-misc/foo[bar]) !bar? (app-misc/foo)
-                        ls.append(settings.get_hyvar_and([
-                            get_cond_expression(j, slot, subslot, flag_name, [("", flag_name,dep_def)], True),
-                            get_cond_expression(j, slot, subslot, flag_name, [], False)
-                        ]))
-                    elif "=" in pre and "!" in pre:  # app-misc/foo[!bar=]    bar? (app-misc/foo[-bar]) !bar? (app-misc/foo[bar])
-                        ls.append(settings.get_hyvar_and([
-                            get_cond_expression(j, slot, subslot, flag_name, [("-", flag_name,dep_def)], True),
-                            get_cond_expression(j, slot, subslot, flag_name, [("", flag_name,dep_def)], False)
-                        ]))
-                    elif "=" in pre:  # app-misc/foo[bar=]    bar? (app-misc/foo[bar]) !bar? (app-misc/foo[-bar])
-                        ls.append(settings.get_hyvar_and([
-                            get_cond_expression(j, slot, subslot, flag_name, [("", flag_name,dep_def)], True),
-                            get_cond_expression(j, slot, subslot, flag_name, [("-", flag_name,dep_def)], False)
-                        ]))
-                    else:
-                        logging.error("Prefix " + pre + " of compact form not recognized. Exiting")
-                        exit(1)
+                if "?" in pre and "!" in pre: # app-misc/foo[!bar?]    bar? (app-misc/foo) !bar? (app-misc/foo[-bar])
+                    ls.append( settings.get_hyvar_and( [
+                        get_cond_expression(packages, slot, subslot, flag_name, [],True),
+                        get_cond_expression(packages, slot, subslot, flag_name, [("-", flag_name,dep_def)], False)
+                    ]))
+                elif "?" in pre: # app-misc/foo[bar?] -> bar? (app-misc/foo[bar]) !bar? (app-misc/foo)
+                    ls.append(settings.get_hyvar_and([
+                        get_cond_expression(packages, slot, subslot, flag_name, [("", flag_name,dep_def)], True),
+                        get_cond_expression(packages, slot, subslot, flag_name, [], False)
+                    ]))
+                elif "=" in pre and "!" in pre:  # app-misc/foo[!bar=]    bar? (app-misc/foo[-bar]) !bar? (app-misc/foo[bar])
+                    ls.append(settings.get_hyvar_and([
+                        get_cond_expression(packages, slot, subslot, flag_name, [("-", flag_name,dep_def)], True),
+                        get_cond_expression(packages, slot, subslot, flag_name, [("", flag_name,dep_def)], False)
+                    ]))
+                elif "=" in pre:  # app-misc/foo[bar=]    bar? (app-misc/foo[bar]) !bar? (app-misc/foo[-bar])
+                    ls.append(settings.get_hyvar_and([
+                        get_cond_expression(packages, slot, subslot, flag_name, [("", flag_name,dep_def)], True),
+                        get_cond_expression(packages, slot, subslot, flag_name, [("-", flag_name,dep_def)], False)
+                    ]))
+                else:
+                    logging.error("Prefix " + pre + " of compact form not recognized. Exiting")
+                    exit(1)
         else:
             ls.append(settings.get_hyvar_or([get_expression(x, slot, subslot, []) for x in packages]))
         return settings.get_hyvar_and(ls)
@@ -259,7 +265,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             return "true"
         feature = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][use_flag])
         ls = []
-        c = feature + " = "
+        c = "( " + feature + " = "
         if ctx.NOT():
             c += "0 impl "
             for i in range(3, ctx.getChildCount() - 1):
@@ -268,7 +274,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             c += "1 impl "
             for i in range(2, ctx.getChildCount() - 1):
                 ls.append(ctx.getChild(i).accept(self))
-        c += settings.get_hyvar_and(ls)
+        c += settings.get_hyvar_and(ls) + ")"
         return c
 
     def visitDependELxor_or_max(self, ctx):
@@ -282,8 +288,13 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
                 ctx.getChild(i).accept(self))
 
     # REDEFINITION OF ERROR STRATEGY METHODS
-    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        msg = "Parsing error in \"" + self.processing + "\" (stage " + self.stage + "): column " + str(
-            column) + " " + msg + "\nSentence: " + self.parsed_string
-        raise Exception(msg)
+    def visitErrorNode(self, node):
+        token = node.getSymbol()
+        raise Exception("Erroneous Node at line " +
+                        str(token.line) + ", column " + str(token.column) + ": '" +
+                        str(token.text) + "'")
+    # def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+    #     msg = "Parsing error in \"" + self.processing + "\" (stage " + self.stage + "): column " + str(
+    #         column) + " " + msg + "\nSentence: " + self.parsed_string
+    #     raise Exception(msg)
 

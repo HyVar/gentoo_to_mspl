@@ -110,10 +110,10 @@ def generate_name_mapping_file(target_dir):
 
 def is_base_package(package):
     """
-    :param package: name of the package as x/x(-version)?
-    :return: true if the name of the package contains also the version information
+    :param package: name of the package
+    :return: true if the name of the package is not a version
     """
-    return len(package.split("/")[1].split('-')) == 1
+    return "implementations" in mspl[package]
 
 def convert(package,target_dir):
 
@@ -249,17 +249,19 @@ def main(argv):
 
     # test instances
 
-    convert("games-kids/gcompris-15.10", target_dir)
-    convert("games-kids/gcompris", target_dir)
-    exit(0)
+    # convert("games-kids/gcompris-15.10", target_dir)
+    # convert("games-kids/gcompris", target_dir)
+    # convert("dev-libs/softhsm-2.2.0", target_dir)
+    # exit(0)
+
     counter = 0
     for i in mspl.keys():
         if not os.path.isfile(os.path.join(target_dir,i+".json")):
             logging.debug("Processing package " + i)
             convert(i, target_dir)
             counter += 1
-            if counter == 10:
-                exit(0)
+            # if counter == 100:
+            #     exit(0)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

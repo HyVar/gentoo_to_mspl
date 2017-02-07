@@ -35,11 +35,6 @@ class DepGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#dependELxor_or_max.
-    def visitDependELxor_or_max(self, ctx):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by DepGrammarParser#dependELparen.
     def visitDependELparen(self, ctx):
         return self.visitChildren(ctx)
@@ -47,16 +42,6 @@ class DepGrammarVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DepGrammarParser#use_flag.
     def visitUse_flag(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#conditionAttribute.
-    def visitConditionAttribute(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#conditionOP.
-    def visitConditionOP(self, ctx):
         return self.visitChildren(ctx)
 
 

@@ -23,15 +23,18 @@ dependEL:
     (NOT | BLOCK)? atom                     #dependELatom
   | NOT? use_flag LPAREN dependEL+ RPAREN       #dependELcondition
   | OR LPAREN dependEL* RPAREN              #dependELor
-  | (ONEMAX | XOR) LPAREN dependEL* RPAREN          #dependELxor_or_max
+// michael extended version | (ONEMAX | XOR) LPAREN dependEL* RPAREN          #dependELxor_or_max
   | LPAREN dependEL* RPAREN                 #dependELparen
   ;
 
-use_flag: use (LBRACE conditionAttribute* RBRACE)? IMPLIES;
-conditionAttribute: attribute=use conditionOP value ;
-conditionOP: LEQ | LT | GT | GEQ | EQ | NEQ ;
+// michael extended version use_flag: use (LBRACE conditionAttribute* RBRACE)? IMPLIES;
+//conditionAttribute: attribute=use conditionOP value ;
+//conditionOP: LEQ | LT | GT | GEQ | EQ | NEQ ;
 
-choice: OR | ONEMAX | XOR ;
+use_flag: use IMPLIES;
+
+// michael extended version choice: OR | ONEMAX | XOR ;
+choice: OR ;
 
 use: (ABlock | SBlock) ( (MINUS | AT)? (ABlock | SBlock))*;
 value: (ABlock | SBlock | VBlock) (MINUS (ABlock | SBlock | VBlock))*;
@@ -47,7 +50,8 @@ atom:
 selection_comma_list:
     selection (COMMA selection)* ;
 
-versionOP: LEQ | LT | GT | GEQ | EQ | NEQ | REV ;
+// michael extended version versionOP: LEQ | LT | GT | GEQ | EQ | REV | NEQ ;
+versionOP: LEQ | LT | GT | GEQ | EQ | REV ;
 catpackage: category DIV package;
 category: (ABlock | SBlock) (MINUS (ABlock | SBlock))* ;
 package: ( (ABlock MINUS) | (SBlock MINUS?) )* ABlock;

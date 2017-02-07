@@ -28,7 +28,7 @@ EQ : '='   ;
 GEQ : '>=' ;
 LT : '<'   ;
 GT : '>'   ;
-NEQ : '!=' ;
+// michael extended version NEQ : '!=' ;
 REV: '~'   ;
 
 
