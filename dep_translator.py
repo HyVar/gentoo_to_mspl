@@ -111,8 +111,6 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
         return ls_normal,ls_compact
 
     def visitUse_flag(self, ctx):
-        # return only the name of the flag, not other values
-        # TODO check with Michael if this is ok.
         return ctx.use().getText()
 
     def visitAtom(self, ctx):
@@ -126,12 +124,16 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             if slot:
                 if slot not in self.map_name_id["slot"][package]:
                     # add the slot in self.map_name_id
-                    self.map_name_id["slot"][package][slot] = len(self.map_name_id["slot"][package])
+                    #self.map_name_id["slot"][package][slot] = len(self.map_name_id["slot"][package])
+                    # return false because the slot is not allowed
+                    logging.warning("Slot " + slot + " not found for package " + package + ". Return false constraint")
+                    return "false"
                 c += " and " + settings.get_hyvar_slot(id) + " = " + unicode(self.map_name_id["slot"][package][slot])
             if subslot:
                 if subslot not in  self.map_name_id["subslot"][package]:
-                    #add the subslot in self.map_name_id
-                    self.map_name_id["subslot"][package][subslot] = len(self.map_name_id["subslot"][package])
+                    # return false because the subslot is not allowed
+                    logging.warning("Subslot " + subslot + " not found for package " + package + ". Return false constraint")
+                    return "false"
                 c += " and " + settings.get_hyvar_subslot(id) + " = " +\
                      unicode(self.map_name_id["subslot"][package][subslot])
             for pre,flag,def_dep in flags:
