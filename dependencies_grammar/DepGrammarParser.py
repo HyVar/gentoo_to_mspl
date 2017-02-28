@@ -7,118 +7,89 @@ from io import StringIO
 def serializedATN():
     with StringIO() as buf:
         buf.write(u"\3\u0430\ud6d1\u8206\uad2d\u4417\uaef1\u8d80\uaadd\3")
-        buf.write(u"!\u0100\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t")
+        buf.write(u"#\u00ce\4\2\t\2\4\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t")
         buf.write(u"\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t\13\4\f\t\f\4\r\t\r")
         buf.write(u"\4\16\t\16\4\17\t\17\4\20\t\20\4\21\t\21\4\22\t\22\4")
-        buf.write(u"\23\t\23\4\24\t\24\4\25\t\25\4\26\t\26\3\2\7\2.\n\2\f")
-        buf.write(u"\2\16\2\61\13\2\3\3\5\3\64\n\3\3\3\3\3\5\38\n\3\3\3\3")
-        buf.write(u"\3\3\3\7\3=\n\3\f\3\16\3@\13\3\3\3\3\3\3\3\3\3\3\3\7")
-        buf.write(u"\3G\n\3\f\3\16\3J\13\3\3\3\3\3\3\3\3\3\7\3P\n\3\f\3\16")
-        buf.write(u"\3S\13\3\3\3\5\3V\n\3\3\4\7\4Y\n\4\f\4\16\4\\\13\4\3")
-        buf.write(u"\5\5\5_\n\5\3\5\3\5\5\5c\n\5\3\5\3\5\3\5\6\5h\n\5\r\5")
-        buf.write(u"\16\5i\3\5\3\5\3\5\3\5\3\5\7\5q\n\5\f\5\16\5t\13\5\3")
-        buf.write(u"\5\3\5\3\5\7\5y\n\5\f\5\16\5|\13\5\3\5\5\5\177\n\5\3")
-        buf.write(u"\6\3\6\3\6\3\7\3\7\3\b\3\b\5\b\u0088\n\b\3\b\7\b\u008b")
-        buf.write(u"\n\b\f\b\16\b\u008e\13\b\3\t\3\t\3\t\7\t\u0093\n\t\f")
-        buf.write(u"\t\16\t\u0096\13\t\3\n\3\n\3\n\5\n\u009b\n\n\3\n\3\n")
-        buf.write(u"\3\n\3\n\5\n\u00a1\n\n\3\n\3\n\3\n\3\n\3\n\3\n\5\n\u00a9")
-        buf.write(u"\n\n\3\n\3\n\3\n\3\n\5\n\u00af\n\n\5\n\u00b1\n\n\3\13")
-        buf.write(u"\3\13\3\13\7\13\u00b6\n\13\f\13\16\13\u00b9\13\13\3\f")
-        buf.write(u"\3\f\3\r\3\r\3\r\3\r\3\16\3\16\3\16\7\16\u00c4\n\16\f")
-        buf.write(u"\16\16\16\u00c7\13\16\3\17\3\17\3\17\3\17\5\17\u00cd")
-        buf.write(u"\n\17\7\17\u00cf\n\17\f\17\16\17\u00d2\13\17\3\17\3\17")
-        buf.write(u"\3\20\3\20\5\20\u00d8\n\20\3\21\3\21\3\21\3\21\3\21\3")
-        buf.write(u"\21\3\21\3\21\3\21\3\21\5\21\u00e4\n\21\3\22\3\22\3\22")
-        buf.write(u"\7\22\u00e9\n\22\f\22\16\22\u00ec\13\22\3\23\5\23\u00ef")
-        buf.write(u"\n\23\3\23\3\23\5\23\u00f3\n\23\3\23\5\23\u00f6\n\23")
-        buf.write(u"\3\24\3\24\3\25\3\25\3\25\3\25\3\26\3\26\3\26\2\2\27")
-        buf.write(u"\2\4\6\b\n\f\16\20\22\24\26\30\32\34\36 \"$&(*\2\13\3")
-        buf.write(u"\2\7\b\4\2\37\37!!\4\2\27\27\36\36\3\2\37!\3\2\n\17\3")
-        buf.write(u"\2\37 \4\2\7\7\26\27\3\2\26\27\4\2\t\t\13\13\u0112\2")
-        buf.write(u"/\3\2\2\2\4U\3\2\2\2\6Z\3\2\2\2\b~\3\2\2\2\n\u0080\3")
-        buf.write(u"\2\2\2\f\u0083\3\2\2\2\16\u0085\3\2\2\2\20\u008f\3\2")
-        buf.write(u"\2\2\22\u00b0\3\2\2\2\24\u00b2\3\2\2\2\26\u00ba\3\2\2")
-        buf.write(u"\2\30\u00bc\3\2\2\2\32\u00c0\3\2\2\2\34\u00d0\3\2\2\2")
-        buf.write(u"\36\u00d5\3\2\2\2 \u00e3\3\2\2\2\"\u00e5\3\2\2\2$\u00ee")
-        buf.write(u"\3\2\2\2&\u00f7\3\2\2\2(\u00f9\3\2\2\2*\u00fd\3\2\2\2")
-        buf.write(u",.\5\4\3\2-,\3\2\2\2.\61\3\2\2\2/-\3\2\2\2/\60\3\2\2")
-        buf.write(u"\2\60\3\3\2\2\2\61/\3\2\2\2\62\64\7\7\2\2\63\62\3\2\2")
-        buf.write(u"\2\63\64\3\2\2\2\64\65\3\2\2\2\65V\5\16\b\2\668\7\7\2")
-        buf.write(u"\2\67\66\3\2\2\2\678\3\2\2\289\3\2\2\29:\5\n\6\2:>\7")
-        buf.write(u"\20\2\2;=\5\4\3\2<;\3\2\2\2=@\3\2\2\2><\3\2\2\2>?\3\2")
-        buf.write(u"\2\2?A\3\2\2\2@>\3\2\2\2AB\7\21\2\2BV\3\2\2\2CD\5\f\7")
-        buf.write(u"\2DH\7\20\2\2EG\5\4\3\2FE\3\2\2\2GJ\3\2\2\2HF\3\2\2\2")
-        buf.write(u"HI\3\2\2\2IK\3\2\2\2JH\3\2\2\2KL\7\21\2\2LV\3\2\2\2M")
-        buf.write(u"Q\7\20\2\2NP\5\4\3\2ON\3\2\2\2PS\3\2\2\2QO\3\2\2\2QR")
-        buf.write(u"\3\2\2\2RT\3\2\2\2SQ\3\2\2\2TV\7\21\2\2U\63\3\2\2\2U")
-        buf.write(u"\67\3\2\2\2UC\3\2\2\2UM\3\2\2\2V\5\3\2\2\2WY\5\b\5\2")
-        buf.write(u"XW\3\2\2\2Y\\\3\2\2\2ZX\3\2\2\2Z[\3\2\2\2[\7\3\2\2\2")
-        buf.write(u"\\Z\3\2\2\2]_\t\2\2\2^]\3\2\2\2^_\3\2\2\2_`\3\2\2\2`")
-        buf.write(u"\177\5\22\n\2ac\7\7\2\2ba\3\2\2\2bc\3\2\2\2cd\3\2\2\2")
-        buf.write(u"de\5\n\6\2eg\7\20\2\2fh\5\b\5\2gf\3\2\2\2hi\3\2\2\2i")
-        buf.write(u"g\3\2\2\2ij\3\2\2\2jk\3\2\2\2kl\7\21\2\2l\177\3\2\2\2")
-        buf.write(u"mn\7\4\2\2nr\7\20\2\2oq\5\b\5\2po\3\2\2\2qt\3\2\2\2r")
-        buf.write(u"p\3\2\2\2rs\3\2\2\2su\3\2\2\2tr\3\2\2\2u\177\7\21\2\2")
-        buf.write(u"vz\7\20\2\2wy\5\b\5\2xw\3\2\2\2y|\3\2\2\2zx\3\2\2\2z")
-        buf.write(u"{\3\2\2\2{}\3\2\2\2|z\3\2\2\2}\177\7\21\2\2~^\3\2\2\2")
-        buf.write(u"~b\3\2\2\2~m\3\2\2\2~v\3\2\2\2\177\t\3\2\2\2\u0080\u0081")
-        buf.write(u"\5\16\b\2\u0081\u0082\7\t\2\2\u0082\13\3\2\2\2\u0083")
-        buf.write(u"\u0084\7\4\2\2\u0084\r\3\2\2\2\u0085\u008c\t\3\2\2\u0086")
-        buf.write(u"\u0088\t\4\2\2\u0087\u0086\3\2\2\2\u0087\u0088\3\2\2")
-        buf.write(u"\2\u0088\u0089\3\2\2\2\u0089\u008b\t\3\2\2\u008a\u0087")
-        buf.write(u"\3\2\2\2\u008b\u008e\3\2\2\2\u008c\u008a\3\2\2\2\u008c")
-        buf.write(u"\u008d\3\2\2\2\u008d\17\3\2\2\2\u008e\u008c\3\2\2\2\u008f")
-        buf.write(u"\u0094\t\5\2\2\u0090\u0091\7\27\2\2\u0091\u0093\t\5\2")
-        buf.write(u"\2\u0092\u0090\3\2\2\2\u0093\u0096\3\2\2\2\u0094\u0092")
-        buf.write(u"\3\2\2\2\u0094\u0095\3\2\2\2\u0095\21\3\2\2\2\u0096\u0094")
-        buf.write(u"\3\2\2\2\u0097\u009a\5\30\r\2\u0098\u0099\7\32\2\2\u0099")
-        buf.write(u"\u009b\5 \21\2\u009a\u0098\3\2\2\2\u009a\u009b\3\2\2")
-        buf.write(u"\2\u009b\u00a0\3\2\2\2\u009c\u009d\7\22\2\2\u009d\u009e")
-        buf.write(u"\5\24\13\2\u009e\u009f\7\23\2\2\u009f\u00a1\3\2\2\2\u00a0")
-        buf.write(u"\u009c\3\2\2\2\u00a0\u00a1\3\2\2\2\u00a1\u00b1\3\2\2")
-        buf.write(u"\2\u00a2\u00a3\5\26\f\2\u00a3\u00a4\5\30\r\2\u00a4\u00a5")
-        buf.write(u"\7\27\2\2\u00a5\u00a8\5\36\20\2\u00a6\u00a7\7\32\2\2")
-        buf.write(u"\u00a7\u00a9\5 \21\2\u00a8\u00a6\3\2\2\2\u00a8\u00a9")
-        buf.write(u"\3\2\2\2\u00a9\u00ae\3\2\2\2\u00aa\u00ab\7\22\2\2\u00ab")
-        buf.write(u"\u00ac\5\24\13\2\u00ac\u00ad\7\23\2\2\u00ad\u00af\3\2")
-        buf.write(u"\2\2\u00ae\u00aa\3\2\2\2\u00ae\u00af\3\2\2\2\u00af\u00b1")
-        buf.write(u"\3\2\2\2\u00b0\u0097\3\2\2\2\u00b0\u00a2\3\2\2\2\u00b1")
-        buf.write(u"\23\3\2\2\2\u00b2\u00b7\5$\23\2\u00b3\u00b4\7\33\2\2")
-        buf.write(u"\u00b4\u00b6\5$\23\2\u00b5\u00b3\3\2\2\2\u00b6\u00b9")
-        buf.write(u"\3\2\2\2\u00b7\u00b5\3\2\2\2\u00b7\u00b8\3\2\2\2\u00b8")
-        buf.write(u"\25\3\2\2\2\u00b9\u00b7\3\2\2\2\u00ba\u00bb\t\6\2\2\u00bb")
-        buf.write(u"\27\3\2\2\2\u00bc\u00bd\5\32\16\2\u00bd\u00be\7\31\2")
-        buf.write(u"\2\u00be\u00bf\5\34\17\2\u00bf\31\3\2\2\2\u00c0\u00c5")
-        buf.write(u"\t\3\2\2\u00c1\u00c2\7\27\2\2\u00c2\u00c4\t\3\2\2\u00c3")
-        buf.write(u"\u00c1\3\2\2\2\u00c4\u00c7\3\2\2\2\u00c5\u00c3\3\2\2")
-        buf.write(u"\2\u00c5\u00c6\3\2\2\2\u00c6\33\3\2\2\2\u00c7\u00c5\3")
-        buf.write(u"\2\2\2\u00c8\u00c9\7!\2\2\u00c9\u00cf\7\27\2\2\u00ca")
-        buf.write(u"\u00cc\7\37\2\2\u00cb\u00cd\7\27\2\2\u00cc\u00cb\3\2")
-        buf.write(u"\2\2\u00cc\u00cd\3\2\2\2\u00cd\u00cf\3\2\2\2\u00ce\u00c8")
-        buf.write(u"\3\2\2\2\u00ce\u00ca\3\2\2\2\u00cf\u00d2\3\2\2\2\u00d0")
-        buf.write(u"\u00ce\3\2\2\2\u00d0\u00d1\3\2\2\2\u00d1\u00d3\3\2\2")
-        buf.write(u"\2\u00d2\u00d0\3\2\2\2\u00d3\u00d4\7!\2\2\u00d4\35\3")
-        buf.write(u"\2\2\2\u00d5\u00d7\t\7\2\2\u00d6\u00d8\7\30\2\2\u00d7")
-        buf.write(u"\u00d6\3\2\2\2\u00d7\u00d8\3\2\2\2\u00d8\37\3\2\2\2\u00d9")
-        buf.write(u"\u00e4\5\"\22\2\u00da\u00db\5\"\22\2\u00db\u00dc\7\31")
-        buf.write(u"\2\2\u00dc\u00dd\5\"\22\2\u00dd\u00e4\3\2\2\2\u00de\u00e4")
-        buf.write(u"\7\13\2\2\u00df\u00e4\7\30\2\2\u00e0\u00e1\5\"\22\2\u00e1")
-        buf.write(u"\u00e2\7\13\2\2\u00e2\u00e4\3\2\2\2\u00e3\u00d9\3\2\2")
-        buf.write(u"\2\u00e3\u00da\3\2\2\2\u00e3\u00de\3\2\2\2\u00e3\u00df")
-        buf.write(u"\3\2\2\2\u00e3\u00e0\3\2\2\2\u00e4!\3\2\2\2\u00e5\u00ea")
-        buf.write(u"\t\5\2\2\u00e6\u00e7\7\27\2\2\u00e7\u00e9\t\5\2\2\u00e8")
-        buf.write(u"\u00e6\3\2\2\2\u00e9\u00ec\3\2\2\2\u00ea\u00e8\3\2\2")
-        buf.write(u"\2\u00ea\u00eb\3\2\2\2\u00eb#\3\2\2\2\u00ec\u00ea\3\2")
-        buf.write(u"\2\2\u00ed\u00ef\5&\24\2\u00ee\u00ed\3\2\2\2\u00ee\u00ef")
-        buf.write(u"\3\2\2\2\u00ef\u00f0\3\2\2\2\u00f0\u00f2\5\16\b\2\u00f1")
-        buf.write(u"\u00f3\5(\25\2\u00f2\u00f1\3\2\2\2\u00f2\u00f3\3\2\2")
-        buf.write(u"\2\u00f3\u00f5\3\2\2\2\u00f4\u00f6\5*\26\2\u00f5\u00f4")
-        buf.write(u"\3\2\2\2\u00f5\u00f6\3\2\2\2\u00f6%\3\2\2\2\u00f7\u00f8")
-        buf.write(u"\t\b\2\2\u00f8\'\3\2\2\2\u00f9\u00fa\7\20\2\2\u00fa\u00fb")
-        buf.write(u"\t\t\2\2\u00fb\u00fc\7\21\2\2\u00fc)\3\2\2\2\u00fd\u00fe")
-        buf.write(u"\t\n\2\2\u00fe+\3\2\2\2#/\63\67>HQUZ^birz~\u0087\u008c")
-        buf.write(u"\u0094\u009a\u00a0\u00a8\u00ae\u00b0\u00b7\u00c5\u00cc")
-        buf.write(u"\u00ce\u00d0\u00d7\u00e3\u00ea\u00ee\u00f2\u00f5")
+        buf.write(u"\23\t\23\4\24\t\24\3\2\6\2*\n\2\r\2\16\2+\3\3\5\3/\n")
+        buf.write(u"\3\3\3\3\3\5\3\63\n\3\3\3\3\3\3\3\7\38\n\3\f\3\16\3;")
+        buf.write(u"\13\3\3\3\3\3\3\3\3\3\3\3\7\3B\n\3\f\3\16\3E\13\3\3\3")
+        buf.write(u"\3\3\3\3\3\3\7\3K\n\3\f\3\16\3N\13\3\3\3\5\3Q\n\3\3\4")
+        buf.write(u"\6\4T\n\4\r\4\16\4U\3\5\5\5Y\n\5\3\5\3\5\5\5]\n\5\3\5")
+        buf.write(u"\3\5\3\5\6\5b\n\5\r\5\16\5c\3\5\3\5\3\5\3\5\3\5\7\5k")
+        buf.write(u"\n\5\f\5\16\5n\13\5\3\5\3\5\3\5\7\5s\n\5\f\5\16\5v\13")
+        buf.write(u"\5\3\5\5\5y\n\5\3\6\3\6\3\6\3\7\3\7\3\b\3\b\3\b\5\b\u0083")
+        buf.write(u"\n\b\3\b\3\b\3\b\3\b\5\b\u0089\n\b\3\b\3\b\3\b\5\b\u008e")
+        buf.write(u"\n\b\3\b\3\b\5\b\u0092\n\b\3\b\3\b\3\b\3\b\5\b\u0098")
+        buf.write(u"\n\b\5\b\u009a\n\b\3\t\3\t\3\t\7\t\u009f\n\t\f\t\16\t")
+        buf.write(u"\u00a2\13\t\3\n\3\n\3\n\3\n\3\n\3\n\3\n\3\n\3\n\3\n\5")
+        buf.write(u"\n\u00ae\n\n\3\13\3\13\3\f\3\f\3\f\3\f\3\r\3\r\3\16\3")
+        buf.write(u"\16\3\17\3\17\3\20\3\20\3\21\5\21\u00bf\n\21\3\21\3\21")
+        buf.write(u"\5\21\u00c3\n\21\3\21\5\21\u00c6\n\21\3\22\3\22\3\23")
+        buf.write(u"\3\23\3\24\3\24\3\24\2\2\25\2\4\6\b\n\f\16\20\22\24\26")
+        buf.write(u"\30\32\34\36 \"$&\2\6\3\2\6\7\3\2\3\5\3\2\t\16\4\2\33")
+        buf.write(u"\33\"\"\u00da\2)\3\2\2\2\4P\3\2\2\2\6S\3\2\2\2\bx\3\2")
+        buf.write(u"\2\2\nz\3\2\2\2\f}\3\2\2\2\16\u0099\3\2\2\2\20\u009b")
+        buf.write(u"\3\2\2\2\22\u00ad\3\2\2\2\24\u00af\3\2\2\2\26\u00b1\3")
+        buf.write(u"\2\2\2\30\u00b5\3\2\2\2\32\u00b7\3\2\2\2\34\u00b9\3\2")
+        buf.write(u"\2\2\36\u00bb\3\2\2\2 \u00be\3\2\2\2\"\u00c7\3\2\2\2")
+        buf.write(u"$\u00c9\3\2\2\2&\u00cb\3\2\2\2(*\5\4\3\2)(\3\2\2\2*+")
+        buf.write(u"\3\2\2\2+)\3\2\2\2+,\3\2\2\2,\3\3\2\2\2-/\7\7\2\2.-\3")
+        buf.write(u"\2\2\2./\3\2\2\2/\60\3\2\2\2\60Q\5\34\17\2\61\63\7\7")
+        buf.write(u"\2\2\62\61\3\2\2\2\62\63\3\2\2\2\63\64\3\2\2\2\64\65")
+        buf.write(u"\5\n\6\2\659\7\17\2\2\668\5\4\3\2\67\66\3\2\2\28;\3\2")
+        buf.write(u"\2\29\67\3\2\2\29:\3\2\2\2:<\3\2\2\2;9\3\2\2\2<=\7\20")
+        buf.write(u"\2\2=Q\3\2\2\2>?\5\f\7\2?C\7\17\2\2@B\5\4\3\2A@\3\2\2")
+        buf.write(u"\2BE\3\2\2\2CA\3\2\2\2CD\3\2\2\2DF\3\2\2\2EC\3\2\2\2")
+        buf.write(u"FG\7\20\2\2GQ\3\2\2\2HL\7\17\2\2IK\5\4\3\2JI\3\2\2\2")
+        buf.write(u"KN\3\2\2\2LJ\3\2\2\2LM\3\2\2\2MO\3\2\2\2NL\3\2\2\2OQ")
+        buf.write(u"\7\20\2\2P.\3\2\2\2P\62\3\2\2\2P>\3\2\2\2PH\3\2\2\2Q")
+        buf.write(u"\5\3\2\2\2RT\5\b\5\2SR\3\2\2\2TU\3\2\2\2US\3\2\2\2UV")
+        buf.write(u"\3\2\2\2V\7\3\2\2\2WY\t\2\2\2XW\3\2\2\2XY\3\2\2\2YZ\3")
+        buf.write(u"\2\2\2Zy\5\16\b\2[]\7\7\2\2\\[\3\2\2\2\\]\3\2\2\2]^\3")
+        buf.write(u"\2\2\2^_\5\n\6\2_a\7\17\2\2`b\5\b\5\2a`\3\2\2\2bc\3\2")
+        buf.write(u"\2\2ca\3\2\2\2cd\3\2\2\2de\3\2\2\2ef\7\20\2\2fy\3\2\2")
+        buf.write(u"\2gh\7\3\2\2hl\7\17\2\2ik\5\b\5\2ji\3\2\2\2kn\3\2\2\2")
+        buf.write(u"lj\3\2\2\2lm\3\2\2\2mo\3\2\2\2nl\3\2\2\2oy\7\20\2\2p")
+        buf.write(u"t\7\17\2\2qs\5\b\5\2rq\3\2\2\2sv\3\2\2\2tr\3\2\2\2tu")
+        buf.write(u"\3\2\2\2uw\3\2\2\2vt\3\2\2\2wy\7\20\2\2xX\3\2\2\2x\\")
+        buf.write(u"\3\2\2\2xg\3\2\2\2xp\3\2\2\2y\t\3\2\2\2z{\5\34\17\2{")
+        buf.write(u"|\7\b\2\2|\13\3\2\2\2}~\t\3\2\2~\r\3\2\2\2\177\u0082")
+        buf.write(u"\5\26\f\2\u0080\u0081\7\27\2\2\u0081\u0083\5\22\n\2\u0082")
+        buf.write(u"\u0080\3\2\2\2\u0082\u0083\3\2\2\2\u0083\u0088\3\2\2")
+        buf.write(u"\2\u0084\u0085\7\21\2\2\u0085\u0086\5\20\t\2\u0086\u0087")
+        buf.write(u"\7\36\2\2\u0087\u0089\3\2\2\2\u0088\u0084\3\2\2\2\u0088")
+        buf.write(u"\u0089\3\2\2\2\u0089\u009a\3\2\2\2\u008a\u008b\5\24\13")
+        buf.write(u"\2\u008b\u008d\5\26\f\2\u008c\u008e\7\25\2\2\u008d\u008c")
+        buf.write(u"\3\2\2\2\u008d\u008e\3\2\2\2\u008e\u0091\3\2\2\2\u008f")
+        buf.write(u"\u0090\7\27\2\2\u0090\u0092\5\22\n\2\u0091\u008f\3\2")
+        buf.write(u"\2\2\u0091\u0092\3\2\2\2\u0092\u0097\3\2\2\2\u0093\u0094")
+        buf.write(u"\7\21\2\2\u0094\u0095\5\20\t\2\u0095\u0096\7\36\2\2\u0096")
+        buf.write(u"\u0098\3\2\2\2\u0097\u0093\3\2\2\2\u0097\u0098\3\2\2")
+        buf.write(u"\2\u0098\u009a\3\2\2\2\u0099\177\3\2\2\2\u0099\u008a")
+        buf.write(u"\3\2\2\2\u009a\17\3\2\2\2\u009b\u00a0\5 \21\2\u009c\u009d")
+        buf.write(u"\7\35\2\2\u009d\u009f\5 \21\2\u009e\u009c\3\2\2\2\u009f")
+        buf.write(u"\u00a2\3\2\2\2\u00a0\u009e\3\2\2\2\u00a0\u00a1\3\2\2")
+        buf.write(u"\2\u00a1\21\3\2\2\2\u00a2\u00a0\3\2\2\2\u00a3\u00a4\5")
+        buf.write(u"\36\20\2\u00a4\u00a5\7\13\2\2\u00a5\u00ae\3\2\2\2\u00a6")
+        buf.write(u"\u00a7\5\36\20\2\u00a7\u00a8\7\26\2\2\u00a8\u00a9\7#")
+        buf.write(u"\2\2\u00a9\u00ae\3\2\2\2\u00aa\u00ae\5\36\20\2\u00ab")
+        buf.write(u"\u00ae\7\13\2\2\u00ac\u00ae\7\25\2\2\u00ad\u00a3\3\2")
+        buf.write(u"\2\2\u00ad\u00a6\3\2\2\2\u00ad\u00aa\3\2\2\2\u00ad\u00ab")
+        buf.write(u"\3\2\2\2\u00ad\u00ac\3\2\2\2\u00ae\23\3\2\2\2\u00af\u00b0")
+        buf.write(u"\t\4\2\2\u00b0\25\3\2\2\2\u00b1\u00b2\5\30\r\2\u00b2")
+        buf.write(u"\u00b3\7\26\2\2\u00b3\u00b4\5\32\16\2\u00b4\27\3\2\2")
+        buf.write(u"\2\u00b5\u00b6\7\33\2\2\u00b6\31\3\2\2\2\u00b7\u00b8")
+        buf.write(u"\7#\2\2\u00b8\33\3\2\2\2\u00b9\u00ba\t\5\2\2\u00ba\35")
+        buf.write(u"\3\2\2\2\u00bb\u00bc\7\33\2\2\u00bc\37\3\2\2\2\u00bd")
+        buf.write(u"\u00bf\5\"\22\2\u00be\u00bd\3\2\2\2\u00be\u00bf\3\2\2")
+        buf.write(u"\2\u00bf\u00c0\3\2\2\2\u00c0\u00c2\5\34\17\2\u00c1\u00c3")
+        buf.write(u"\5$\23\2\u00c2\u00c1\3\2\2\2\u00c2\u00c3\3\2\2\2\u00c3")
+        buf.write(u"\u00c5\3\2\2\2\u00c4\u00c6\5&\24\2\u00c5\u00c4\3\2\2")
+        buf.write(u"\2\u00c5\u00c6\3\2\2\2\u00c6!\3\2\2\2\u00c7\u00c8\7\37")
+        buf.write(u"\2\2\u00c8#\3\2\2\2\u00c9\u00ca\7 \2\2\u00ca%\3\2\2\2")
+        buf.write(u"\u00cb\u00cc\7!\2\2\u00cc\'\3\2\2\2\33+.\629CLPUX\\c")
+        buf.write(u"ltx\u0082\u0088\u008d\u0091\u0097\u0099\u00a0\u00ad\u00be")
+        buf.write(u"\u00c2\u00c5")
         return buf.getvalue()
 
 
@@ -132,79 +103,80 @@ class DepGrammarParser ( Parser ):
 
     sharedContextCache = PredictionContextCache()
 
-    literalNames = [ u"<INVALID>", u"<INVALID>", u"'||'", u"'^^'", u"'??'", 
-                     u"'!'", u"'!!'", u"'?'", u"'<='", u"'='", u"'>='", 
-                     u"'<'", u"'>'", u"'~'", u"'('", u"')'", u"'['", u"']'", 
-                     u"'{'", u"'}'", u"'+'", u"'-'", u"'*'", u"'/'", u"':'", 
-                     u"','", u"'.'", u"'_'", u"'@'" ]
+    literalNames = [ u"<INVALID>", u"'||'", u"'^^'", u"'??'", u"'!!'", u"'!'", 
+                     u"'?'", u"'<='", u"'>='", u"'='", u"'<'", u"'>'", u"'~'", 
+                     u"'('", u"')'", u"'['", u"'{'", u"'}'", u"'-'", u"'*'", 
+                     u"'/'", u"':'", u"'.'", u"'_'", u"'@'", u"<INVALID>", 
+                     u"<INVALID>", u"','", u"']'" ]
 
-    symbolicNames = [ u"<INVALID>", u"WS", u"OR", u"XOR", u"ONEMAX", u"NOT", 
-                      u"BLOCK", u"IMPLIES", u"LEQ", u"EQ", u"GEQ", u"LT", 
+    symbolicNames = [ u"<INVALID>", u"OR", u"XOR", u"ONEMAX", u"BLOCK", 
+                      u"NOT", u"IMPLIES", u"LEQ", u"GEQ", u"EQ", u"LT", 
                       u"GT", u"REV", u"LPAREN", u"RPAREN", u"LBRACKET", 
-                      u"RBRACKET", u"LBRACE", u"RBRACE", u"PLUS", u"MINUS", 
-                      u"TIMES", u"DIV", u"COLON", u"COMMA", u"DOT", u"UNDERSCORE", 
-                      u"AT", u"SBlock", u"VBlock", u"ABlock" ]
+                      u"LBRACE", u"RBRACE", u"MINUS", u"TIMES", u"DIV", 
+                      u"COLON", u"DOT", u"UNDERSCORE", u"AT", u"Block", 
+                      u"WS", u"COMMA", u"RBRACKET", u"PREFIX", u"PREFERENCE", 
+                      u"SUFFIX", u"FLAG", u"PKG_SUBSLOT" ]
 
-    RULE_required = 0
-    RULE_requiredEL = 1
+    RULE_localDEP = 0
+    RULE_localDEPEL = 1
     RULE_depend = 2
     RULE_dependEL = 3
     RULE_use_flag = 4
     RULE_choice = 5
-    RULE_use = 6
-    RULE_value = 7
-    RULE_atom = 8
-    RULE_selection_comma_list = 9
-    RULE_versionOP = 10
-    RULE_catpackage = 11
-    RULE_category = 12
-    RULE_package = 13
-    RULE_version = 14
-    RULE_slotSPEC = 15
-    RULE_slotID = 16
-    RULE_selection = 17
-    RULE_prefix = 18
-    RULE_preference = 19
-    RULE_suffix = 20
+    RULE_atom = 6
+    RULE_selection_comma_list = 7
+    RULE_slotSPEC = 8
+    RULE_versionOP = 9
+    RULE_catpackage = 10
+    RULE_category = 11
+    RULE_package = 12
+    RULE_use = 13
+    RULE_slotID = 14
+    RULE_selection = 15
+    RULE_prefix = 16
+    RULE_preference = 17
+    RULE_suffix = 18
 
-    ruleNames =  [ u"required", u"requiredEL", u"depend", u"dependEL", u"use_flag", 
-                   u"choice", u"use", u"value", u"atom", u"selection_comma_list", 
+    ruleNames =  [ u"localDEP", u"localDEPEL", u"depend", u"dependEL", u"use_flag", 
+                   u"choice", u"atom", u"selection_comma_list", u"slotSPEC", 
                    u"versionOP", u"catpackage", u"category", u"package", 
-                   u"version", u"slotSPEC", u"slotID", u"selection", u"prefix", 
-                   u"preference", u"suffix" ]
+                   u"use", u"slotID", u"selection", u"prefix", u"preference", 
+                   u"suffix" ]
 
     EOF = Token.EOF
-    WS=1
-    OR=2
-    XOR=3
-    ONEMAX=4
+    OR=1
+    XOR=2
+    ONEMAX=3
+    BLOCK=4
     NOT=5
-    BLOCK=6
-    IMPLIES=7
-    LEQ=8
+    IMPLIES=6
+    LEQ=7
+    GEQ=8
     EQ=9
-    GEQ=10
-    LT=11
-    GT=12
-    REV=13
-    LPAREN=14
-    RPAREN=15
-    LBRACKET=16
-    RBRACKET=17
-    LBRACE=18
-    RBRACE=19
-    PLUS=20
-    MINUS=21
-    TIMES=22
-    DIV=23
-    COLON=24
-    COMMA=25
-    DOT=26
-    UNDERSCORE=27
-    AT=28
-    SBlock=29
-    VBlock=30
-    ABlock=31
+    LT=10
+    GT=11
+    REV=12
+    LPAREN=13
+    RPAREN=14
+    LBRACKET=15
+    LBRACE=16
+    RBRACE=17
+    MINUS=18
+    TIMES=19
+    DIV=20
+    COLON=21
+    DOT=22
+    UNDERSCORE=23
+    AT=24
+    Block=25
+    WS=26
+    COMMA=27
+    RBRACKET=28
+    PREFIX=29
+    PREFERENCE=30
+    SUFFIX=31
+    FLAG=32
+    PKG_SUBSLOT=33
 
     def __init__(self, input):
         super(DepGrammarParser, self).__init__(input)
@@ -214,47 +186,49 @@ class DepGrammarParser ( Parser ):
 
 
 
-    class RequiredContext(ParserRuleContext):
+    class LocalDEPContext(ParserRuleContext):
 
         def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.RequiredContext, self).__init__(parent, invokingState)
+            super(DepGrammarParser.LocalDEPContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def requiredEL(self, i=None):
+        def localDEPEL(self, i=None):
             if i is None:
-                return self.getTypedRuleContexts(DepGrammarParser.RequiredELContext)
+                return self.getTypedRuleContexts(DepGrammarParser.LocalDEPELContext)
             else:
-                return self.getTypedRuleContext(DepGrammarParser.RequiredELContext,i)
+                return self.getTypedRuleContext(DepGrammarParser.LocalDEPELContext,i)
 
 
         def getRuleIndex(self):
-            return DepGrammarParser.RULE_required
+            return DepGrammarParser.RULE_localDEP
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitRequired"):
-                return visitor.visitRequired(self)
+            if hasattr(visitor, "visitLocalDEP"):
+                return visitor.visitLocalDEP(self)
             else:
                 return visitor.visitChildren(self)
 
 
 
 
-    def required(self):
+    def localDEP(self):
 
-        localctx = DepGrammarParser.RequiredContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 0, self.RULE_required)
+        localctx = DepGrammarParser.LocalDEPContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 0, self.RULE_localDEP)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 45
+            self.state = 39 
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
-                self.state = 42
-                self.requiredEL()
-                self.state = 47
+            while True:
+                self.state = 38
+                self.localDEPEL()
+                self.state = 41 
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
+                if not ((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.XOR) | (1 << DepGrammarParser.ONEMAX) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0)):
+                    break
 
         except RecognitionException as re:
             localctx.exception = re
@@ -264,138 +238,212 @@ class DepGrammarParser ( Parser ):
             self.exitRule()
         return localctx
 
-    class RequiredELContext(ParserRuleContext):
+    class LocalDEPELContext(ParserRuleContext):
 
         def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.RequiredELContext, self).__init__(parent, invokingState)
+            super(DepGrammarParser.LocalDEPELContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def use(self):
-            return self.getTypedRuleContext(DepGrammarParser.UseContext,0)
+
+        def getRuleIndex(self):
+            return DepGrammarParser.RULE_localDEPEL
+
+     
+        def copyFrom(self, ctx):
+            super(DepGrammarParser.LocalDEPELContext, self).copyFrom(ctx)
 
 
-        def NOT(self):
-            return self.getToken(DepGrammarParser.NOT, 0)
 
-        def use_flag(self):
-            return self.getTypedRuleContext(DepGrammarParser.Use_flagContext,0)
+    class LocalDEPchoiceContext(LocalDEPELContext):
 
-
-        def LPAREN(self):
-            return self.getToken(DepGrammarParser.LPAREN, 0)
-
-        def RPAREN(self):
-            return self.getToken(DepGrammarParser.RPAREN, 0)
-
-        def requiredEL(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(DepGrammarParser.RequiredELContext)
-            else:
-                return self.getTypedRuleContext(DepGrammarParser.RequiredELContext,i)
-
+        def __init__(self, parser, ctx): # actually a DepGrammarParser.LocalDEPELContext)
+            super(DepGrammarParser.LocalDEPchoiceContext, self).__init__(parser)
+            self.copyFrom(ctx)
 
         def choice(self):
             return self.getTypedRuleContext(DepGrammarParser.ChoiceContext,0)
 
+        def LPAREN(self):
+            return self.getToken(DepGrammarParser.LPAREN, 0)
+        def RPAREN(self):
+            return self.getToken(DepGrammarParser.RPAREN, 0)
+        def localDEPEL(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(DepGrammarParser.LocalDEPELContext)
+            else:
+                return self.getTypedRuleContext(DepGrammarParser.LocalDEPELContext,i)
 
-        def getRuleIndex(self):
-            return DepGrammarParser.RULE_requiredEL
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitRequiredEL"):
-                return visitor.visitRequiredEL(self)
+            if hasattr(visitor, "visitLocalDEPchoice"):
+                return visitor.visitLocalDEPchoice(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class LocalDEPconditionContext(LocalDEPELContext):
+
+        def __init__(self, parser, ctx): # actually a DepGrammarParser.LocalDEPELContext)
+            super(DepGrammarParser.LocalDEPconditionContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def use_flag(self):
+            return self.getTypedRuleContext(DepGrammarParser.Use_flagContext,0)
+
+        def LPAREN(self):
+            return self.getToken(DepGrammarParser.LPAREN, 0)
+        def RPAREN(self):
+            return self.getToken(DepGrammarParser.RPAREN, 0)
+        def NOT(self):
+            return self.getToken(DepGrammarParser.NOT, 0)
+        def localDEPEL(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(DepGrammarParser.LocalDEPELContext)
+            else:
+                return self.getTypedRuleContext(DepGrammarParser.LocalDEPELContext,i)
+
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitLocalDEPcondition"):
+                return visitor.visitLocalDEPcondition(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class LocalDEPparenContext(LocalDEPELContext):
+
+        def __init__(self, parser, ctx): # actually a DepGrammarParser.LocalDEPELContext)
+            super(DepGrammarParser.LocalDEPparenContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def LPAREN(self):
+            return self.getToken(DepGrammarParser.LPAREN, 0)
+        def RPAREN(self):
+            return self.getToken(DepGrammarParser.RPAREN, 0)
+        def localDEPEL(self, i=None):
+            if i is None:
+                return self.getTypedRuleContexts(DepGrammarParser.LocalDEPELContext)
+            else:
+                return self.getTypedRuleContext(DepGrammarParser.LocalDEPELContext,i)
+
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitLocalDEPparen"):
+                return visitor.visitLocalDEPparen(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+    class LocalDEPatomContext(LocalDEPELContext):
+
+        def __init__(self, parser, ctx): # actually a DepGrammarParser.LocalDEPELContext)
+            super(DepGrammarParser.LocalDEPatomContext, self).__init__(parser)
+            self.copyFrom(ctx)
+
+        def use(self):
+            return self.getTypedRuleContext(DepGrammarParser.UseContext,0)
+
+        def NOT(self):
+            return self.getToken(DepGrammarParser.NOT, 0)
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitLocalDEPatom"):
+                return visitor.visitLocalDEPatom(self)
             else:
                 return visitor.visitChildren(self)
 
 
 
+    def localDEPEL(self):
 
-    def requiredEL(self):
-
-        localctx = DepGrammarParser.RequiredELContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 2, self.RULE_requiredEL)
+        localctx = DepGrammarParser.LocalDEPELContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 2, self.RULE_localDEPEL)
         self._la = 0 # Token type
         try:
-            self.state = 83
+            self.state = 78
             self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,6,self._ctx)
             if la_ == 1:
+                localctx = DepGrammarParser.LocalDEPatomContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
-                self.state = 49
+                self.state = 44
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.NOT:
-                    self.state = 48
+                    self.state = 43
                     self.match(DepGrammarParser.NOT)
 
 
-                self.state = 51
+                self.state = 46
                 self.use()
                 pass
 
             elif la_ == 2:
+                localctx = DepGrammarParser.LocalDEPconditionContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
-                self.state = 53
+                self.state = 48
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.NOT:
-                    self.state = 52
+                    self.state = 47
                     self.match(DepGrammarParser.NOT)
 
 
-                self.state = 55
+                self.state = 50
                 self.use_flag()
-                self.state = 56
+                self.state = 51
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 60
+                self.state = 55
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
+                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.XOR) | (1 << DepGrammarParser.ONEMAX) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0):
+                    self.state = 52
+                    self.localDEPEL()
                     self.state = 57
-                    self.requiredEL()
-                    self.state = 62
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 63
+                self.state = 58
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
             elif la_ == 3:
+                localctx = DepGrammarParser.LocalDEPchoiceContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
-                self.state = 65
+                self.state = 60
                 self.choice()
-                self.state = 66
+                self.state = 61
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 70
+                self.state = 65
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
+                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.XOR) | (1 << DepGrammarParser.ONEMAX) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0):
+                    self.state = 62
+                    self.localDEPEL()
                     self.state = 67
-                    self.requiredEL()
-                    self.state = 72
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 73
+                self.state = 68
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
             elif la_ == 4:
+                localctx = DepGrammarParser.LocalDEPparenContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
-                self.state = 75
+                self.state = 70
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 79
+                self.state = 74
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
+                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.XOR) | (1 << DepGrammarParser.ONEMAX) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0):
+                    self.state = 71
+                    self.localDEPEL()
                     self.state = 76
-                    self.requiredEL()
-                    self.state = 81
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 82
+                self.state = 77
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
@@ -440,15 +488,17 @@ class DepGrammarParser ( Parser ):
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 88
+            self.state = 81 
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
-                self.state = 85
+            while True:
+                self.state = 80
                 self.dependEL()
-                self.state = 90
+                self.state = 83 
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
+                if not ((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0)):
+                    break
 
         except RecognitionException as re:
             localctx.exception = re
@@ -581,97 +631,97 @@ class DepGrammarParser ( Parser ):
         self.enterRule(localctx, 6, self.RULE_dependEL)
         self._la = 0 # Token type
         try:
-            self.state = 124
+            self.state = 118
             self._errHandler.sync(self)
             la_ = self._interp.adaptivePredict(self._input,13,self._ctx)
             if la_ == 1:
                 localctx = DepGrammarParser.DependELatomContext(self, localctx)
                 self.enterOuterAlt(localctx, 1)
-                self.state = 92
+                self.state = 86
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                if _la==DepGrammarParser.NOT or _la==DepGrammarParser.BLOCK:
-                    self.state = 91
+                if _la==DepGrammarParser.BLOCK or _la==DepGrammarParser.NOT:
+                    self.state = 85
                     _la = self._input.LA(1)
-                    if not(_la==DepGrammarParser.NOT or _la==DepGrammarParser.BLOCK):
+                    if not(_la==DepGrammarParser.BLOCK or _la==DepGrammarParser.NOT):
                         self._errHandler.recoverInline(self)
                     else:
                         self._errHandler.reportMatch(self)
                         self.consume()
 
 
-                self.state = 94
+                self.state = 88
                 self.atom()
                 pass
 
             elif la_ == 2:
                 localctx = DepGrammarParser.DependELconditionContext(self, localctx)
                 self.enterOuterAlt(localctx, 2)
-                self.state = 96
+                self.state = 90
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.NOT:
-                    self.state = 95
+                    self.state = 89
                     self.match(DepGrammarParser.NOT)
 
 
-                self.state = 98
+                self.state = 92
                 self.use_flag()
-                self.state = 99
+                self.state = 93
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 101 
+                self.state = 95 
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 while True:
-                    self.state = 100
+                    self.state = 94
                     self.dependEL()
-                    self.state = 103 
+                    self.state = 97 
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
-                    if not ((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0)):
+                    if not ((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0)):
                         break
 
-                self.state = 105
+                self.state = 99
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
             elif la_ == 3:
                 localctx = DepGrammarParser.DependELorContext(self, localctx)
                 self.enterOuterAlt(localctx, 3)
-                self.state = 107
+                self.state = 101
                 self.match(DepGrammarParser.OR)
-                self.state = 108
+                self.state = 102
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 112
+                self.state = 106
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
-                    self.state = 109
+                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0):
+                    self.state = 103
                     self.dependEL()
-                    self.state = 114
+                    self.state = 108
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 115
+                self.state = 109
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
             elif la_ == 4:
                 localctx = DepGrammarParser.DependELparenContext(self, localctx)
                 self.enterOuterAlt(localctx, 4)
-                self.state = 116
+                self.state = 110
                 self.match(DepGrammarParser.LPAREN)
-                self.state = 120
+                self.state = 114
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
-                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.ABlock))) != 0):
-                    self.state = 117
+                while (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.BLOCK) | (1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV) | (1 << DepGrammarParser.LPAREN) | (1 << DepGrammarParser.Block) | (1 << DepGrammarParser.FLAG))) != 0):
+                    self.state = 111
                     self.dependEL()
-                    self.state = 122
+                    self.state = 116
                     self._errHandler.sync(self)
                     _la = self._input.LA(1)
 
-                self.state = 123
+                self.state = 117
                 self.match(DepGrammarParser.RPAREN)
                 pass
 
@@ -715,9 +765,9 @@ class DepGrammarParser ( Parser ):
         self.enterRule(localctx, 8, self.RULE_use_flag)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 126
+            self.state = 120
             self.use()
-            self.state = 127
+            self.state = 121
             self.match(DepGrammarParser.IMPLIES)
         except RecognitionException as re:
             localctx.exception = re
@@ -736,6 +786,12 @@ class DepGrammarParser ( Parser ):
         def OR(self):
             return self.getToken(DepGrammarParser.OR, 0)
 
+        def ONEMAX(self):
+            return self.getToken(DepGrammarParser.ONEMAX, 0)
+
+        def XOR(self):
+            return self.getToken(DepGrammarParser.XOR, 0)
+
         def getRuleIndex(self):
             return DepGrammarParser.RULE_choice
 
@@ -752,184 +808,16 @@ class DepGrammarParser ( Parser ):
 
         localctx = DepGrammarParser.ChoiceContext(self, self._ctx, self.state)
         self.enterRule(localctx, 10, self.RULE_choice)
-        try:
-            self.enterOuterAlt(localctx, 1)
-            self.state = 129
-            self.match(DepGrammarParser.OR)
-        except RecognitionException as re:
-            localctx.exception = re
-            self._errHandler.reportError(self, re)
-            self._errHandler.recover(self, re)
-        finally:
-            self.exitRule()
-        return localctx
-
-    class UseContext(ParserRuleContext):
-
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.UseContext, self).__init__(parent, invokingState)
-            self.parser = parser
-
-        def ABlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.ABlock)
-            else:
-                return self.getToken(DepGrammarParser.ABlock, i)
-
-        def SBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.SBlock)
-            else:
-                return self.getToken(DepGrammarParser.SBlock, i)
-
-        def MINUS(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.MINUS)
-            else:
-                return self.getToken(DepGrammarParser.MINUS, i)
-
-        def AT(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.AT)
-            else:
-                return self.getToken(DepGrammarParser.AT, i)
-
-        def getRuleIndex(self):
-            return DepGrammarParser.RULE_use
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitUse"):
-                return visitor.visitUse(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-
-
-    def use(self):
-
-        localctx = DepGrammarParser.UseContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 12, self.RULE_use)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 131
+            self.state = 123
             _la = self._input.LA(1)
-            if not(_la==DepGrammarParser.SBlock or _la==DepGrammarParser.ABlock):
+            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.OR) | (1 << DepGrammarParser.XOR) | (1 << DepGrammarParser.ONEMAX))) != 0)):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
                 self.consume()
-            self.state = 138
-            self._errHandler.sync(self)
-            _alt = self._interp.adaptivePredict(self._input,15,self._ctx)
-            while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
-                if _alt==1:
-                    self.state = 133
-                    self._errHandler.sync(self)
-                    _la = self._input.LA(1)
-                    if _la==DepGrammarParser.MINUS or _la==DepGrammarParser.AT:
-                        self.state = 132
-                        _la = self._input.LA(1)
-                        if not(_la==DepGrammarParser.MINUS or _la==DepGrammarParser.AT):
-                            self._errHandler.recoverInline(self)
-                        else:
-                            self._errHandler.reportMatch(self)
-                            self.consume()
-
-
-                    self.state = 135
-                    _la = self._input.LA(1)
-                    if not(_la==DepGrammarParser.SBlock or _la==DepGrammarParser.ABlock):
-                        self._errHandler.recoverInline(self)
-                    else:
-                        self._errHandler.reportMatch(self)
-                        self.consume() 
-                self.state = 140
-                self._errHandler.sync(self)
-                _alt = self._interp.adaptivePredict(self._input,15,self._ctx)
-
-        except RecognitionException as re:
-            localctx.exception = re
-            self._errHandler.reportError(self, re)
-            self._errHandler.recover(self, re)
-        finally:
-            self.exitRule()
-        return localctx
-
-    class ValueContext(ParserRuleContext):
-
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.ValueContext, self).__init__(parent, invokingState)
-            self.parser = parser
-
-        def ABlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.ABlock)
-            else:
-                return self.getToken(DepGrammarParser.ABlock, i)
-
-        def SBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.SBlock)
-            else:
-                return self.getToken(DepGrammarParser.SBlock, i)
-
-        def VBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.VBlock)
-            else:
-                return self.getToken(DepGrammarParser.VBlock, i)
-
-        def MINUS(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.MINUS)
-            else:
-                return self.getToken(DepGrammarParser.MINUS, i)
-
-        def getRuleIndex(self):
-            return DepGrammarParser.RULE_value
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitValue"):
-                return visitor.visitValue(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-
-
-    def value(self):
-
-        localctx = DepGrammarParser.ValueContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 14, self.RULE_value)
-        self._la = 0 # Token type
-        try:
-            self.enterOuterAlt(localctx, 1)
-            self.state = 141
-            _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.VBlock) | (1 << DepGrammarParser.ABlock))) != 0)):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
-            self.state = 146
-            self._errHandler.sync(self)
-            _la = self._input.LA(1)
-            while _la==DepGrammarParser.MINUS:
-                self.state = 142
-                self.match(DepGrammarParser.MINUS)
-                self.state = 143
-                _la = self._input.LA(1)
-                if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.VBlock) | (1 << DepGrammarParser.ABlock))) != 0)):
-                    self._errHandler.recoverInline(self)
-                else:
-                    self._errHandler.reportMatch(self)
-                    self.consume()
-                self.state = 148
-                self._errHandler.sync(self)
-                _la = self._input.LA(1)
-
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -969,12 +857,8 @@ class DepGrammarParser ( Parser ):
             return self.getTypedRuleContext(DepGrammarParser.VersionOPContext,0)
 
 
-        def MINUS(self):
-            return self.getToken(DepGrammarParser.MINUS, 0)
-
-        def version(self):
-            return self.getTypedRuleContext(DepGrammarParser.VersionContext,0)
-
+        def TIMES(self):
+            return self.getToken(DepGrammarParser.TIMES, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_atom
@@ -991,68 +875,72 @@ class DepGrammarParser ( Parser ):
     def atom(self):
 
         localctx = DepGrammarParser.AtomContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 16, self.RULE_atom)
+        self.enterRule(localctx, 12, self.RULE_atom)
         self._la = 0 # Token type
         try:
-            self.state = 174
+            self.state = 151
             self._errHandler.sync(self)
             token = self._input.LA(1)
-            if token in [DepGrammarParser.SBlock, DepGrammarParser.ABlock]:
+            if token in [DepGrammarParser.Block]:
                 self.enterOuterAlt(localctx, 1)
-                self.state = 149
+                self.state = 125
                 self.catpackage()
-                self.state = 152
+                self.state = 128
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.COLON:
-                    self.state = 150
+                    self.state = 126
                     self.match(DepGrammarParser.COLON)
-                    self.state = 151
+                    self.state = 127
                     self.slotSPEC()
 
 
-                self.state = 158
+                self.state = 134
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.LBRACKET:
-                    self.state = 154
+                    self.state = 130
                     self.match(DepGrammarParser.LBRACKET)
-                    self.state = 155
+                    self.state = 131
                     self.selection_comma_list()
-                    self.state = 156
+                    self.state = 132
                     self.match(DepGrammarParser.RBRACKET)
 
 
                 pass
-            elif token in [DepGrammarParser.LEQ, DepGrammarParser.EQ, DepGrammarParser.GEQ, DepGrammarParser.LT, DepGrammarParser.GT, DepGrammarParser.REV]:
+            elif token in [DepGrammarParser.LEQ, DepGrammarParser.GEQ, DepGrammarParser.EQ, DepGrammarParser.LT, DepGrammarParser.GT, DepGrammarParser.REV]:
                 self.enterOuterAlt(localctx, 2)
-                self.state = 160
+                self.state = 136
                 self.versionOP()
-                self.state = 161
+                self.state = 137
                 self.catpackage()
-                self.state = 162
-                self.match(DepGrammarParser.MINUS)
-                self.state = 163
-                self.version()
-                self.state = 166
+                self.state = 139
+                self._errHandler.sync(self)
+                _la = self._input.LA(1)
+                if _la==DepGrammarParser.TIMES:
+                    self.state = 138
+                    self.match(DepGrammarParser.TIMES)
+
+
+                self.state = 143
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.COLON:
-                    self.state = 164
+                    self.state = 141
                     self.match(DepGrammarParser.COLON)
-                    self.state = 165
+                    self.state = 142
                     self.slotSPEC()
 
 
-                self.state = 172
+                self.state = 149
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
                 if _la==DepGrammarParser.LBRACKET:
-                    self.state = 168
+                    self.state = 145
                     self.match(DepGrammarParser.LBRACKET)
-                    self.state = 169
+                    self.state = 146
                     self.selection_comma_list()
-                    self.state = 170
+                    self.state = 147
                     self.match(DepGrammarParser.RBRACKET)
 
 
@@ -1102,23 +990,112 @@ class DepGrammarParser ( Parser ):
     def selection_comma_list(self):
 
         localctx = DepGrammarParser.Selection_comma_listContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 18, self.RULE_selection_comma_list)
+        self.enterRule(localctx, 14, self.RULE_selection_comma_list)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 176
+            self.state = 153
             self.selection()
-            self.state = 181
+            self.state = 158
             self._errHandler.sync(self)
             _la = self._input.LA(1)
             while _la==DepGrammarParser.COMMA:
-                self.state = 177
+                self.state = 154
                 self.match(DepGrammarParser.COMMA)
-                self.state = 178
+                self.state = 155
                 self.selection()
-                self.state = 183
+                self.state = 160
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
+
+        except RecognitionException as re:
+            localctx.exception = re
+            self._errHandler.reportError(self, re)
+            self._errHandler.recover(self, re)
+        finally:
+            self.exitRule()
+        return localctx
+
+    class SlotSPECContext(ParserRuleContext):
+
+        def __init__(self, parser, parent=None, invokingState=-1):
+            super(DepGrammarParser.SlotSPECContext, self).__init__(parent, invokingState)
+            self.parser = parser
+            self.slot = None # SlotIDContext
+            self.subslot = None # Token
+
+        def EQ(self):
+            return self.getToken(DepGrammarParser.EQ, 0)
+
+        def slotID(self):
+            return self.getTypedRuleContext(DepGrammarParser.SlotIDContext,0)
+
+
+        def DIV(self):
+            return self.getToken(DepGrammarParser.DIV, 0)
+
+        def PKG_SUBSLOT(self):
+            return self.getToken(DepGrammarParser.PKG_SUBSLOT, 0)
+
+        def TIMES(self):
+            return self.getToken(DepGrammarParser.TIMES, 0)
+
+        def getRuleIndex(self):
+            return DepGrammarParser.RULE_slotSPEC
+
+        def accept(self, visitor):
+            if hasattr(visitor, "visitSlotSPEC"):
+                return visitor.visitSlotSPEC(self)
+            else:
+                return visitor.visitChildren(self)
+
+
+
+
+    def slotSPEC(self):
+
+        localctx = DepGrammarParser.SlotSPECContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 16, self.RULE_slotSPEC)
+        try:
+            self.state = 171
+            self._errHandler.sync(self)
+            la_ = self._interp.adaptivePredict(self._input,21,self._ctx)
+            if la_ == 1:
+                self.enterOuterAlt(localctx, 1)
+                self.state = 161
+                localctx.slot = self.slotID()
+                self.state = 162
+                self.match(DepGrammarParser.EQ)
+                pass
+
+            elif la_ == 2:
+                self.enterOuterAlt(localctx, 2)
+                self.state = 164
+                localctx.slot = self.slotID()
+                self.state = 165
+                self.match(DepGrammarParser.DIV)
+                self.state = 166
+                localctx.subslot = self.match(DepGrammarParser.PKG_SUBSLOT)
+                pass
+
+            elif la_ == 3:
+                self.enterOuterAlt(localctx, 3)
+                self.state = 168
+                localctx.slot = self.slotID()
+                pass
+
+            elif la_ == 4:
+                self.enterOuterAlt(localctx, 4)
+                self.state = 169
+                self.match(DepGrammarParser.EQ)
+                pass
+
+            elif la_ == 5:
+                self.enterOuterAlt(localctx, 5)
+                self.state = 170
+                self.match(DepGrammarParser.TIMES)
+                pass
+
 
         except RecognitionException as re:
             localctx.exception = re
@@ -1167,13 +1144,13 @@ class DepGrammarParser ( Parser ):
     def versionOP(self):
 
         localctx = DepGrammarParser.VersionOPContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 20, self.RULE_versionOP)
+        self.enterRule(localctx, 18, self.RULE_versionOP)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 184
+            self.state = 173
             _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV))) != 0)):
+            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.LEQ) | (1 << DepGrammarParser.GEQ) | (1 << DepGrammarParser.EQ) | (1 << DepGrammarParser.LT) | (1 << DepGrammarParser.GT) | (1 << DepGrammarParser.REV))) != 0)):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
@@ -1218,14 +1195,14 @@ class DepGrammarParser ( Parser ):
     def catpackage(self):
 
         localctx = DepGrammarParser.CatpackageContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 22, self.RULE_catpackage)
+        self.enterRule(localctx, 20, self.RULE_catpackage)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 186
+            self.state = 175
             self.category()
-            self.state = 187
+            self.state = 176
             self.match(DepGrammarParser.DIV)
-            self.state = 188
+            self.state = 177
             self.package()
         except RecognitionException as re:
             localctx.exception = re
@@ -1241,23 +1218,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.CategoryContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def ABlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.ABlock)
-            else:
-                return self.getToken(DepGrammarParser.ABlock, i)
-
-        def SBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.SBlock)
-            else:
-                return self.getToken(DepGrammarParser.SBlock, i)
-
-        def MINUS(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.MINUS)
-            else:
-                return self.getToken(DepGrammarParser.MINUS, i)
+        def Block(self):
+            return self.getToken(DepGrammarParser.Block, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_category
@@ -1274,34 +1236,11 @@ class DepGrammarParser ( Parser ):
     def category(self):
 
         localctx = DepGrammarParser.CategoryContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 24, self.RULE_category)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 22, self.RULE_category)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 190
-            _la = self._input.LA(1)
-            if not(_la==DepGrammarParser.SBlock or _la==DepGrammarParser.ABlock):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
-            self.state = 195
-            self._errHandler.sync(self)
-            _la = self._input.LA(1)
-            while _la==DepGrammarParser.MINUS:
-                self.state = 191
-                self.match(DepGrammarParser.MINUS)
-                self.state = 192
-                _la = self._input.LA(1)
-                if not(_la==DepGrammarParser.SBlock or _la==DepGrammarParser.ABlock):
-                    self._errHandler.recoverInline(self)
-                else:
-                    self._errHandler.reportMatch(self)
-                    self.consume()
-                self.state = 197
-                self._errHandler.sync(self)
-                _la = self._input.LA(1)
-
+            self.state = 179
+            self.match(DepGrammarParser.Block)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1316,23 +1255,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.PackageContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def ABlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.ABlock)
-            else:
-                return self.getToken(DepGrammarParser.ABlock, i)
-
-        def MINUS(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.MINUS)
-            else:
-                return self.getToken(DepGrammarParser.MINUS, i)
-
-        def SBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.SBlock)
-            else:
-                return self.getToken(DepGrammarParser.SBlock, i)
+        def PKG_SUBSLOT(self):
+            return self.getToken(DepGrammarParser.PKG_SUBSLOT, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_package
@@ -1349,45 +1273,11 @@ class DepGrammarParser ( Parser ):
     def package(self):
 
         localctx = DepGrammarParser.PackageContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 26, self.RULE_package)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 24, self.RULE_package)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 206
-            self._errHandler.sync(self)
-            _alt = self._interp.adaptivePredict(self._input,26,self._ctx)
-            while _alt!=2 and _alt!=ATN.INVALID_ALT_NUMBER:
-                if _alt==1:
-                    self.state = 204
-                    self._errHandler.sync(self)
-                    token = self._input.LA(1)
-                    if token in [DepGrammarParser.ABlock]:
-                        self.state = 198
-                        self.match(DepGrammarParser.ABlock)
-                        self.state = 199
-                        self.match(DepGrammarParser.MINUS)
-                        pass
-                    elif token in [DepGrammarParser.SBlock]:
-                        self.state = 200
-                        self.match(DepGrammarParser.SBlock)
-                        self.state = 202
-                        self._errHandler.sync(self)
-                        _la = self._input.LA(1)
-                        if _la==DepGrammarParser.MINUS:
-                            self.state = 201
-                            self.match(DepGrammarParser.MINUS)
-
-
-                        pass
-                    else:
-                        raise NoViableAltException(self)
-             
-                self.state = 208
-                self._errHandler.sync(self)
-                _alt = self._interp.adaptivePredict(self._input,26,self._ctx)
-
-            self.state = 209
-            self.match(DepGrammarParser.ABlock)
+            self.state = 181
+            self.match(DepGrammarParser.PKG_SUBSLOT)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1396,144 +1286,44 @@ class DepGrammarParser ( Parser ):
             self.exitRule()
         return localctx
 
-    class VersionContext(ParserRuleContext):
+    class UseContext(ParserRuleContext):
 
         def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.VersionContext, self).__init__(parent, invokingState)
+            super(DepGrammarParser.UseContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def SBlock(self):
-            return self.getToken(DepGrammarParser.SBlock, 0)
+        def FLAG(self):
+            return self.getToken(DepGrammarParser.FLAG, 0)
 
-        def VBlock(self):
-            return self.getToken(DepGrammarParser.VBlock, 0)
-
-        def TIMES(self):
-            return self.getToken(DepGrammarParser.TIMES, 0)
+        def Block(self):
+            return self.getToken(DepGrammarParser.Block, 0)
 
         def getRuleIndex(self):
-            return DepGrammarParser.RULE_version
+            return DepGrammarParser.RULE_use
 
         def accept(self, visitor):
-            if hasattr(visitor, "visitVersion"):
-                return visitor.visitVersion(self)
+            if hasattr(visitor, "visitUse"):
+                return visitor.visitUse(self)
             else:
                 return visitor.visitChildren(self)
 
 
 
 
-    def version(self):
+    def use(self):
 
-        localctx = DepGrammarParser.VersionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 28, self.RULE_version)
+        localctx = DepGrammarParser.UseContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 26, self.RULE_use)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 211
+            self.state = 183
             _la = self._input.LA(1)
-            if not(_la==DepGrammarParser.SBlock or _la==DepGrammarParser.VBlock):
+            if not(_la==DepGrammarParser.Block or _la==DepGrammarParser.FLAG):
                 self._errHandler.recoverInline(self)
             else:
                 self._errHandler.reportMatch(self)
                 self.consume()
-            self.state = 213
-            self._errHandler.sync(self)
-            _la = self._input.LA(1)
-            if _la==DepGrammarParser.TIMES:
-                self.state = 212
-                self.match(DepGrammarParser.TIMES)
-
-
-        except RecognitionException as re:
-            localctx.exception = re
-            self._errHandler.reportError(self, re)
-            self._errHandler.recover(self, re)
-        finally:
-            self.exitRule()
-        return localctx
-
-    class SlotSPECContext(ParserRuleContext):
-
-        def __init__(self, parser, parent=None, invokingState=-1):
-            super(DepGrammarParser.SlotSPECContext, self).__init__(parent, invokingState)
-            self.parser = parser
-            self.slot = None # SlotIDContext
-            self.subslot = None # SlotIDContext
-
-        def slotID(self, i=None):
-            if i is None:
-                return self.getTypedRuleContexts(DepGrammarParser.SlotIDContext)
-            else:
-                return self.getTypedRuleContext(DepGrammarParser.SlotIDContext,i)
-
-
-        def DIV(self):
-            return self.getToken(DepGrammarParser.DIV, 0)
-
-        def EQ(self):
-            return self.getToken(DepGrammarParser.EQ, 0)
-
-        def TIMES(self):
-            return self.getToken(DepGrammarParser.TIMES, 0)
-
-        def getRuleIndex(self):
-            return DepGrammarParser.RULE_slotSPEC
-
-        def accept(self, visitor):
-            if hasattr(visitor, "visitSlotSPEC"):
-                return visitor.visitSlotSPEC(self)
-            else:
-                return visitor.visitChildren(self)
-
-
-
-
-    def slotSPEC(self):
-
-        localctx = DepGrammarParser.SlotSPECContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 30, self.RULE_slotSPEC)
-        try:
-            self.state = 225
-            self._errHandler.sync(self)
-            la_ = self._interp.adaptivePredict(self._input,28,self._ctx)
-            if la_ == 1:
-                self.enterOuterAlt(localctx, 1)
-                self.state = 215
-                localctx.slot = self.slotID()
-                pass
-
-            elif la_ == 2:
-                self.enterOuterAlt(localctx, 2)
-                self.state = 216
-                localctx.slot = self.slotID()
-                self.state = 217
-                self.match(DepGrammarParser.DIV)
-                self.state = 218
-                localctx.subslot = self.slotID()
-                pass
-
-            elif la_ == 3:
-                self.enterOuterAlt(localctx, 3)
-                self.state = 220
-                self.match(DepGrammarParser.EQ)
-                pass
-
-            elif la_ == 4:
-                self.enterOuterAlt(localctx, 4)
-                self.state = 221
-                self.match(DepGrammarParser.TIMES)
-                pass
-
-            elif la_ == 5:
-                self.enterOuterAlt(localctx, 5)
-                self.state = 222
-                localctx.slot = self.slotID()
-                self.state = 223
-                self.match(DepGrammarParser.EQ)
-                pass
-
-
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1548,29 +1338,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.SlotIDContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def ABlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.ABlock)
-            else:
-                return self.getToken(DepGrammarParser.ABlock, i)
-
-        def SBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.SBlock)
-            else:
-                return self.getToken(DepGrammarParser.SBlock, i)
-
-        def VBlock(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.VBlock)
-            else:
-                return self.getToken(DepGrammarParser.VBlock, i)
-
-        def MINUS(self, i=None):
-            if i is None:
-                return self.getTokens(DepGrammarParser.MINUS)
-            else:
-                return self.getToken(DepGrammarParser.MINUS, i)
+        def Block(self):
+            return self.getToken(DepGrammarParser.Block, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_slotID
@@ -1587,34 +1356,11 @@ class DepGrammarParser ( Parser ):
     def slotID(self):
 
         localctx = DepGrammarParser.SlotIDContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 32, self.RULE_slotID)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 28, self.RULE_slotID)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 227
-            _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.VBlock) | (1 << DepGrammarParser.ABlock))) != 0)):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
-            self.state = 232
-            self._errHandler.sync(self)
-            _la = self._input.LA(1)
-            while _la==DepGrammarParser.MINUS:
-                self.state = 228
-                self.match(DepGrammarParser.MINUS)
-                self.state = 229
-                _la = self._input.LA(1)
-                if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.SBlock) | (1 << DepGrammarParser.VBlock) | (1 << DepGrammarParser.ABlock))) != 0)):
-                    self._errHandler.recoverInline(self)
-                else:
-                    self._errHandler.reportMatch(self)
-                    self.consume()
-                self.state = 234
-                self._errHandler.sync(self)
-                _la = self._input.LA(1)
-
+            self.state = 185
+            self.match(DepGrammarParser.Block)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1660,33 +1406,33 @@ class DepGrammarParser ( Parser ):
     def selection(self):
 
         localctx = DepGrammarParser.SelectionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 34, self.RULE_selection)
+        self.enterRule(localctx, 30, self.RULE_selection)
         self._la = 0 # Token type
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 236
+            self.state = 188
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if (((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.PLUS) | (1 << DepGrammarParser.MINUS))) != 0):
-                self.state = 235
+            if _la==DepGrammarParser.PREFIX:
+                self.state = 187
                 self.prefix()
 
 
-            self.state = 238
+            self.state = 190
             self.use()
-            self.state = 240
+            self.state = 192
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==DepGrammarParser.LPAREN:
-                self.state = 239
+            if _la==DepGrammarParser.PREFERENCE:
+                self.state = 191
                 self.preference()
 
 
-            self.state = 243
+            self.state = 195
             self._errHandler.sync(self)
             _la = self._input.LA(1)
-            if _la==DepGrammarParser.IMPLIES or _la==DepGrammarParser.EQ:
-                self.state = 242
+            if _la==DepGrammarParser.SUFFIX:
+                self.state = 194
                 self.suffix()
 
 
@@ -1704,14 +1450,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.PrefixContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def NOT(self):
-            return self.getToken(DepGrammarParser.NOT, 0)
-
-        def MINUS(self):
-            return self.getToken(DepGrammarParser.MINUS, 0)
-
-        def PLUS(self):
-            return self.getToken(DepGrammarParser.PLUS, 0)
+        def PREFIX(self):
+            return self.getToken(DepGrammarParser.PREFIX, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_prefix
@@ -1728,17 +1468,11 @@ class DepGrammarParser ( Parser ):
     def prefix(self):
 
         localctx = DepGrammarParser.PrefixContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 36, self.RULE_prefix)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 32, self.RULE_prefix)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 245
-            _la = self._input.LA(1)
-            if not((((_la) & ~0x3f) == 0 and ((1 << _la) & ((1 << DepGrammarParser.NOT) | (1 << DepGrammarParser.PLUS) | (1 << DepGrammarParser.MINUS))) != 0)):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
+            self.state = 197
+            self.match(DepGrammarParser.PREFIX)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1753,17 +1487,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.PreferenceContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def LPAREN(self):
-            return self.getToken(DepGrammarParser.LPAREN, 0)
-
-        def RPAREN(self):
-            return self.getToken(DepGrammarParser.RPAREN, 0)
-
-        def PLUS(self):
-            return self.getToken(DepGrammarParser.PLUS, 0)
-
-        def MINUS(self):
-            return self.getToken(DepGrammarParser.MINUS, 0)
+        def PREFERENCE(self):
+            return self.getToken(DepGrammarParser.PREFERENCE, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_preference
@@ -1780,21 +1505,11 @@ class DepGrammarParser ( Parser ):
     def preference(self):
 
         localctx = DepGrammarParser.PreferenceContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 38, self.RULE_preference)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 34, self.RULE_preference)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 247
-            self.match(DepGrammarParser.LPAREN)
-            self.state = 248
-            _la = self._input.LA(1)
-            if not(_la==DepGrammarParser.PLUS or _la==DepGrammarParser.MINUS):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
-            self.state = 249
-            self.match(DepGrammarParser.RPAREN)
+            self.state = 199
+            self.match(DepGrammarParser.PREFERENCE)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)
@@ -1809,11 +1524,8 @@ class DepGrammarParser ( Parser ):
             super(DepGrammarParser.SuffixContext, self).__init__(parent, invokingState)
             self.parser = parser
 
-        def IMPLIES(self):
-            return self.getToken(DepGrammarParser.IMPLIES, 0)
-
-        def EQ(self):
-            return self.getToken(DepGrammarParser.EQ, 0)
+        def SUFFIX(self):
+            return self.getToken(DepGrammarParser.SUFFIX, 0)
 
         def getRuleIndex(self):
             return DepGrammarParser.RULE_suffix
@@ -1830,17 +1542,11 @@ class DepGrammarParser ( Parser ):
     def suffix(self):
 
         localctx = DepGrammarParser.SuffixContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 40, self.RULE_suffix)
-        self._la = 0 # Token type
+        self.enterRule(localctx, 36, self.RULE_suffix)
         try:
             self.enterOuterAlt(localctx, 1)
-            self.state = 251
-            _la = self._input.LA(1)
-            if not(_la==DepGrammarParser.IMPLIES or _la==DepGrammarParser.EQ):
-                self._errHandler.recoverInline(self)
-            else:
-                self._errHandler.reportMatch(self)
-                self.consume()
+            self.state = 201
+            self.match(DepGrammarParser.SUFFIX)
         except RecognitionException as re:
             localctx.exception = re
             self._errHandler.reportError(self, re)

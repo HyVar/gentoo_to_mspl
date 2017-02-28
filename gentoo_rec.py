@@ -19,7 +19,6 @@ import sys
 import settings
 import logging
 import os
-import tarfile
 import re
 import dep_translator
 import getopt
@@ -147,7 +146,8 @@ def convert(package,target_dir):
     if not package in mspl:
         raise Exception("Package " + package + " not found in the MSPL JSON files")
 
-    data = {"attributes": [], "constraints": [] }
+    data = {"attributes": [], "constraints": [], "configures": mspl[package]["configures"],
+            "dependencies": mspl[package]["dependencies"]}
 
     if is_base_package(package):
         versions = mspl[package]["implementations"].values()
@@ -189,10 +189,16 @@ def convert(package,target_dir):
         # add constraints
         assert "fm" in mspl[package]
         assert "external" in mspl[package]["fm"]
-        visitor = dep_translator.DepVisitor(mspl,map_name_id,package)
-        parser = visitor.parser(mspl[package]["fm"]["external"])
-        tree = parser.depend()
-        visitor.visit(tree)
+        assert "local" in mspl[package]["fm"]
+        visitor = dep_translator.DepVisitor(mspl, map_name_id, package)
+        if mspl[package]["fm"]["external"]:
+            parser = visitor.parser(mspl[package]["fm"]["external"])
+            tree = parser.depend()
+            visitor.visit(tree)
+        if mspl[package]["fm"]["local"]:
+            parser = visitor.parser(mspl[package]["fm"]["local"])
+            tree = parser.localDEP()
+            visitor.visit(tree)
         data["constraints"].extend(visitor.constraints)
 
     # add validity formulas. Context must be one of the possible env
@@ -260,8 +266,8 @@ def main(argv):
     # test instances
 
     # convert("games-kids/gcompris-15.10", target_dir)
-    # convert("games-kids/gcompris", target_dir)
-    # convert("dev-libs/softhsm-2.2.0", target_dir)
+    # convert("dev-java/jython-2.7.0", target_dir)
+    # convert("dev-texlive/texlive-latexextra-2014", target_dir) -> no pacchetti
     # exit(0)
 
     counter = 0

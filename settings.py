@@ -29,6 +29,9 @@ def process_envirnoment_name(s):
 
 
 def get_hyvar_or(ls):
+    ls = [x for x in ls if x != "false"]
+    if "true" in ls:
+        return "true"
     s = ""
     if ls:
         s += "( " + ls[0] + ")"
@@ -39,6 +42,9 @@ def get_hyvar_or(ls):
     return s
 
 def get_hyvar_and(ls):
+    ls = [x for x in ls if x != "true"]
+    if "false" in ls:
+        return "false"
     s = ""
     if ls:
         s += "( " + ls[0] + ")"

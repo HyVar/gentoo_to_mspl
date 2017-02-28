@@ -2,72 +2,69 @@ lexer grammar DepGrammarLexer;
 
 // To generate files run antlr4 -Dlanguage=Python2 -no-listener
 
-fragment ALPHA: [a-zA-Z] ;  // '@' is in the name of some features...
-fragment NUM: [0-9] ;
-
-WS: [ \t\r\n]+ -> skip ;
-
-///////////////////////////////////////////////////////////
-// mode: default:
+fragment SPECIAL_CHAR: ('-'|'_'|'+'|'.');
+fragment NUM: [0-9];
+fragment LETTER: [a-zA-Z];
 
 // logic operators
 OR: '||' ;
 XOR: '^^' ;
 ONEMAX: '??' ;
 
-NOT: '!';
 BLOCK: '!!';
+NOT: '!';
 
 IMPLIES: '?';
-
 
 // version operators
 
 LEQ : '<=' ;
-EQ : '='   ;
 GEQ : '>=' ;
+EQ : '='   ;
 LT : '<'   ;
 GT : '>'   ;
-// michael extended version NEQ : '!=' ;
 REV: '~'   ;
-
 
 // special symbols
 
 LPAREN  : '(' ;
 RPAREN  : ')' ;
-LBRACKET: '[' ;
-RBRACKET: ']' ;
+LBRACKET: '[' -> pushMode(BRACKET_MODE);
 LBRACE  : '{' ;
 RBRACE  : '}' ;
 
-PLUS  : '+' ;
 MINUS : '-' ;
 TIMES : '*' ;
-DIV   : '/' ;
+DIV   : '/' -> pushMode(NO_DIV_MODE);
 COLON : ':' ;
-COMMA : ',' ;
 DOT   : '.' ;
 UNDERSCORE: '_' ;
 AT    : '@' ;
 
-
 // identifiers
-// Valid package names: [a-zA-Z0-9'-'_+] "that does not end with a version..."
-// valid version names: [0-9]+('.'[0-9]+)*[a-zA-Z]?( ('_alpha' | '_beta' | '_pre' | '_rc' | '_p') ([1-9][0-9]*)? )* ('-r' [0-9]+)?
-// the intersection between package names and version names is [0-9]+[a-zA-Z]?( ('_alpha' | '_beta' | '_pre' | '_rc' | '_p') ([1-9][0-9]*)? )* ('-r' [0-9]+)?
+Block : [a-zA-Z0-9]([a-zA-Z0-9]|SPECIAL_CHAR)* ;
 
-SBlock: [0-9]+[a-zA-Z]?( ('_alpha' | '_beta' | '_pre' | '_rc' | '_p') [0-9]* )* ('-r' [0-9]+)? ;
-VBlock: [0-9]+('.'[0-9]+)*[a-zA-Z]?( ('_alpha' | '_beta' | '_pre' | '_rc' | '_p') [0-9]* )* ('-r' [0-9]+)? ;
-ABlock: [a-zA-Z_+] [a-zA-Z0-9_+]* ;
+WS: [ \t\r\n]+ -> skip ;
 
-//ABlock: (ALPHA | (NUM+ ALPHA ALPHA)) (ALPHA | NUM | PLUS | UNDERSCORE)* | ; // not enough: sys-firmware/tt-s2-6400-firmware
-//NBlock: NUM (ALPHA | NUM | PLUS | DOT | UNDERSCORE)*;
+// tokens inside a square braket
+mode BRACKET_MODE;
 
-//ABlock: ALPHA (ALPHA | NUM | PLUS| DOT | UNDERSCORE)*;
-//NBlock: NUM (ALPHA | NUM | PLUS| DOT | UNDERSCORE)*;
+COMMA : ',' ;
+RBRACKET: ']' -> mode(DEFAULT_MODE) ;
+PREFIX  : '!' | '-' | '+' ;
+PREFERENCE: '(+)' | '(-)';
+SUFFIX: '?'|'=';
 
+FLAG: [a-zA-Z0-9]('.'|'-'|[a-zA-Z0-9_])*;
 
+// tokens after a div
+mode NO_DIV_MODE;
 
+// Some packages are written in sequence without any space to delimit them
+// In these cases the last number is consider as a delimitator of the package version
+PKG_SUBSLOT : ([a-zA-Z0-9]([a-zA-Z0-9]|SPECIAL_CHAR)*([ ]|EOF) |
+    [a-zA-Z0-9]([a-zA-Z0-9]|SPECIAL_CHAR)*
+        { self._input.LA(1) in [ord(x) for x in ":*[?=!"] }? |
+    [a-zA-Z0-9]([a-zA-Z0-9]|SPECIAL_CHAR)*NUM+) -> mode(DEFAULT_MODE);
 
 

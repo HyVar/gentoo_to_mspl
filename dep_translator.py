@@ -58,6 +58,13 @@ def match_package_version(template, operator, s):
 
 class DepVisitor(DepGrammarVisitor, ErrorListener):
     def __init__(self, mspl, map_name_id,package):
+        """
+        The flag mode is used to parse the local constraints only that can contain only use flags
+        :param mspl:
+        :param map_name_id:
+        :param package:
+        :param flag_mode: True in case the dependencies to parse are local
+        """
         super(DepGrammarVisitor, self).__init__()
         super(ErrorListener, self).__init__()
         self.mspl = mspl
@@ -113,6 +120,75 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
     def visitUse_flag(self, ctx):
         return ctx.use().getText()
 
+    def visitLocalDEPcondition(self, ctx):
+        use_flag = ctx.use_flag().accept(self)
+        if use_flag not in self.map_name_id["flag"][self.package]:
+            logging.error("Flag " + use_flag + " not declared for package " + self.package + ". Ignoring the constraint")
+            return "true"
+        feature = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][use_flag])
+        ls = []
+        c = feature + " = "
+        if ctx.NOT():
+            c += "0 impl ("
+            for i in range(3, ctx.getChildCount() - 1):
+                ls.append(ctx.getChild(i).accept(self))
+        else:
+            c += "1 impl ("
+            for i in range(2, ctx.getChildCount() - 1):
+                ls.append(ctx.getChild(i).accept(self))
+        c += settings.get_hyvar_and(ls) + ")"
+        return c
+
+    def visitLocalDEPatom(self, ctx):
+        flag_name = ctx.use().getText().strip()
+        if flag_name not in self.map_name_id["flag"][self.package]:
+            logging.error("The use flag " + flag_name + " is not a valid one for package " + self.package +
+                          ". Return a false constraint.")
+            return "false"
+        c = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][flag_name])
+        if ctx.getChildCount() > 1:
+            # its a conflict and not a dependency
+            # we treat ! and !! in a similar way
+            return "not (" + c + ")"
+        else:
+            return c
+
+    def visitLocalDEPchoice(self, ctx):
+        choice = ctx.choice().getText()
+        ls = []
+        for i in range(2,ctx.getChildCount()-1):
+            ls.append(ctx.getChild(i).accept(self))
+        if choice == "??":
+            if len(ls) == 1:
+                return ls[0]
+            elif len(ls) == 2:
+                return "( " + ls[0] + " xor " + ls[1] + ")"
+            else:
+                # dev-qt/qtwebkit-5.7.1
+                # todo fix onemax
+                logging.error("?? onemax operator in local dependency not supported with more than two arguments. ")
+                return "false"
+        elif choice == "^^":
+            if len(ls) == 2:
+                return "( " + ls[0] + " xor " + ls[1] + ")"
+            else:
+                logging.error("^^ xor operator in local dependency not supported with more than two arguments. Return false")
+                return "false"
+        else: # choice == "||"
+            return settings.get_hyvar_or(ls)
+
+    def visitLocalDEPparen(self, ctx):
+        ls = []
+        for i in range(1,ctx.getChildCount()-1):
+            ls.append(ctx.getChild(i).accept(self))
+        return settings.get_hyvar_and(ls)
+
+    def visitLocalDEP(self, ctx):
+        for i in range(ctx.getChildCount()):
+            self.constraints.append(
+                settings.get_hyvar_package(self.map_name_id["package"][self.package]) + " = 1 impl (" +
+                ctx.getChild(i).accept(self)  + ")")
+
     def visitAtom(self, ctx):
 
         def get_expression(package,slot,subslot,flags):
@@ -123,16 +199,14 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             c = settings.get_hyvar_package(id) + " = 1"
             if slot:
                 if slot not in self.map_name_id["slot"][package]:
-                    # add the slot in self.map_name_id
-                    #self.map_name_id["slot"][package][slot] = len(self.map_name_id["slot"][package])
                     # return false because the slot is not allowed
-                    logging.warning("Slot " + slot + " not found for package " + package + ". Return false constraint")
+                    #logging.warning("Slot " + slot + " not found for package " + package + ". Return false constraint")
                     return "false"
                 c += " and " + settings.get_hyvar_slot(id) + " = " + unicode(self.map_name_id["slot"][package][slot])
             if subslot:
                 if subslot not in  self.map_name_id["subslot"][package]:
                     # return false because the subslot is not allowed
-                    logging.warning("Subslot " + subslot + " not found for package " + package + ". Return false constraint")
+                    #logging.warning("Subslot " + subslot + " not found for package " + package + ". Return false constraint")
                     return "false"
                 c += " and " + settings.get_hyvar_subslot(id) + " = " +\
                      unicode(self.map_name_id["subslot"][package][subslot])
@@ -169,29 +243,45 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             ls = []
             for i in package_targets:
                 ls.append(get_expression(i,slot,subslot,flags))
+            c = settings.get_hyvar_or(ls)
+            if c == "false":
+                logging.warning("Subslot " + unicode(subslot) + " or slot " + unicode(slot) +
+                                " not found in packages " + unicode(package_targets) +
+                                ". Return false constraint while processing " + self.package)
             if flag_set:
-                return flag_representation + " = 1 impl " + settings.get_hyvar_or(ls)
+                return flag_representation + " = 1 impl " + c
             else:
-                return flag_representation + " = 0 impl " + settings.get_hyvar_or(ls)
+                return flag_representation + " = 0 impl " + c
 
-        package = ctx.catpackage().getText()
+        package = ctx.catpackage().getText().strip()
+        version_op = ctx.versionOP()
+        if version_op:
+            m = re.search("-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$", package)
+            if m:
+                version = m.group()[1:]
+                package = package.replace("-" + version, "")
+            else:
+                logging.error("Impossible to find version in package " + package)
+                exit(1)
+            if ctx.TIMES():
+                version += "*"
+
         if package not in self.mspl:
             logging.warning("Package " + package + " in dependency of package " + self.package + " does not exits.")
             return "false"
         packages = []
 
         # if version is specified
-        version = ctx.version()
-        if version:
-            version = version.getText()
+        if version_op:
             version_op = ctx.versionOP().getText()
-
-
             for i in self.mspl[package]["implementations"].keys():
                 if match_package_version(version,version_op,i):
                     packages.append(self.mspl[package]["implementations"][i])
         else:
-            packages = self.mspl[package]["implementations"].values()
+            if "implementations" in self.mspl[package]:
+                packages = self.mspl[package]["implementations"].values()
+            else:
+                packages.append(package)
 
         # slots
         # := and :* are ignored since they do not restrict the use of slots
@@ -235,7 +325,12 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
                     logging.error("Prefix " + pre + " of compact form not recognized. Exiting")
                     exit(1)
         else:
-            ls.append(settings.get_hyvar_or([get_expression(x, slot, subslot, []) for x in packages]))
+            c = settings.get_hyvar_or([get_expression(x, slot, subslot, []) for x in packages])
+            if c == "false":
+                logging.warning("Subslot " + unicode(subslot) + " or slot " + unicode(slot) +
+                                " not found in packages " + unicode(packages) +
+                                ". Return false constraint while processing " + self.package)
+            ls.append(c)
         return settings.get_hyvar_and(ls)
 
 
@@ -261,33 +356,29 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
         return settings.get_hyvar_and(ls)
 
     def visitDependELcondition(self, ctx):
-        use_flag = ctx.use_flag().accept(self)
+        use_flag = ctx.use_flag().accept(self).strip()
         if use_flag not in self.map_name_id["flag"][self.package]:
             logging.error("Flag " + use_flag + " not declared for package " + self.package + ". Ignoring the constraint")
             return "true"
         feature = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][use_flag])
         ls = []
-        c = "( " + feature + " = "
+        c = feature + " = "
         if ctx.NOT():
-            c += "0 impl "
+            c += "0 impl ("
             for i in range(3, ctx.getChildCount() - 1):
                 ls.append(ctx.getChild(i).accept(self))
         else:
-            c += "1 impl "
+            c += "1 impl ("
             for i in range(2, ctx.getChildCount() - 1):
                 ls.append(ctx.getChild(i).accept(self))
         c += settings.get_hyvar_and(ls) + ")"
         return c
 
-    def visitDependELxor_or_max(self, ctx):
-        logging.warning("visitDependELxor_or_max not supported")
-        return ""
-
     def visitDepend(self, ctx):
         for i in range(ctx.getChildCount()):
+            c = ctx.getChild(i).accept(self)
             self.constraints.append(
-                settings.get_hyvar_package(self.map_name_id["package"][self.package]) + " = 1 impl " +
-                ctx.getChild(i).accept(self))
+                settings.get_hyvar_package(self.map_name_id["package"][self.package]) + " = 1 impl (" + c + ")")
 
     # REDEFINITION OF ERROR STRATEGY METHODS
     def visitErrorNode(self, node):
@@ -295,8 +386,8 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
         raise Exception("Erroneous Node at line " +
                         str(token.line) + ", column " + str(token.column) + ": '" +
                         str(token.text) + "'")
-    # def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-    #     msg = "Parsing error in \"" + self.processing + "\" (stage " + self.stage + "): column " + str(
-    #         column) + " " + msg + "\nSentence: " + self.parsed_string
-    #     raise Exception(msg)
+
+    def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
+        msg = "Parsing error, column " + str(column) + ", " + msg + "\nSentence: " + self.parsed_string
+        raise Exception(msg)
 

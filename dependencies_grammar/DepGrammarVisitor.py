@@ -5,13 +5,28 @@ from antlr4 import *
 
 class DepGrammarVisitor(ParseTreeVisitor):
 
-    # Visit a parse tree produced by DepGrammarParser#required.
-    def visitRequired(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#localDEP.
+    def visitLocalDEP(self, ctx):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#requiredEL.
-    def visitRequiredEL(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#localDEPatom.
+    def visitLocalDEPatom(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#localDEPcondition.
+    def visitLocalDEPcondition(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#localDEPchoice.
+    def visitLocalDEPchoice(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#localDEPparen.
+    def visitLocalDEPparen(self, ctx):
         return self.visitChildren(ctx)
 
 
@@ -50,16 +65,6 @@ class DepGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#use.
-    def visitUse(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#value.
-    def visitValue(self, ctx):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by DepGrammarParser#atom.
     def visitAtom(self, ctx):
         return self.visitChildren(ctx)
@@ -67,6 +72,11 @@ class DepGrammarVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DepGrammarParser#selection_comma_list.
     def visitSelection_comma_list(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotSPEC.
+    def visitSlotSPEC(self, ctx):
         return self.visitChildren(ctx)
 
 
@@ -90,13 +100,8 @@ class DepGrammarVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DepGrammarParser#version.
-    def visitVersion(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#slotSPEC.
-    def visitSlotSPEC(self, ctx):
+    # Visit a parse tree produced by DepGrammarParser#use.
+    def visitUse(self, ctx):
         return self.visitChildren(ctx)
 
 
