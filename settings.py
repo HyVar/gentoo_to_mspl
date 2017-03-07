@@ -15,6 +15,11 @@ PACKAGE_NAME_SEPARATOR = '/'
 TEMP_DIR = 'tmp'
 NAME_MAP_FILE = 'name_maps.json'
 
+ROOT_SPL_NAME ="__root__"
+
+
+VERSION_RE = "-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$"
+
 id_count = 0
 def get_new_id():
     global id_count

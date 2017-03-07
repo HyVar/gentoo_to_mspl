@@ -14,12 +14,9 @@ from antlr4.error.ErrorListener import ErrorListener
 from dependencies_grammar.DepGrammarLexer import DepGrammarLexer
 from dependencies_grammar.DepGrammarParser import DepGrammarParser
 from dependencies_grammar.DepGrammarVisitor import DepGrammarVisitor
-
 import re
 import settings
 import logging
-
-
 
 
 def match_package_version(template, operator, s):
@@ -145,7 +142,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             logging.error("The use flag " + flag_name + " is not a valid one for package " + self.package +
                           ". Return a false constraint.")
             return "false"
-        c = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][flag_name])
+        c = settings.get_hyvar_flag(self.map_name_id["flag"][self.package][flag_name]) + " = 1"
         if ctx.getChildCount() > 1:
             # its a conflict and not a dependency
             # we treat ! and !! in a similar way
@@ -154,26 +151,30 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             return c
 
     def visitLocalDEPchoice(self, ctx):
+        # https://wiki.gentoo.org/wiki/Handbook:Parts/Working/USE#Declaring_temporary_USE_flags
+        # for the semantics of the operators
+
+        def get_no_two_true_expressions(xs):
+            ys = ["not( " + x + " and " + y + ")" for x in ls for y in ls if x < y]
+            return settings.get_hyvar_and(ys)
+
         choice = ctx.choice().getText()
         ls = []
         for i in range(2,ctx.getChildCount()-1):
             ls.append(ctx.getChild(i).accept(self))
         if choice == "??":
+            # with ls(ls) < 2 the constraint is always satisfied -> skipping
+            if len(ls) >= 2:
+                return get_no_two_true_expressions(ls)
+            return "true"
+        elif choice == "^^":
             if len(ls) == 1:
                 return ls[0]
             elif len(ls) == 2:
                 return "( " + ls[0] + " xor " + ls[1] + ")"
-            else:
-                # dev-qt/qtwebkit-5.7.1
-                # todo fix onemax
-                logging.error("?? onemax operator in local dependency not supported with more than two arguments. ")
-                return "false"
-        elif choice == "^^":
-            if len(ls) == 2:
-                return "( " + ls[0] + " xor " + ls[1] + ")"
-            else:
-                logging.error("^^ xor operator in local dependency not supported with more than two arguments. Return false")
-                return "false"
+            elif len(ls) > 2:
+                return settings.get_hyvar_and([get_no_two_true_expressions(ls),settings.get_hyvar_or(ls)])
+            return "false" # if ls is empty nothing can be set to true
         else: # choice == "||"
             return settings.get_hyvar_or(ls)
 
@@ -247,6 +248,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             if c == "false":
                 logging.warning("Subslot " + unicode(subslot) + " or slot " + unicode(slot) +
                                 " not found in packages " + unicode(package_targets) +
+                                " with flags " + unicode(flags) +
                                 ". Return false constraint while processing " + self.package)
             if flag_set:
                 return flag_representation + " = 1 impl " + c
@@ -256,7 +258,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
         package = ctx.catpackage().getText().strip()
         version_op = ctx.versionOP()
         if version_op:
-            m = re.search("-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$", package)
+            m = re.search(settings.VERSION_RE, package)
             if m:
                 version = m.group()[1:]
                 package = package.replace("-" + version, "")
@@ -328,7 +330,7 @@ class DepVisitor(DepGrammarVisitor, ErrorListener):
             c = settings.get_hyvar_or([get_expression(x, slot, subslot, []) for x in packages])
             if c == "false":
                 logging.warning("Subslot " + unicode(subslot) + " or slot " + unicode(slot) +
-                                " not found in packages " + unicode(packages) +
+                                " not found in packages " + package + unicode(packages) +
                                 ". Return false constraint while processing " + self.package)
             ls.append(c)
         return settings.get_hyvar_and(ls)

@@ -36,10 +36,6 @@ map_id_name = {}
 mspl = {}
 spl = {}
 
-
-# logging.basicConfig(filename='example.log',level=log.DEBUG)
-logging.basicConfig(level=logging.DEBUG)
-
 def usage():
     """Print usage"""
     print(__doc__)
@@ -116,6 +112,12 @@ def generate_name_mapping_file(target_dir):
                 id = settings.get_new_id()
                 map_name_id["flag"][i][j] = id
                 map_id_name[id] = {"type": "flag", "name": j, "package": i}
+            # consider also the flags in the "features" key of the mspl
+            for j in [x for x in mspl[i]["features"] if x != "__main__"]:
+                if j not in map_name_id["flag"][i]:
+                    id = settings.get_new_id()
+                    map_name_id["flag"][i][j] = id
+                    map_id_name[id] = {"type": "flag", "name": j, "package": i}
             # add slots and subslots
             j = mspl[i]["features"]["__main__"]
             # process slots (conversion from name into a range of integers)
@@ -150,12 +152,13 @@ def convert(package,target_dir):
             "dependencies": mspl[package]["dependencies"]}
 
     if is_base_package(package):
+        data["implementations"] = mspl[package]["implementations"]
         versions = mspl[package]["implementations"].values()
         # if installed then one of its version should be installed as well
         data["constraints"].append(
             settings.get_hyvar_package(map_name_id["package"][package]) +
             " = 1 impl (" +
-            settings.get_hyvar_or([settings.get_hyvar_package(map_name_id["package"][i]) for i in versions]) + ")")
+            settings.get_hyvar_or([settings.get_hyvar_package(map_name_id["package"][i]) + " = 1" for i in versions]) + ")")
         # two versions should have different slots or subslots
         for i in versions:
             for j in versions:
@@ -200,6 +203,10 @@ def convert(package,target_dir):
             tree = parser.localDEP()
             visitor.visit(tree)
         data["constraints"].extend(visitor.constraints)
+
+        # package with version needs its base package to be selected
+        data["constraints"].append(settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl 1 = " +
+                                settings.get_hyvar_package(map_name_id["package"][re.sub(settings.VERSION_RE,"",package)]))
 
     # add validity formulas. Context must be one of the possible env
     ls = set([ map_name_id["context"][settings.process_envirnoment_name(x)] for x in mspl[package]["environment"]])
@@ -265,8 +272,8 @@ def main(argv):
 
     # test instances
 
-    # convert("games-kids/gcompris-15.10", target_dir)
-    # convert("dev-java/jython-2.7.0", target_dir)
+    # convert("x11-drivers/xf86-video-nouveau-1.0.13", target_dir)
+    # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
     # convert("dev-texlive/texlive-latexextra-2014", target_dir) -> no pacchetti
     # exit(0)
 
