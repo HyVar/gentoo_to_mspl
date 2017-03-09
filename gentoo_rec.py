@@ -167,9 +167,9 @@ def convert(package,target_dir):
                         "( " + settings.get_hyvar_package(map_name_id["package"][i]) + "= 1 and " +
                         settings.get_hyvar_package(map_name_id["package"][j]) + " = 1) impl (" +
                         settings.get_hyvar_slot(map_name_id["package"][i]) + " != " +
-                        settings.get_hyvar_slot(map_name_id["package"][i]) + " or " +
+                        settings.get_hyvar_slot(map_name_id["package"][j]) + " or " +
                         settings.get_hyvar_subslot(map_name_id["package"][i]) + " != " +
-                        settings.get_hyvar_subslot(map_name_id["package"][i]) + ")")
+                        settings.get_hyvar_subslot(map_name_id["package"][j]) + ")")
 
     else:
 
@@ -272,7 +272,7 @@ def main(argv):
 
     # test instances
 
-    # convert("x11-drivers/xf86-video-nouveau-1.0.13", target_dir)
+    # convert("www-client/firefox-45.6.0-r1", target_dir)
     # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
     # convert("dev-texlive/texlive-latexextra-2014", target_dir) -> no pacchetti
     # exit(0)

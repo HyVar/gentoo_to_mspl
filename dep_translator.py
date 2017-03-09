@@ -24,7 +24,7 @@ def match_package_version(template, operator, s):
     Check if a version package matches a template
     """
     if operator == "~":
-        return match_package_version(template + "-r*", "=", s)
+        return match_package_version(template + "-r*", "=", s) or match_package_version(template, "=", s)
     if operator == "=":
         template = re.sub('\.','\\\.',template)
         template = re.sub('\*', '.*', template)

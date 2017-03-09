@@ -174,7 +174,7 @@ def main(argv):
     logging.info("Process the MSPL based on its dependencies graph")
     utils.preprocess(mspl,initial_configuration)
 
-    spl = create_hyvarrec_spl(settings.ROOT_SPL_NAME,"x86")
+    spl = create_hyvarrec_spl(settings.ROOT_SPL_NAME,"amd64")
     with open('/tmp/prova.json', 'w') as f:
         json.dump(spl, f,indent=1)
 
