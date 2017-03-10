@@ -60,6 +60,18 @@ def get_hyvar_and(ls):
     return s
 
 
+def get_hyvar_impl(x,y):
+    if x == "false" or y == "true":
+        return "true"
+    if y == "false":
+        return "true"
+    if x == "true":
+        return "( " + y + ")"
+    else:
+        return "( " + x + " impl " + y + ")"
+
+
+
 def get_hyvar_package(id):
     return "feature[p" + id + "]"
 

@@ -160,17 +160,30 @@ def convert(package,target_dir):
             " = 1 impl (" +
             settings.get_hyvar_or([settings.get_hyvar_package(map_name_id["package"][i]) + " = 1" for i in versions]) + ")")
         # two versions should have different slots or subslots
+        possible_slot_matches = [(i,j,unicode(map_name_id["slot"][i][s]),unicode(map_name_id["slot"][j][s]))
+                                 for i in versions for j in versions for s in map_name_id["slot"][i] if
+                                 i<j and s in map_name_id["slot"][j]]
+        possible_subslot_matches = [(i, j, unicode(map_name_id["subslot"][i][s]),unicode(map_name_id["subslot"][j][s]))
+                                    for i in versions for j in versions for s in map_name_id["subslot"][i] if
+                                    i < j and s in map_name_id["subslot"][j]]
         for i in versions:
             for j in versions:
                 if i < j:
-                    data["constraints"].append(
-                        "( " + settings.get_hyvar_package(map_name_id["package"][i]) + "= 1 and " +
-                        settings.get_hyvar_package(map_name_id["package"][j]) + " = 1) impl (" +
-                        settings.get_hyvar_slot(map_name_id["package"][i]) + " != " +
-                        settings.get_hyvar_slot(map_name_id["package"][j]) + " or " +
-                        settings.get_hyvar_subslot(map_name_id["package"][i]) + " != " +
-                        settings.get_hyvar_subslot(map_name_id["package"][j]) + ")")
-
+                    slots = [(x[2],x[3]) for x in possible_slot_matches if x[0] == i and x[1] == j]
+                    subslots = [(x[2], x[3]) for x in possible_subslot_matches if x[0] == i and x[1] == j]
+                    c = settings.get_hyvar_impl(
+                            settings.get_hyvar_and(
+                                [settings.get_hyvar_package(map_name_id["package"][i]) + "= 1",
+                                 settings.get_hyvar_package(map_name_id["package"][j]) + " = 1"]),
+                            settings.get_hyvar_impl(
+                                settings.get_hyvar_or(
+                                    [settings.get_hyvar_slot(map_name_id["package"][i]) + " = " + x[0] + " and " +
+                                    settings.get_hyvar_slot(map_name_id["package"][j]) + " = " + x[1] for x in slots]),
+                                settings.get_hyvar_or(
+                                    [settings.get_hyvar_subslot(map_name_id["package"][i]) + " = " + x[0] + " xor " +
+                                    settings.get_hyvar_subslot(map_name_id["package"][j]) + " = " + x[1] for x in subslots])))
+                    if c != "true":
+                        data["constraints"].append(c)
     else:
 
         # add slot and subslot as attributes
@@ -272,7 +285,7 @@ def main(argv):
 
     # test instances
 
-    # convert("www-client/firefox-45.6.0-r1", target_dir)
+    # convert("x11-libs/gtk+", target_dir)
     # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
     # convert("dev-texlive/texlive-latexextra-2014", target_dir) -> no pacchetti
     # exit(0)
