@@ -20,9 +20,9 @@ import re
 import networkx
 
 
-def preprocess(mspl,initial_configuration):
+def preprocess(mspl,initial_configuration,package_request):
     # crate graph with no loops
-    graph = create_graph(mspl,initial_configuration)
+    graph = create_graph(mspl,initial_configuration,package_request)
     # add information about descendants
     reachability_analysis(graph,mspl)
 
@@ -36,41 +36,50 @@ class Node:
 
 def merge_nodes(graph,nodes):
 
-    in_edges = set([x for x,y in graph.in_edges(nodes)])
-    out_edges = set([x for y,x in graph.out_edges(nodes)])
+    in_edges = set()
+    out_edges = set()
+
+    for x in graph.in_edges(nodes):
+        if x[0] not in nodes:
+            in_edges.update([x[0]])
+        #     logging.debug("Removing edge " + unicode((x[0].names,x[1].names)))
+        # else:
+        #     logging.debug("Removing self edge " + unicode((x[0].names, x[1].names)))
+        graph.remove_edge(*x)
+
+    for x in graph.out_edges(nodes):
+        if x[1] not in nodes:
+            out_edges.update([x[1]])
+        #     logging.debug("Removing edge " + unicode((x[0].names, x[1].names)))
+        # else:
+        #     logging.debug("Removing self edge " + unicode((x[0].names, x[1].names)))
+        graph.remove_edge(*x)
 
     names = set()
     for i in nodes:
         names.update(i.names)
-    #     in_edges.update(set([x for x,_ in graph.in_edges(i)]))
-    #     out_edges.update(set([x for _,x in graph.out_edges(i)]))
-    in_edges.difference_update(nodes)
-    out_edges.difference_update(nodes)
-    node = Node(nodes[0].names.pop())
+        graph.remove_node(i)
+
+    node = Node(names.pop())
     node.add_names(names)
     graph.add_node(node)
-    # logging.debug("Merging nodes: " + unicode(names))
+
     if in_edges:
         for i in in_edges:
             graph.add_edge(i,node)
+            # logging.debug("Creating edge " + unicode((i.names, node.names)))
     if out_edges:
-        for i in list(out_edges):
+        for i in out_edges:
             graph.add_edge(node,i)
-    graph.remove_nodes_from(nodes)
+            # logging.debug("Creating edge " + unicode((node.names, i.names)))
+    return node
 
 
-def create_graph(mspl,initial_configuration):
+def create_graph(mspl,initial_configuration,package_request):
     graph = networkx.DiGraph()
 
     added = {}
     to_process = set()
-
-    # add root node
-    name = settings.ROOT_SPL_NAME
-    node = Node(name)
-    graph.add_node(node)
-    to_process.add(name)
-    added[name] = node
 
     # add nodes for the intial configuration that are installed
     for i in initial_configuration.keys():
@@ -83,6 +92,19 @@ def create_graph(mspl,initial_configuration):
         else:
             logging.warning("The information about the installed package " + i + "(" + name + ") can not be found." +
                             "This package will be ignored.")
+
+    # add root node dependencies
+    for i in package_request:
+        v_name = re.sub(settings.VERSION_RE, "", i)
+        if v_name in mspl:
+            if i not in added:
+                if v_name not in added:
+                    node = Node(v_name)
+                    graph.add_node(node)
+                    added[v_name] = node
+                    to_process.add(v_name)
+                added[i] = added[v_name]
+                to_process.add(i)
 
     # add edges and nodes (only base packages, not versions)
     while to_process:
@@ -104,26 +126,36 @@ def create_graph(mspl,initial_configuration):
                 logging.warning("The package " + u_name + " requires the configuration of package " + i +
                                 " which is not found. Skipping this dependency.")
 
-    logging.debug("Graph created with " + unicode(len(graph.nodes())) + " nodes and " +
-                  unicode(len(graph.edges())) + " edges")
+    logging.debug("Graph created with " + unicode(graph.number_of_nodes()) + " nodes and " +
+                  unicode(graph.size()) + " edges")
 
     # merge loops, if any
-    try:
-        cycle = networkx.find_cycle(graph, orientation='original')
-    except networkx.exception.NetworkXNoCycle:
-        cycle = []
+    # use simple_cycles to start procedure (find_cycle seems to have a bug and does not find all the cycles)
+    cycle = next(networkx.simple_cycles(graph),[])
     while cycle:
         logging.debug("Find cycle of length " + unicode(len(cycle)))
-        merge_nodes(graph,[x for x,_ in cycle])
-        logging.debug("Graph has " + unicode(len(graph.nodes())) + " nodes and " +
-                      unicode(len(graph.edges())) + " edges")
+        # logging.debug(unicode([ (x[0].names,x[1].names) for x in cycle]))
+        node = merge_nodes(graph,cycle)
+        logging.debug("Graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
+                      unicode(graph.size()) + " edges")
         try:
-            cycle = networkx.find_cycle(graph, orientation='original')
+            cycle = [ x[0] for x in networkx.find_cycle(graph,source=node,orientation='original')]
         except networkx.exception.NetworkXNoCycle:
             cycle = []
+        while cycle:
+            logging.debug("Find cycle of length " + unicode(len(cycle)))
+            node = merge_nodes(graph, cycle)
+            logging.debug("Graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
+                          unicode(graph.size()) + " edges")
+            try:
+                cycle = [x[0] for x in networkx.find_cycle(graph,source=node,orientation='original')]
+            except networkx.exception.NetworkXNoCycle:
+                cycle = []
+        # to make sure every cycle has been captured
+        cycle = next(networkx.simple_cycles(graph), [])
 
-    logging.debug("Final graph has " + unicode(len(graph.nodes())) + " nodes and " +
-                  unicode(len(graph.edges())) + " edges")
+    logging.debug("Final graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
+                  unicode(graph.size()) + " edges")
 
     return graph
 
@@ -136,5 +168,6 @@ def reachability_analysis(graph,mspl):
         for j in nodes:
             pkgs.extend(list(j.names))
         for j in i.names:
-            mspl[j]["include"] = pkgs
+            mspl[j]["descendants"] = pkgs
+            mspl[j]["loop"] = list(i.names)
 

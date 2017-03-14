@@ -148,8 +148,21 @@ def convert(package,target_dir):
     if not package in mspl:
         raise Exception("Package " + package + " not found in the MSPL JSON files")
 
-    data = {"attributes": [], "constraints": [], "configures": mspl[package]["configures"],
-            "dependencies": mspl[package]["dependencies"]}
+    data = {"attributes": [], "constraints": [], "configures": [],
+            "dependencies": []}
+
+    # add "dependencies" and "configures"
+    for i in mspl[package]["configures"]:
+        if i in mspl:
+            data["configures"].append(i)
+        else:
+            logging.warning("The package " + i + " find in configures is not found. It will be ignored")
+
+    for i in mspl[package]["dependencies"]:
+        if i in mspl:
+            data["dependencies"].append(i)
+        else:
+            logging.warning("The package " + i + " find in dependencies is not found. It will be ignored")
 
     if is_base_package(package):
         data["implementations"] = mspl[package]["implementations"]
@@ -220,6 +233,11 @@ def convert(package,target_dir):
         # package with version needs its base package to be selected
         data["constraints"].append(settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl 1 = " +
                                 settings.get_hyvar_package(map_name_id["package"][re.sub(settings.VERSION_RE,"",package)]))
+
+        # if package is not selected its flags are not selected either
+        data["constraints"].append(settings.get_hyvar_impl(
+            settings.get_hyvar_package(map_name_id["package"][package]) + " = 0",
+            settings.get_hyvar_and([settings.get_hyvar_flag(x) + " = 0" for x in map_name_id["flag"][package].values()])))
 
     # add validity formulas. Context must be one of the possible env
     ls = set([ map_name_id["context"][settings.process_envirnoment_name(x)] for x in mspl[package]["environment"]])

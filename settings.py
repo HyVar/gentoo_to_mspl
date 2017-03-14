@@ -10,6 +10,8 @@ __email__ = "mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 import re
+import uuid
+import threading
 
 PACKAGE_NAME_SEPARATOR = '/'
 TEMP_DIR = 'tmp'
@@ -19,6 +21,20 @@ ROOT_SPL_NAME ="__root__"
 
 
 VERSION_RE = "-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$"
+
+# List of the temp files.
+TMP_FILES = []
+TMP_FILES_LOCK = threading.Lock()
+
+def get_new_temp_file(extension):
+  global TMP_FILES_LOCK
+  global TMP_FILES
+  name = '/tmp/' + uuid.uuid4().hex + '.' + extension
+  TMP_FILES_LOCK.acquire()
+  TMP_FILES.append(name)
+  TMP_FILES_LOCK.release()
+  return name
+
 
 id_count = 0
 def get_new_id():
