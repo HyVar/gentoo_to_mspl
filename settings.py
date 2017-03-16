@@ -44,6 +44,8 @@ def get_new_id():
 
 
 def process_envirnoment_name(s):
+    if s == "**":
+        return "*"
     if s[0] == "~":  # testing env are equivalent for us to stable env
         return s[1:]
     return s

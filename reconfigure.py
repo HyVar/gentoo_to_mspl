@@ -155,12 +155,30 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
                     "context_values": [{"id": settings.get_hyvar_context(),
                                         "value": map_name_id["name_to_id"]["context"][contex_value]}]},
                 "constraints": [],
-                "preferences": []}
+                "preferences": [],
+                "smt_constraints": {
+                    "formulas": [],
+                    "features": [],
+                    "other_int_symbols": [] }
+                }
 
         # process configures
+        other_symbols = set()
+        feature_symbols = set()
         for j in dconf[i]:
             json["attributes"].extend(mspl[j]["attributes"])
             json["constraints"].extend(mspl[j]["constraints"])
+            if "smt_constraints" in mspl[j]:
+                json["smt_constraints"]["formulas"].extend(mspl[j]["smt_constraints"]["formulas"])
+                other_symbols.update(mspl[j]["smt_constraints"]["other_int_symbols"])
+                print mspl[j]["smt_constraints"]["features"]
+                print j
+                feature_symbols.update(mspl[j]["smt_constraints"]["features"])
+        # if other_symbols:
+        json["smt_constraints"]["other_int_symbols"] = list(other_symbols)
+        # if feature_symbols:
+        json["smt_constraints"]["features"] = list(feature_symbols)
+
         # the constraints added should also require the depends, if any.
         # hence, no need to add additional constraints for them
 
@@ -213,6 +231,7 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
 
         logging.debug("SPL created : attributes " + unicode(len(json["attributes"])) +
                       ", constraints " + unicode(len(json["constraints"])) +
+                      ", smt formulas " + unicode(len(json["smt_constraints"]["formulas"])) +
                       ", packages to configure " + unicode(len(spls[i])))
 
         ddep[i].difference_update(dconf[i])

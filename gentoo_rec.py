@@ -22,6 +22,11 @@ import os
 import re
 import dep_translator
 import getopt
+import z3
+import SpecificationGrammar.SpecTranslator as SpecTranslator
+import multiprocessing
+from threading import Thread, Semaphore
+from Queue import Queue
 
 
 # Global variables
@@ -35,6 +40,10 @@ map_id_name = {}
 # stores the json info related to the mspl and spl produced processing the gentoo files
 mspl = {}
 spl = {}
+
+# encode into z3 SMT representation directly
+TO_SMT_DIRECTLY = True
+z3.set_param(max_lines=1, max_width=1000000,max_depth=1000,max_args=1000)
 
 def usage():
     """Print usage"""
@@ -125,25 +134,31 @@ def generate_name_mapping_file(target_dir):
             for k in mspl[i]["features"]["__main__"]["slots"]:
                 map_name_id["slot"][i][k] = counter
                 counter += 1
+            if counter > 1:
+                logging.error("Find more than one slot for package " + i)
             # process subslots (conversion from name into a range of integers)
             counter = 0
             for k in mspl[i]["features"]["__main__"]["subslots"]:
                 map_name_id["subslot"][i][k] = counter
                 counter += 1
+            if counter > 1:
+                logging.error("Find more than one subslot for package " + i)
         # process environment (conversion from name into a range of integers)
         for j in mspl[i]["environment"]:
             name = settings.process_envirnoment_name(j)
-            if not name in map_name_id["context"]:
-                map_name_id["context"][name] = len(map_name_id["context"])
+            # consider only envirnoments that we are sure the component can be installed
+            # * and ** are treated the same, ~x and x are treated the same
+            if not name.startswith("-"):
+                if not name in map_name_id["context"]:
+                    map_name_id["context"][name] = len(map_name_id["context"])
     logging.info("Write map of names in " + settings.NAME_MAP_FILE)
     with open(os.path.join(target_dir, settings.NAME_MAP_FILE), 'w') as f:
         json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
 
 
+def convert(package,semaphore_hyvar,semaphore_smt,target_dir):
 
-
-def convert(package,target_dir):
-
+    logging.debug("Processing package " + package)
     assert mspl
     if not package in mspl:
         raise Exception("Package " + package + " not found in the MSPL JSON files")
@@ -219,7 +234,9 @@ def convert(package,target_dir):
         assert "fm" in mspl[package]
         assert "external" in mspl[package]["fm"]
         assert "local" in mspl[package]["fm"]
+        semaphore_hyvar.acquire()
         visitor = dep_translator.DepVisitor(mspl, map_name_id, package)
+        semaphore_hyvar.release()
         if mspl[package]["fm"]["external"]:
             parser = visitor.parser(mspl[package]["fm"]["external"])
             tree = parser.depend()
@@ -240,10 +257,42 @@ def convert(package,target_dir):
             settings.get_hyvar_and([settings.get_hyvar_flag(x) + " = 0" for x in map_name_id["flag"][package].values()])))
 
     # add validity formulas. Context must be one of the possible env
-    ls = set([ map_name_id["context"][settings.process_envirnoment_name(x)] for x in mspl[package]["environment"]])
-    data["constraints"].append(
-        settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl (" +
-        settings.get_hyvar_or( [ settings.get_hyvar_context() + " = " + unicode(x) for x in ls]) + ")")
+    envs = [settings.process_envirnoment_name(x) for x in mspl[package]["environment"]]
+    envs = [x for x in envs if not x.startswith("-")]
+    if envs:
+        if "*" not in envs:
+            data["constraints"].append(
+                settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl (" +
+                settings.get_hyvar_or(
+                    [settings.get_hyvar_context() + " = " + unicode(map_name_id["context"][x]) for x in envs]) + ")")
+    else:
+        logging.warning("Environment empty for package " + package + ". This package will be treated as not installable.")
+        data["constraints"] = ["false"]
+
+    # if activated, for performance reasons do the encoding directly into z3 smt formulas
+    if TO_SMT_DIRECTLY:
+        data["smt_constraints"] = {}
+        data["smt_constraints"]["formulas"] = []
+        features = set()
+        other = set()
+        for i in data["constraints"]:
+            try:
+                # logging.debug("Processing " + i)
+                semaphore_smt.acquire()
+                d = SpecTranslator.translate_constraint(i, {})
+                semaphore_smt.release()
+                # logging.debug("Processing done " + i)
+                data["smt_constraints"]["formulas"].append(unicode(d["formula"]))
+                other.update(d["contexts"])
+                other.update(d["attributes"])
+                features.update(d["features"])
+            except Exception as e:
+                logging.error("Parsing failed while converting into SMT " + i + ": " + unicode(e))
+                logging.error("Exiting")
+                sys.exit(1)
+        data["smt_constraints"]["features"] = list(features)
+        data["smt_constraints"]["other_int_symbols"] = list(other)
+        data["constraints"] = []
 
     logging.debug("Writing file " + os.path.join(target_dir, package + ".json"))
     d = package.split(settings.PACKAGE_NAME_SEPARATOR)[0]
@@ -251,8 +300,14 @@ def convert(package,target_dir):
         os.makedirs(os.path.join(target_dir,d))
     with open(os.path.join(target_dir, package + ".json"), 'w') as f:
         json.dump(data, f, indent=1)
+    return True
 
-
+# worker for a thread
+def worker(queue,semaphore_hyvar,semaphore_smt,target_dir):
+    while True:
+        pkg = queue.get()
+        convert(pkg,semaphore_hyvar,semaphore_smt,target_dir)
+        queue.task_done()
 
 
 def main(argv):
@@ -303,19 +358,33 @@ def main(argv):
 
     # test instances
 
-    # convert("x11-libs/gtk+", target_dir)
+    # convert("media-libs/mesa-11.0.9", target_dir)
     # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
-    # convert("dev-texlive/texlive-latexextra-2014", target_dir) -> no pacchetti
+    # convert("app-dicts/sword-asv-1.3", target_dir)
     # exit(0)
 
-    counter = 0
-    for i in mspl.keys():
-        if not os.path.isfile(os.path.join(target_dir,i+".json")):
-            logging.debug("Processing package " + i)
-            convert(i, target_dir)
-            counter += 1
-            # if counter == 100:
-            #     exit(0)
+    to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
+    thread_num = max(1,multiprocessing.cpu_count() /2)
+    # if more than one thread is used python go into segmentation fault
+    logging.info("Starting to convert packages using " + unicode(thread_num) + " processes.")
+    logging.info("Number of packages to convert: " + unicode(len(to_convert)))
+
+    
+
+    queue = Queue()
+    for i in to_convert:
+        queue.put(i)
+
+    # semaphores because ANTLR lexer probably is not thread safe (it crashes if executed in parallel)
+    semaphore_hyvar = Semaphore()
+    semaphore_smt = Semaphore()
+    for i in range(thread_num):
+        thread = Thread(target=worker,args=(queue,semaphore_hyvar,semaphore_smt,target_dir))
+        thread.daemon = True
+        thread.start()
+
+    queue.join()       # block until all tasks are done
+    logging.info("Execution terminated.")
 
 if __name__ == "__main__":
     main(sys.argv[1:])
