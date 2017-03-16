@@ -25,9 +25,6 @@ import getopt
 import z3
 import SpecificationGrammar.SpecTranslator as SpecTranslator
 import multiprocessing
-from threading import Thread, Semaphore
-from Queue import Queue
-
 
 # Global variables
 
@@ -43,7 +40,7 @@ spl = {}
 
 # encode into z3 SMT representation directly
 TO_SMT_DIRECTLY = True
-z3.set_param(max_lines=1, max_width=1000000,max_depth=1000,max_args=1000)
+z3.set_param(max_lines=1, max_width=10000,max_depth=30,max_args=50)
 
 def usage():
     """Print usage"""
@@ -156,7 +153,7 @@ def generate_name_mapping_file(target_dir):
         json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
 
 
-def convert(package,semaphore_hyvar,semaphore_smt,target_dir):
+def convert(package,target_dir):
 
     logging.debug("Processing package " + package)
     assert mspl
@@ -234,9 +231,7 @@ def convert(package,semaphore_hyvar,semaphore_smt,target_dir):
         assert "fm" in mspl[package]
         assert "external" in mspl[package]["fm"]
         assert "local" in mspl[package]["fm"]
-        semaphore_hyvar.acquire()
         visitor = dep_translator.DepVisitor(mspl, map_name_id, package)
-        semaphore_hyvar.release()
         if mspl[package]["fm"]["external"]:
             parser = visitor.parser(mspl[package]["fm"]["external"])
             tree = parser.depend()
@@ -275,24 +270,27 @@ def convert(package,semaphore_hyvar,semaphore_smt,target_dir):
         data["smt_constraints"]["formulas"] = []
         features = set()
         other = set()
+        # capture constraints that may be too long for the python parser
+        too_long_constraints = []
         for i in data["constraints"]:
             try:
                 # logging.debug("Processing " + i)
-                semaphore_smt.acquire()
                 d = SpecTranslator.translate_constraint(i, {})
-                semaphore_smt.release()
-                # logging.debug("Processing done " + i)
-                data["smt_constraints"]["formulas"].append(unicode(d["formula"]))
-                other.update(d["contexts"])
-                other.update(d["attributes"])
-                features.update(d["features"])
+                s = unicode(d["formula"])
+                if "..." not in s:
+                    data["smt_constraints"]["formulas"].append(unicode(d["formula"]))
+                    other.update(d["contexts"])
+                    other.update(d["attributes"])
+                    features.update(d["features"])
+                else:
+                    too_long_constraints.append(i)
             except Exception as e:
                 logging.error("Parsing failed while converting into SMT " + i + ": " + unicode(e))
                 logging.error("Exiting")
                 sys.exit(1)
         data["smt_constraints"]["features"] = list(features)
         data["smt_constraints"]["other_int_symbols"] = list(other)
-        data["constraints"] = []
+        data["constraints"] = too_long_constraints
 
     logging.debug("Writing file " + os.path.join(target_dir, package + ".json"))
     d = package.split(settings.PACKAGE_NAME_SEPARATOR)[0]
@@ -303,12 +301,10 @@ def convert(package,semaphore_hyvar,semaphore_smt,target_dir):
     return True
 
 # worker for a thread
-def worker(queue,semaphore_hyvar,semaphore_smt,target_dir):
-    while True:
-        pkg = queue.get()
-        convert(pkg,semaphore_hyvar,semaphore_smt,target_dir)
-        queue.task_done()
-
+def worker(pair):
+    pkg,target_dir = pair
+    convert(pkg,target_dir)
+    return True
 
 def main(argv):
     """
@@ -364,26 +360,13 @@ def main(argv):
     # exit(0)
 
     to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
-    thread_num = max(1,multiprocessing.cpu_count() /2)
+    cores_to_use = max(1,multiprocessing.cpu_count()-1)
     # if more than one thread is used python go into segmentation fault
-    logging.info("Starting to convert packages using " + unicode(thread_num) + " processes.")
+    logging.info("Starting to convert packages using " + unicode(cores_to_use) + " processes.")
     logging.info("Number of packages to convert: " + unicode(len(to_convert)))
 
-    
-
-    queue = Queue()
-    for i in to_convert:
-        queue.put(i)
-
-    # semaphores because ANTLR lexer probably is not thread safe (it crashes if executed in parallel)
-    semaphore_hyvar = Semaphore()
-    semaphore_smt = Semaphore()
-    for i in range(thread_num):
-        thread = Thread(target=worker,args=(queue,semaphore_hyvar,semaphore_smt,target_dir))
-        thread.daemon = True
-        thread.start()
-
-    queue.join()       # block until all tasks are done
+    pool = multiprocessing.Pool(cores_to_use)
+    pool.map(worker,[(x,target_dir) for x in to_convert])
     logging.info("Execution terminated.")
 
 if __name__ == "__main__":
