@@ -55,27 +55,27 @@ def get_hyvar_or(ls):
     ls = [x for x in ls if x != "false"]
     if "true" in ls:
         return "true"
-    s = ""
+    s = "("
     if ls:
         s += "( " + ls[0] + ")"
         for i in ls[1:]:
             s += " or (" + i + ")"
     else:
         return "false"
-    return s
+    return s + ")"
 
 def get_hyvar_and(ls):
     ls = [x for x in ls if x != "true"]
     if "false" in ls:
         return "false"
-    s = ""
+    s = "("
     if ls:
         s += "( " + ls[0] + ")"
         for i in ls[1:]:
             s += " and (" + i + ")"
     else:
         return "true"
-    return s
+    return s + ")"
 
 
 def get_hyvar_impl(x,y):

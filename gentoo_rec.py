@@ -4,6 +4,7 @@ gentoo_rec.py:
 Tool to convert the prepocessed gentoo files
 
 Usage: gentoo_rec.py <directory containing the mspl and spl directories> <output directory>
+    --no_opt: disable the conversion in SMTLIB of the formulas
 """
 __author__ = "Jacopo Mauro"
 __copyright__ = "Copyright 2017, Jacopo Mauro"
@@ -40,7 +41,6 @@ spl = {}
 
 # encode into z3 SMT representation directly
 TO_SMT_DIRECTLY = True
-z3.set_param(max_lines=1, max_width=10000,max_depth=30,max_args=50)
 
 def usage():
     """Print usage"""
@@ -152,6 +152,20 @@ def generate_name_mapping_file(target_dir):
     with open(os.path.join(target_dir, settings.NAME_MAP_FILE), 'w') as f:
         json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
 
+
+# function to encode SMT expression into SMTLIB
+# ; benchmark
+# (set-info :status unknown)
+# (set-logic QF_LIA)
+# (declare-fun b () Int)
+# (declare-fun a () Int)
+# (assert ...)
+# (check-sat)
+# // empty line
+def toSMT2(f, status="unknown", name="benchmark", logic=""):
+  v = (z3.Ast * 0)()
+  return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
+      "\n"," ").replace("(check-sat)","").replace("; benchmark (set-info :status unknown)","").strip()
 
 def convert(package,target_dir):
 
@@ -266,31 +280,27 @@ def convert(package,target_dir):
 
     # if activated, for performance reasons do the encoding directly into z3 smt formulas
     if TO_SMT_DIRECTLY:
-        data["smt_constraints"] = {}
-        data["smt_constraints"]["formulas"] = []
         features = set()
-        other = set()
-        # capture constraints that may be too long for the python parser
-        too_long_constraints = []
+        ls = []
         for i in data["constraints"]:
             try:
                 # logging.debug("Processing " + i)
                 d = SpecTranslator.translate_constraint(i, {})
-                s = unicode(d["formula"])
-                if "..." not in s:
-                    data["smt_constraints"]["formulas"].append(unicode(d["formula"]))
-                    other.update(d["contexts"])
-                    other.update(d["attributes"])
-                    features.update(d["features"])
-                else:
-                    too_long_constraints.append(i)
+                # other.update(d["contexts"])
+                # other.update(d["attributes"])
+                features.update(d["features"])
+                ls.append(d["formula"])
             except Exception as e:
                 logging.error("Parsing failed while converting into SMT " + i + ": " + unicode(e))
                 logging.error("Exiting")
                 sys.exit(1)
+        formula = z3.simplify(z3.And(ls))
+        s = toSMT2(formula)
+        data["smt_constraints"] = {}
+        data["smt_constraints"]["formulas"] = [s]
         data["smt_constraints"]["features"] = list(features)
-        data["smt_constraints"]["other_int_symbols"] = list(other)
-        data["constraints"] = too_long_constraints
+        # data["smt_constraints"]["other_int_symbols"] = list(other)
+        data["constraints"] = []
 
     logging.debug("Writing file " + os.path.join(target_dir, package + ".json"))
     d = package.split(settings.PACKAGE_NAME_SEPARATOR)[0]
@@ -314,8 +324,9 @@ def main(argv):
     global map_name_id
     global map_id_name
     global mspl
+    global TO_SMT_DIRECTLY
     try:
-        opts, args = getopt.getopt(argv,"hv",["help","verbose"])
+        opts, args = getopt.getopt(argv,"hv",["help","verbose","no_opt"])
     except getopt.GetoptError as err:
         print str(err)
         usage()
@@ -324,6 +335,8 @@ def main(argv):
         if opt == '-h':
             usage()
             sys.exit()
+        elif opt in ("--no_opt"):
+            TO_SMT_DIRECTLY = False
         elif opt in ("-v", "--verbose"):
             logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
             logging.info("Verbose output.")

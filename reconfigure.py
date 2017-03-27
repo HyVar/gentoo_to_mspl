@@ -65,7 +65,9 @@ def run_hyvar(json_data):
     file_name = settings.get_new_temp_file("json")
     with open(file_name,"w") as f:
         json.dump(json_data, f)
-    cmd = ["hyvar-rec", "--explain", file_name]
+        # json.dump(json_data, f,indent=1)
+    # cmd = ["hyvar-rec", "--explain", file_name]
+    cmd = ["hyvar-rec", file_name]
     logging.debug("Running command " + unicode(cmd))
     process = psutil.Popen(cmd,stdout=PIPE,stderr=PIPE)
     out, err = process.communicate()
@@ -170,13 +172,7 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
             json["constraints"].extend(mspl[j]["constraints"])
             if "smt_constraints" in mspl[j]:
                 json["smt_constraints"]["formulas"].extend(mspl[j]["smt_constraints"]["formulas"])
-                other_symbols.update(mspl[j]["smt_constraints"]["other_int_symbols"])
-                print mspl[j]["smt_constraints"]["features"]
-                print j
                 feature_symbols.update(mspl[j]["smt_constraints"]["features"])
-        # if other_symbols:
-        json["smt_constraints"]["other_int_symbols"] = list(other_symbols)
-        # if feature_symbols:
         json["smt_constraints"]["features"] = list(feature_symbols)
 
         # the constraints added should also require the depends, if any.
@@ -217,17 +213,21 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
                     settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j]) + " = 0")
 
         # add info about the initial configuration
+        # only the flag features need to be defined. Preferences take care about packages
         for j in initial_configuration.keys():
             if j in dconf[i]:
-                json["configuration"]["selectedFeatures"].append(
-                    settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j]))
                 for k in initial_configuration[j]:
                     json["configuration"]["selectedFeatures"].append(
                         settings.get_hyvar_flag(map_name_id["name_to_id"]["flag"][j][k]))
-            elif j in ddep[i]:
-                json["configuration"]["selectedFeatures"].append(
-                    settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j]))
 
+        # add preferences: do not remove packages already installed
+        c = "0 "
+        for j in initial_configuration.keys():
+            if j in dconf[i]:
+                c += " - " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
+            elif j in ddep[i]:
+                c += " - " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
+        json["preferences"].append(c)
 
         logging.debug("SPL created : attributes " + unicode(len(json["attributes"])) +
                       ", constraints " + unicode(len(json["constraints"])) +
@@ -261,6 +261,21 @@ def update_configuration(hyvarrec_out,configuration):
                           " was not selected.")
         else:
             configuration[p].append(f)
+
+
+def get_diff_configuration(new_conf,old_conf):
+    data = {"toUpdate": {}, "toInstall": {}, "toRemove": {}}
+    for i in new_conf.keys():
+        if "implementations" not in mspl[i]:
+            if i in old_conf:
+                if set(new_conf[i]) != set(old_conf[i]):
+                    data["toUpdate"][i] = new_conf[i]
+            else:
+                data["toInstall"][i] = new_conf[i]
+    for i in old_conf.keys():
+        if i not in new_conf:
+            data["toRemove"][i] = {}
+    return data
 
 
 def main(argv):
@@ -370,7 +385,11 @@ def main(argv):
             assert len(ls) == 1
             to_solve.append(ls[0])
 
-    print json.dumps(configuration,indent=1)
+    configuration_diff = get_diff_configuration(configuration,initial_configuration)
+    logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
+    logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
+    logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
+    print json.dumps(configuration_diff,indent=1)
 
     logging.info("Cleaning.")
     clean()
