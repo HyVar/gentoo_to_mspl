@@ -336,7 +336,7 @@ def main(argv):
     cores_to_use = max(1,multiprocessing.cpu_count()-1)
 
     try:
-        opts, args = getopt.getopt(argv,"hv",["help","verbose","no_opt"])
+        opts, args = getopt.getopt(argv,"hvp:",["help","verbose","no_opt","par="])
     except getopt.GetoptError as err:
         print str(err)
         usage()
