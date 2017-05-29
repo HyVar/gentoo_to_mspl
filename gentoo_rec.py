@@ -311,8 +311,13 @@ def convert(package,target_dir):
 
     logging.debug("Writing file " + os.path.join(target_dir, package + ".json"))
     d = package.split(settings.PACKAGE_NAME_SEPARATOR)[0]
-    if not os.path.exists(os.path.join(target_dir,d)):
-        os.makedirs(os.path.join(target_dir,d))
+    try:
+        if not os.path.exists(os.path.join(target_dir, d)):
+            os.makedirs(os.path.join(target_dir, d))
+    except OSError, e:
+        if e.errno != 17:
+            raise
+        # if e.errno == 17 another thread already created the directory (race condition)
     with open(os.path.join(target_dir, package + ".json"), 'w') as f:
         json.dump(data, f, indent=1)
     return True
