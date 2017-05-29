@@ -361,6 +361,9 @@ def main(argv):
     input_dir = os.path.abspath(args[0])
     target_dir = os.path.abspath(args[1])
 
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
     logging.info("Load the MSPL. This may take a while")
     load_mspl(os.path.join(input_dir,'mspl'))
     logging.info("Load the SPL. This may take a while")
