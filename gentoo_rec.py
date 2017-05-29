@@ -5,6 +5,7 @@ Tool to convert the prepocessed gentoo files
 
 Usage: gentoo_rec.py <directory containing the mspl and spl directories> <output directory>
     --no_opt: disable the conversion in SMTLIB of the formulas
+    -p --par: cores to use
 """
 __author__ = "Jacopo Mauro"
 __copyright__ = "Copyright 2017, Jacopo Mauro"
@@ -265,6 +266,12 @@ def convert(package,target_dir):
             settings.get_hyvar_package(map_name_id["package"][package]) + " = 0",
             settings.get_hyvar_and([settings.get_hyvar_flag(x) + " = 0" for x in map_name_id["flag"][package].values()])))
 
+        # if flag is selected then its package is selected too
+        for i in map_name_id["flag"][package].values():
+            data["constraints"].append(settings.get_hyvar_impl(
+                settings.get_hyvar_flag(i) + " = 1",
+                settings.get_hyvar_package(map_name_id["package"][package]) + " = 1"))
+
     # add validity formulas. Context must be one of the possible env
     envs = [settings.process_envirnoment_name(x) for x in mspl[package]["environment"]]
     envs = [x for x in envs if not x.startswith("-")]
@@ -325,6 +332,9 @@ def main(argv):
     global map_id_name
     global mspl
     global TO_SMT_DIRECTLY
+
+    cores_to_use = max(1,multiprocessing.cpu_count()-1)
+
     try:
         opts, args = getopt.getopt(argv,"hv",["help","verbose","no_opt"])
     except getopt.GetoptError as err:
@@ -337,6 +347,8 @@ def main(argv):
             sys.exit()
         elif opt in ("--no_opt"):
             TO_SMT_DIRECTLY = False
+        elif opt in ("-p", "--par"):
+            cores_to_use = int(arg)
         elif opt in ("-v", "--verbose"):
             logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
             logging.info("Verbose output.")
@@ -373,7 +385,6 @@ def main(argv):
     # exit(0)
 
     to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
-    cores_to_use = max(1,multiprocessing.cpu_count()-1)
     # if more than one thread is used python go into segmentation fault
     logging.info("Starting to convert packages using " + unicode(cores_to_use) + " processes.")
     logging.info("Number of packages to convert: " + unicode(len(to_convert)))

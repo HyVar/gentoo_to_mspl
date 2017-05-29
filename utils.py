@@ -107,6 +107,8 @@ def create_graph(mspl,initial_configuration,package_request):
                 to_process.add(i)
 
     # add edges and nodes (only base packages, not versions)
+    # configures add also a link
+    # dependencies add just a node
     while to_process:
         u_name = to_process.pop()
         for i in mspl[u_name]['configures']:
@@ -124,6 +126,20 @@ def create_graph(mspl,initial_configuration,package_request):
                     graph.add_edge(added[u_name], added[i])
             else:
                 logging.warning("The package " + u_name + " requires the configuration of package " + i +
+                                " which is not found. Skipping this dependency.")
+        for i in mspl[u_name]["dependencies"]:
+            v_name = re.sub(settings.VERSION_RE, "", i)
+            if v_name in mspl:
+                if i not in added:
+                    if v_name not in added:
+                        node = Node(v_name)
+                        graph.add_node(node)
+                        added[v_name] = node
+                        to_process.add(v_name)
+                    added[i] = added[v_name]
+                    to_process.add(i)
+            else:
+                logging.warning("The package " + u_name + " requires the dependency of package " + i +
                                 " which is not found. Skipping this dependency.")
 
     logging.debug("Graph created with " + unicode(graph.number_of_nodes()) + " nodes and " +
