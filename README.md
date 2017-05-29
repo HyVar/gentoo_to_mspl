@@ -21,7 +21,7 @@ Structure of the repository:
    - scripts: directory containing ulitity scripts and src 
    - uncompress-portage.sh
    - uncompress-configuration.sh
-   - translate-hyvarrec.sh
+   - portage2hyvarrec.sh
    - run-hyvarrec.sh
       
 
