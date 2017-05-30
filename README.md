@@ -33,3 +33,36 @@ Structure of the repository:
 
 TODO
 ----------------------
+The VM of Gentoo used is available from https://www.osboxes.org/gentoo/
+
+In particular the system was tested with Gentoo 201703 (CLI Minimal) - 64bit.
+
+Note that the sshd service in the virtual machine needs to be started
+
+```
+service sshd start
+```
+
+Then to access the machine configure VirtualBox with a NAT and use ssh.
+Assuming that the port 22 of the VM has been redirected to port 9022
+
+```
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost
+```
+
+To copy the files and extract the configuration and the portage tree structure the following commands need to be
+executed from the gentoo_to_mspl directory.
+```
+scp -o PubkeyAuthentication=no -P 9022  -r guest/*  osboxes@localhost:
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S mv hyvar /'
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S sh /hyvar/compress-configuration.sh'
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S /hyvar/compress-configuration.sh'
+```
+
+
+``` 
+Username: osboxes
+Password: osboxes.org
+Password for Root account: osboxes.org
+```
+
