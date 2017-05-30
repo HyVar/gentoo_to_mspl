@@ -7,9 +7,8 @@ import json
 
 def load_configuration(path):
 	data = {}
-	f = gzip.open(path)
-	output = f.read()
-	f.close()
+	with gzip.open(path) as f:
+		output = f.read()
 	packages=output.split("\n")
 	packages = packages[:-1] # remove last line
 	for line in packages:
@@ -20,17 +19,30 @@ def load_configuration(path):
 	return data
 
 def save_configuration(filename, configuration):
-	f = open(filename, 'w')
-	json.dump(configuration , f, sort_keys=True, indent=4, separators=(',', ': '))
-	f.write('\n')
-	f.close()
+	with open(filename, 'w') as f:
+		json.dump(configuration , f, sort_keys=True, indent=4, separators=(',', ': '))
+		f.write('\n')
+
+
+def load_world(path):
+	with gzip.open(path) as f:
+		output = f.read()
+	return { p : {} for p in output.split() }
+
+def save_world(filename, world):
+	with open(filename, 'w') as f:
+		json.dump(world , f, sort_keys=True, indent=4, separators=(',', ': '))
+		f.write('\n')
 
 
 if __name__ == "__main__":
 	if len(sys.argv) != 2:
-		print ("usage: ", sys.argv[0], " configuration.gz")
+		print ("usage: ", sys.argv[0], " configuration-path")
 		sys.exit(-1)
 	path = sys.argv[1]
-	outfile = os.path.join(os.path.dirname(path),"json/configuration,json")
-	data = load_configuration(path)
+	outfile = os.path.join(path,"json/configuration.json")
+	data = load_configuration(os.path.join(path, "configuration.gz"))
 	save_configuration(outfile, data)
+	outfile = os.path.join(path,"json/world.json")
+	data = load_world(os.path.join(path, "world.gz"))
+	save_world(outfile, data)
