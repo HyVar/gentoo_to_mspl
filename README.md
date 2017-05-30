@@ -54,9 +54,12 @@ To copy the files and extract the configuration and the portage tree structure t
 executed from the gentoo_to_mspl directory.
 ```
 scp -o PubkeyAuthentication=no -P 9022  -r guest/*  osboxes@localhost:
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S mv hyvar /'
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S sh /hyvar/compress-configuration.sh'
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S /hyvar/compress-configuration.sh'
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S ~/hyvar/compress-configuration.sh'
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S ~/hyvar/compress-portage.sh'
+
+scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/portage.tar.bz2 host/portage
+scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/world.gz host/configuration
+scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/configuration.gz host/configuration
 ```
 
 
