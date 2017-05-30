@@ -31,6 +31,6 @@ if __name__ == "__main__":
 		print ("usage: ", sys.argv[0], " configuration.gz")
 		sys.exit(-1)
 	path = sys.argv[1]
-	outfile = os.path.join(os.path.dirname(path),"json/configuration,json")
+	outfile = os.path.join(os.path.dirname(path),"json/configuration.json")
 	data = load_configuration(path)
 	save_configuration(outfile, data)

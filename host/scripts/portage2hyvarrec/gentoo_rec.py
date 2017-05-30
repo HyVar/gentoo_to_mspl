@@ -372,7 +372,7 @@ def main(argv):
     logging.info("Load the MSPL. This may take a while")
     load_mspl(os.path.join(input_dir,'mspl'))
     logging.info("Load the SPL. This may take a while")
-    load_spl(os.path.join(input_dir,'spl'))
+    load_spl(os.path.join(input_dir,os.path.join('catalog','spl')))
 
     if os.path.isfile(os.path.join(target_dir,settings.NAME_MAP_FILE)):
         logging.info("Use the exising " + settings.NAME_MAP_FILE + " file. No computation of new ids")
@@ -387,7 +387,7 @@ def main(argv):
 
     # test instances
 
-    # convert("media-libs/mesa-11.0.9", target_dir)
+    #convert("sys-libs/db-4.5.20_p2-r1", target_dir)
     # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
     # convert("app-dicts/sword-asv-1.3", target_dir)
     # exit(0)

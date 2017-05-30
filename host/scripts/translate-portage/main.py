@@ -52,27 +52,27 @@ def save_catalog(catalog_dir, catalog):
 
 	filename = os.path.join(catalog_dir, "features.json")
 	f = open(filename, 'w')
-	json.dumps(catalog['features'] , f, sort_keys=True, indent=4, separators=(',', ': '))
+	json.dump(catalog['features'] , f, sort_keys=True, indent=4, separators=(',', ': '))
 	f.close()
 
 	filename = os.path.join(catalog_dir, "names.json")
 	f = open(filename, 'w')
-	json.dumps({'declared': catalog['spl'].keys(), 'used': catalog['spl_used'] }, f, sort_keys=True, indent=4, separators=(',', ': '))
+	json.dump({'declared': catalog['spl'].keys(), 'used': catalog['spl_used'] }, f, sort_keys=True, indent=4, separators=(',', ': '))
 	f.close()
 
 	filename = os.path.join(catalog_dir, "versions.json")
 	f = open(filename, 'w')
-	json.dumps(catalog['versions'] , f, sort_keys=True, indent=4, separators=(',', ': '))
+	json.dump(catalog['versions'] , f, sort_keys=True, indent=4, separators=(',', ': '))
 	f.close()
 
 	filename = os.path.join(catalog_dir, "slots.json")
 	f = open(filename, 'w')
-	json.dumps(catalog['slots'] , f, sort_keys=True, indent=4, separators=(',', ': '))
+	json.dump(catalog['slots'] , f, sort_keys=True, indent=4, separators=(',', ': '))
 	f.close()
 
 	filename = os.path.join(catalog_dir, "subslots.json")
 	f = open(filename, 'w')
-	json.dumps(catalog['slots'] , f, sort_keys=True, indent=4, separators=(',', ': '))
+	json.dump(catalog['slots'] , f, sort_keys=True, indent=4, separators=(',', ': '))
 	f.close()
 
 	metadata_dir = os.path.join(catalog_dir, "spl")
@@ -81,7 +81,7 @@ def save_catalog(catalog_dir, catalog):
 		filename = os.path.join(metadata_dir, name + ".json")
 		dtouch(os.path.dirname(filename))
 		f = open(filename, 'w')
-		json.dumps(d , f, sort_keys=True, indent=4, separators=(',', ': '))
+		json.dump(d , f, sort_keys=True, indent=4, separators=(',', ': '))
 		f.close()
 
 
@@ -90,7 +90,7 @@ def save_mspl(mspl_dir, mspl):
 		filename = os.path.join(mspl_dir, name + ".json")
 		dtouch(os.path.dirname(filename))
 		f = open(filename, 'w')
-		json.dumps(d , f, sort_keys=True, indent=4, separators=(',', ': '))
+		json.dump(d , f, sort_keys=True, indent=4, separators=(',', ': '))
 		f.close()
 
 

@@ -3,7 +3,14 @@ reconfigure.py:
 
 Tool that taking in input the gentoo mspl calls hyvar-rec producing a valid configuration, if any
 
-Usage: reconfigure.py [options] <directory containing the mspl> <request package list> <configuration_file> <environment>
+Usage: reconfigure.py [options]
+    <directory containing the mspl>
+    <request package list>
+    <configuration_file>
+    <new_configuration_file>
+    <package_use_file>
+    <emerge_commands_file>
+    <environment>
  --url url of the hyvar-rec service (e.g. http://158.37.63.154:80)
 """
 __author__ = "Jacopo Mauro"
@@ -67,7 +74,7 @@ def run_hyvar(json_data):
         json.dump(json_data, f)
         # json.dump(json_data, f,indent=1)
     # cmd = ["hyvar-rec", "--explain", file_name]
-    cmd = ["hyvar-rec", file_name]
+    cmd = ["hyvar-rec","-p","3",file_name]
     logging.debug("Running command " + unicode(cmd))
     process = psutil.Popen(cmd,stdout=PIPE,stderr=PIPE)
     out, err = process.communicate()
@@ -269,9 +276,9 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
         c = "0 "
         for j in initial_configuration.keys():
             if j in dconf[i]:
-                c += " - " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
+                c += " + " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
             elif j in ddep[i]:
-                c += " - " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
+                c += " + " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
         json["preferences"].append(c)
 
         logging.debug("SPL created : attributes " + unicode(len(json["attributes"])) +
@@ -322,6 +329,17 @@ def get_diff_configuration(new_conf,old_conf):
     return data
 
 
+def get_conf_with_negative_use_flags(conf):
+    data = {}
+    for i in conf.keys():
+        all_flags = map_name_id["name_to_id"]["flag"][i].keys()
+        positive_flags = conf[i]
+        negative_flags = set(all_flags)
+        negative_flags.difference_update(positive_flags)
+        data[i] = ["+" + x for x in positive_flags] + [ "-" + x for x in negative_flags]
+    return data
+
+
 def main(argv):
     """
     Main procedure
@@ -350,15 +368,18 @@ def main(argv):
             logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
             logging.info("Verbose output.")
 
-    if len(args) != 4:
-       print "4 argument are required, " + unicode(len(args)) + " found"
+    if len(args) != 7:
+       print "7 argument are required, " + unicode(len(args)) + " found"
        print(__doc__)
        sys.exit(1)
 
     input_dir = os.path.abspath(args[0])
     request_file = os.path.abspath(args[1])
     configuration_file = os.path.abspath(args[2])
-    environment = args[3]
+    new_configuration_file = os.path.abspath(args[3])
+    package_use_file = os.path.abspath(args[4])
+    emerge_commands_file = os.path.abspath(args[5])
+    environment = args[6]
 
     logging.info("Load the MSPL. This may take a while.")
     load_mspl(input_dir)
@@ -389,7 +410,6 @@ def main(argv):
         else:
             logging.warning("Not found the package " + i + " defined in the initial configuration.")
             del(initial_configuration[i])
-
 
     # logging.info("Process the MSPL based on its dependencies graph")
     # utils.preprocess(mspl,initial_configuration,set(package_request.keys()))
@@ -431,11 +451,33 @@ def main(argv):
             to_solve = create_hyvarrec_spls({p: {} for p in deps_selected},
                                       initial_configuration, environment, confs_deselected)
 
+    # remove all the pacakges without version from final configuration
+    for i in configuration.keys():
+        if "implementations" in mspl[i]:
+            del(configuration[i])
+
     configuration_diff = get_diff_configuration(configuration,initial_configuration)
     logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
     logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
     logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
     print json.dumps(configuration_diff,indent=1)
+
+    logging.debug("Generate emerge commands to run.")
+    with open(emerge_commands_file, "w") as f:
+        f.write("#!/bin/bash\n")
+        f.write("emerge --unmerge " + " ".join(["=" + x for x in configuration_diff["toRemove"].keys()]) + "\n")
+        f.write("emerge -a --newuse " + " ".join(["=" + x for x in configuration_diff["toUpdate"].keys()]) +
+                " " + " ".join(["=" + x for x in configuration_diff["toInstall"].keys()]) + "\n")
+
+    logging.debug("Printing the final configuration with all the positive and negative use flags.")
+    final_conf = get_conf_with_negative_use_flags(configuration)
+    with open(new_configuration_file,"w") as f:
+        json.dump(final_conf,f,indent=1)
+
+    logging.debug("Printing the package.use file.")
+    with open(package_use_file,"w") as f:
+        for i in final_conf.keys():
+            f.write("=" + i + " " + " ".join(final_conf[i]) + "\n")
 
     logging.info("Cleaning.")
     clean()

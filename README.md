@@ -71,7 +71,34 @@ scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/ge
 Then when the files are saved to translate the files the following commands need to be exectued.
 ```
 cd host
+./uncompress-portage.sh
+./uncompress-configuration.sh
+./portage2hyvarrec.sh --no_opt
+
 ```
 
+Remove the directory /etc/portage/package.use in the guest if present.
+```
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S rm -rf /etc/portage/package.use'
+```
+
+Then run
+```
+scp -o PubkeyAuthentication=no -P 9022  host/configuration/package.use host/configuration/update.sh osboxes@localhost:
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S mv ~/package.use /etc/portage/'
+ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S sh update.sh'
+```
+
+For the test in the VM for removing a package the following commands need to be performed.
+
+
+
+TODO:
+ 
+ world file needs to be transformed in json format
+ check why some packages that can stay are removed (preferences???)
+ generate the list of use flags for packages installed and removed (what do do with circular dependencies)
+ sys-apps/kbd-2.0.3 can not be disinstalled
+ 
 
 
