@@ -1,6 +1,5 @@
 #!/bin/bash
 
-[ -d configuration/json ] || mkdir configuration/json
+[ -d configuration/json ] || mkdir -p configuration/json
 
-gunzip -c configuration/world.gz > configuration/json/world
-python scripts/translate-configuration.py configuration/configuration.gz
+python scripts/translate-configuration.py configuration
