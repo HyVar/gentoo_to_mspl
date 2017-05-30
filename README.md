@@ -43,6 +43,12 @@ Note that the sshd service in the virtual machine needs to be started
 service sshd start
 ```
 
+``` 
+Username: osboxes
+Password: osboxes.org
+Password for Root account: osboxes.org
+```
+
 Then to access the machine configure VirtualBox with a NAT and use ssh.
 Assuming that the port 22 of the VM has been redirected to port 9022
 
@@ -62,10 +68,10 @@ scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/ge
 scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/configuration.gz host/configuration
 ```
 
-
-``` 
-Username: osboxes
-Password: osboxes.org
-Password for Root account: osboxes.org
+Then when the files are saved to translate the files the following commands need to be exectued.
 ```
+cd host
+```
+
+
 
