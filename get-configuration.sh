@@ -8,10 +8,10 @@ else
  PORT=$2
  PSWD=osboxes.org
 
- ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} 'echo ${PSWD} | sudo -S ~/hyvar/compress-configuration.sh'
+ ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} 'echo ${PSWD} | sudo -S sh ~/hyvar/compress-configuration.sh'
  scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/world.gz host/configuration
  scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/configuration.gz host/configuration
  cd host
- ./uncompress-configuration.sh
+ sh uncompress-configuration.sh
 fi
 

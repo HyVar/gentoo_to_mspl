@@ -8,6 +8,6 @@ else
  PORT=$2
  PSWD=osboxes.org
 
- ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} 'echo ${PSWD} | sudo -S -- sh -c "echo \"ACCEPT_KEYWORDS=\\\"~amd64\\\"\" >> /etc/portage/make.conf"'
+ ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} 'echo ${PSWD} | sudo -S -- sh -c "echo \"ACCEPT_KEYWORDS=\\\"~amd64\\\"\" >> /etc/portage/make.conf"'
  scp -o PubkeyAuthentication=no -P ${PORT}  -r guest/*  ${HOST}:
 fi
