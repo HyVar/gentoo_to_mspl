@@ -24,13 +24,6 @@ Structure of the repository:
    - portage2hyvarrec.sh
    - run-hyvarrec.sh
       
-
- 
-  
-
-
-
-
 How to prepare the VM 
 ----------------------
 Tor this example we consider the Gentoo VM available from https://www.osboxes.org/gentoo/
@@ -77,6 +70,10 @@ sh get-portage.sh osboxes@localhost 9022
 Note that this script for safety does not override existing data.
 Please run the following script to delete local data TODO
 
+The get-portage.sh script translates all the portage structure and it may take a lot of time (possibly hours).
+However, this script needs to be executed only the portage tree is updated (previous the execution of the cleanup
+scrip).
+
 Reconfigure
 ----------------------
 
@@ -114,19 +111,41 @@ for the packages. The update script needs to be run on the VM by the user as fol
 sudo update.sh
 ```
 
+
+Assumptions
+----------------------
+Packages installed that are not in the portage tree are not considered (working in progress).
+
+User can impose either constraint on slot + subslot or package versions when requiring packages.
+
+We work on testing mode of portage (e.g., we treat ~amd64 as amd64)
+
+Package that are always visible (**) are treated as packages visible if they are stable on any architecture (*)
+
+When the keyword is not specified for a package we do not install it
+
+
 TODO:
 ------------------------ 
- world file needs to be transformed in json format
- check why some packages that can stay are removed (preferences???)
- generate the list of use flags for packages installed and removed (what do do with circular dependencies)
  sys-apps/kbd-2.0.3 can not be disinstalled
  
  makefile that will clean and all operations
  
  amd64 as default in script sh setup-guest.sh
  
- change world structure file to allow user to disinstall packages
+ Both: change world structure file to allow user to disinstall packages + extend capabilities (version,slots)
  
- correct generation of world from gentoo also translating the profile in hyvarrec
+ Michael: correct generation of world from gentoo also translating the profile in hyvarrec
+ 
+ Michael:  (packages are not separted by space for jacopo)
+ The constraint in md5-cache are well translated (new lines and commas)
+ 
+ Michael: refactor of the translation
 
+ Michael: handle the deprecated packages after an update
+
+ 
+Task:
+------------------------ 
+Find configuration from wichi installing something can not be done in portage easily
 
