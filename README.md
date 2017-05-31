@@ -56,6 +56,20 @@ Assuming that the port 22 of the VM has been redirected to port 9022
 ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost
 ```
 
+Option to remove computation of portage2hyvarrec.sh when recomputed
+
+```
+sh setup-guest.sh osboxes@localhost 9022
+sh get-configuration.sh osboxes@localhost 9022
+sh get-portage.sh osboxes@localhost 9022
+
+change world file
+script to reconfigure
+
+sh update-guest.sh osboxes@localhost 9022
+```
+
+
 To configure the guest VM to handle packages like our tool, we need to update the configuration file in the following way
 ```
 ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S -- sh -c "echo \"ACCEPT_KEYWORDS=\\\"~amd64\\\"\" >> /etc/portage/make.conf"'

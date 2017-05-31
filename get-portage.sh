@@ -7,11 +7,12 @@ else
  HOST=$1
  PORT=$2
  PSWD=osboxes.org
+ PSWD_USER=osboxes.org
 
- ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} 'echo ${PSWD} | sudo -S sh ~/hyvar/compress-portage.sh'
- scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/portage.tar.bz2 host/portage
+ sshpass -p $PSWD_USER ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} "echo ${PSWD} | sudo -S sh ~/hyvar/compress-portage.sh"
+ sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/portage.tar.bz2 host/portage
  cd host
  sh uncompress-portage.sh
- sh portage2hyvarrec.sh --no_opt
+ sh portage2hyvarrec.sh
 fi
 

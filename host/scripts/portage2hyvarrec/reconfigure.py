@@ -469,8 +469,10 @@ def main(argv):
     logging.debug("Generate emerge commands to run.")
     with open(emerge_commands_file, "w") as f:
         f.write("#!/bin/bash\n")
-        f.write("emerge --unmerge " + " ".join(["=" + x for x in configuration_diff["toRemove"].keys()]) + "\n")
-        f.write("emerge -a --newuse " + " ".join(["=" + x for x in configuration_diff["toUpdate"].keys()]) +
+        if configuration_diff["toRemove"].keys():
+            f.write("emerge --unmerge " + " ".join(["=" + x for x in configuration_diff["toRemove"].keys()]) + "\n")
+        if configuration_diff["toUpdate"].keys() + configuration_diff["toInstall"].keys():
+            f.write("emerge -a --newuse " + " ".join(["=" + x for x in configuration_diff["toUpdate"].keys()]) +
                 " " + " ".join(["=" + x for x in configuration_diff["toInstall"].keys()]) + "\n")
 
     logging.debug("Printing the final configuration with all the positive and negative use flags.")

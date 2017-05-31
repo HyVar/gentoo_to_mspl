@@ -7,10 +7,10 @@ else
  HOST=$1
  PORT=$2
  PSWD=osboxes.org
+ PSWD_USER=osboxes.org
 
- ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} 'echo ${PSWD} | sudo -S -- sh -c "[ -e /etc/portage/package.use ] && rm -rf /etc/portage/package.use"'
- scp -o PubkeyAuthentication=no -P ${PORT} host/configuration/package.use host/configuration/update.sh ${HOST}:
- ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} 'echo ${PSWD} | sudo -S mv ~/package.use /etc/portage/'
- ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} 'echo ${PSWD} | sudo -S sh update.sh'
-
+ sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S -- sh -c \"[ -e /etc/portage/package.use ] && rm -rf /etc/portage/package.use\""
+ sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT} host/configuration/package.use host/configuration/update.sh ${HOST}:
+ sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S mv ~/package.use /etc/portage/"
+ #sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S sh update.sh"
 fi
