@@ -31,93 +31,102 @@ Structure of the repository:
 
 
 
-TODO
+How to prepare the VM 
 ----------------------
-The VM of Gentoo used is available from https://www.osboxes.org/gentoo/
+Tor this example we consider the Gentoo VM available from https://www.osboxes.org/gentoo/
 
 In particular the system was tested with Gentoo 201703 (CLI Minimal) - 64bit.
 
-Note that the sshd service in the virtual machine needs to be started
-
+Our script will use ssh to connect to the VM. For this reason sshd demon needs to be started on the VM.
+To do so please make sure that sshd is started and if not run the following command.
 ```
-service sshd start
+sudo service sshd start
 ```
 
+Note that the credential to use the VM are the following.
 ``` 
 Username: osboxes
 Password: osboxes.org
 Password for Root account: osboxes.org
 ```
 
-Then to access the machine configure VirtualBox with a NAT and use ssh.
-Assuming that the port 22 of the VM has been redirected to port 9022
-
+To access the machine for the remaing of the running example we assume that it could be reached with the ssh protocol
+at port 9022 (if VirtualBox is used this can be configured with a port forwarding).
+Please verity to have access to the VM. As example this can be obtained as follows.
 ```
 ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost
 ```
 
-Option to remove computation of portage2hyvarrec.sh when recomputed
-
+If the VM is reachable then run the following command that will install the necessary script in the VM and configurint 
+portage to be in testing mode.
 ```
 sh setup-guest.sh osboxes@localhost 9022
+```
+
+
+
+Getting data from the VM 
+----------------------
+
+To get the required information from the VM please run the following scripts.
+```
 sh get-configuration.sh osboxes@localhost 9022
 sh get-portage.sh osboxes@localhost 9022
+```
 
-change world file
-script to reconfigure
+Note that this script for safety does not override existing data.
+Please run the following script to delete local data TODO
 
+Reconfigure
+----------------------
+
+To run the reconfiguration run the following script.
+```
+sh reconfigure <request file> <keyword>
+```
+
+For example, to install git execute the following script.
+```
+sh reconfigure world amd64
+```
+where the world file is the following JSON file.
+```
+{
+	"app-admin/sudo":{},
+	"app-admin/syslog-ng":{},
+	"sys-apps/dbus":{},
+	"sys-boot/grub":{},
+	"sys-kernel/genkernel":{},
+	"sys-kernel/gentoo-sources":{},
+	"dev-vcs/git":{}
+}
+```
+
+Updating the VM
+----------------------
+To update the VM run the following script.
+```
 sh update-guest.sh osboxes@localhost 9022
 ```
-
-
-To configure the guest VM to handle packages like our tool, we need to update the configuration file in the following way
+This script move to the VM in the user home folder the installation script update.sh and set the configuration file
+for the packages. The update script needs to be run on the VM by the user as follows.
 ```
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S -- sh -c "echo \"ACCEPT_KEYWORDS=\\\"~amd64\\\"\" >> /etc/portage/make.conf"'
+sudo update.sh
 ```
-
-To copy the files and extract the configuration and the portage tree structure the following commands need to be
-executed from the gentoo_to_mspl directory.
-```
-scp -o PubkeyAuthentication=no -P 9022  -r guest/*  osboxes@localhost:
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S ~/hyvar/compress-configuration.sh'
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S ~/hyvar/compress-portage.sh'
-
-scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/portage.tar.bz2 host/portage
-scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/world.gz host/configuration
-scp -o PubkeyAuthentication=no -P 9022  osboxes@localhost:/home/osboxes/hyvar/gen/configuration.gz host/configuration
-```
-
-Then when the files are saved to translate the files the following commands need to be exectued.
-```
-cd host
-./uncompress-portage.sh
-./uncompress-configuration.sh
-./portage2hyvarrec.sh --no_opt
-
-```
-
-Remove the directory /etc/portage/package.use in the guest if present.
-```
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S rm -rf /etc/portage/package.use'
-```
-
-Then run
-```
-scp -o PubkeyAuthentication=no -P 9022  host/configuration/package.use host/configuration/update.sh osboxes@localhost:
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S mv ~/package.use /etc/portage/'
-ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost 'echo osboxes.org | sudo -S sh update.sh'
-```
-
-For the test in the VM for removing a package the following commands need to be performed.
-
-
 
 TODO:
- 
+------------------------ 
  world file needs to be transformed in json format
  check why some packages that can stay are removed (preferences???)
  generate the list of use flags for packages installed and removed (what do do with circular dependencies)
  sys-apps/kbd-2.0.3 can not be disinstalled
  
+ makefile that will clean and all operations
+ 
+ amd64 as default in script sh setup-guest.sh
+ 
+ change world structure file to allow user to disinstall packages
+ 
+ correct generation of world from gentoo also translating the profile in hyvarrec
 
 
