@@ -74,7 +74,8 @@ def run_hyvar(json_data):
         json.dump(json_data, f)
         # json.dump(json_data, f,indent=1)
     # cmd = ["hyvar-rec", "--explain", file_name]
-    cmd = ["hyvar-rec","-p","3",file_name]
+    #cmd = ["hyvar-rec","-p","3",file_name]
+    cmd = ["hyvar-rec", file_name]
     logging.debug("Running command " + unicode(cmd))
     process = psutil.Popen(cmd,stdout=PIPE,stderr=PIPE)
     out, err = process.communicate()
@@ -111,12 +112,12 @@ def load_mspl(mspl_dir):
                 mspl[name] = read_json(os.path.join(mspl_dir,i,f))
 
 
-def get_transitive_closure_of_dependencies(pkg):
+def get_transitive_closure_of_dependencies(pkgs):
     # returns the transitive closure of the dependencies as the set of packages to configure
     # dependencies left to configure is left as an empty set
     # todo the graph is not needed if we just want the close of the dependencies
-    configures = set([pkg])
-    to_check = [pkg]
+    configures = set(pkgs)
+    to_check = pkgs
     checked = set()
     while to_check:
         p = to_check.pop()
@@ -166,7 +167,10 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
     while to_process:
         i = to_process.pop()
         # dconf[i],ddep[i] = get_all_dependencies(i)
-        dconf[i], ddep[i] = get_transitive_closure_of_dependencies(i)
+        # compute the transitive closure of the dependencies considering also the initial packages
+        # initial packages are needed because we can not trust the initial configuration
+        # and modification could brake it
+        dconf[i], ddep[i] = get_transitive_closure_of_dependencies([i]+initial_configuration.keys())
         spls[i] = dconf[i].union(ddep[i])
         to_process.difference_update(spls[i])
         intersections = [x for x in spls.keys() if spls[i].intersection(spls[x]) and x != i]
@@ -202,7 +206,6 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
                 }
 
         # process configures
-        other_symbols = set()
         feature_symbols = set()
         for j in dconf[i]:
             json["attributes"].extend(mspl[j]["attributes"])
@@ -336,7 +339,7 @@ def get_conf_with_negative_use_flags(conf):
         positive_flags = conf[i]
         negative_flags = set(all_flags)
         negative_flags.difference_update(positive_flags)
-        data[i] = ["+" + x for x in positive_flags] + [ "-" + x for x in negative_flags]
+        data[i] = positive_flags + [ "-" + x for x in negative_flags]
     return data
 
 
@@ -419,7 +422,7 @@ def main(argv):
     confs_selected = set()
     confs_deselected = set() # includes also deps not selected
     deps_selected = set() # deps that were selected but not yet configured
-    to_solve = list(reversed(create_hyvarrec_spls(package_request,initial_configuration,environment,confs_deselected)))
+    to_solve = create_hyvarrec_spls(package_request,initial_configuration,environment,confs_deselected)
 
     while to_solve:
         job = to_solve.pop()
@@ -427,10 +430,11 @@ def main(argv):
             json_result = run_remote_hyvar(job["json"],url)
         else:
             json_result = run_hyvar(job["json"])
-        logging.debug("Answer obtained: " + unicode(json_result))
+        #logging.debug("Answer obtained: " + unicode(json_result))
         if json_result["result"] != "sat":
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
             exit(1)
+        logging.debug("HyVarRec output: " + unicode(json_result))
         # update the info on the final configuration
         update_configuration(json_result,configuration)
         confs_selected.update([x for x in job["confs"] if x in configuration])
