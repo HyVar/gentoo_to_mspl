@@ -143,6 +143,16 @@ TODO:
  Michael: refactor of the translation
 
  Michael: handle the deprecated packages after an update
+ 
+ Jacopo: remove slot o subslot variables in encoding
+ 
+ Jacopo: install world of kde version into minimal gentoo version and check what happens
+ 
+ Jacopo: incrementality of translation into hyvarrec
+ 
+ Jacopo: try to unify both parsing of dependencies (talk with Michael)
+ 
+ Michael: contact gentoo community
 
  
 Task:
