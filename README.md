@@ -153,6 +153,8 @@ TODO:
  Jacopo: try to unify both parsing of dependencies (talk with Michael)
  
  Michael: contact gentoo community
+ 
+ Passoword in scripts
 
  
 Task:

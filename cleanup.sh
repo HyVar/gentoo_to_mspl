@@ -17,6 +17,7 @@ DIRS=$DIRS' host/portage/json/catalog'
 DIRS=$DIRS' host/portage/json/hyvarrec'
 DIRS=$DIRS' host/portage/json/hyvarrec_no_opt'
 DIRS=$DIRS' host/portage/json/mspl'
+DIRS=$DIRS' host/portage/usr'
 
 for i in $FILES
 do
