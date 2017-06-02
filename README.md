@@ -114,16 +114,22 @@ sudo update.sh
 
 Assumptions
 ----------------------
-Packages installed that are not in the portage tree are not considered (working in progress).
+Packages installed that are not in the portage tree are not considered (working in progress to overcome this limitation).
 
-User can impose either constraint on slot + subslot or package versions when requiring packages.
+fm, runtime, and local dependencies are all considered 
+
+User can impose either constraint on slot + subslot or package versions when requiring packages (work in progress by
+using the dependecies systax to ask for desiderata)
 
 We work on testing mode of portage (e.g., we treat ~amd64 as amd64)
 
 Package that are always visible (**) are treated as packages visible if they are stable on any architecture (*)
 
-When the keyword is not specified for a package we do not install it
+When the keyword is not specified for a package we do not consider its installation
 
+Slot Operators
+ - := is treated as :*
+ - :SLOT= is treated as :SLOT
 
 TODO:
 ------------------------ 
@@ -143,6 +149,9 @@ TODO:
  The constraint in md5-cache are well translated (new lines and commas)
  
  Michael: refactor of the translation
+ Note that here some dependencies are duplicated
+   (e.g., dev-lang/perl:=[-build(-)] in app-text/po4a-0.45-r3)
+ To minimize the work these repetitions should be removed
 
  Michael: handle the deprecated packages after an update
  

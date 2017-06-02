@@ -1,12 +1,3 @@
-"""
-gentoo_rec.py:
-
-Tool to convert the prepocessed gentoo files
-
-Usage: gentoo_rec.py <directory containing the mspl and spl directories> <output directory>
-    --no_opt: disable the conversion in SMTLIB of the formulas
-    -p --par: cores to use
-"""
 __author__ = "Jacopo Mauro"
 __copyright__ = "Copyright 2017, Jacopo Mauro"
 __license__ = "ISC"
@@ -23,10 +14,10 @@ import logging
 import os
 import re
 import dep_translator
-import getopt
 import z3
 import SpecificationGrammar.SpecTranslator as SpecTranslator
 import multiprocessing
+import click
 
 # Global variables
 
@@ -251,6 +242,10 @@ def convert(package,target_dir):
             parser = visitor.parser(mspl[package]["fm"]["external"])
             tree = parser.depend()
             visitor.visit(tree)
+        if mspl[package]["fm"]["runtime"] and mspl[package]["fm"]["runtime"] != mspl[package]["fm"]["external"]:
+            parser = visitor.parser(mspl[package]["fm"]["runtime"])
+            tree = parser.depend()
+            visitor.visit(tree)
         if mspl[package]["fm"]["local"]:
             parser = visitor.parser(mspl[package]["fm"]["local"])
             tree = parser.localDEP()
@@ -328,43 +323,36 @@ def worker(pair):
     convert(pkg,target_dir)
     return True
 
-def main(argv):
+@click.command()
+@click.argument(
+    'input_dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
+@click.argument(
+    'target_dir',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
+@click.option('--no-opt', is_flag=True, help="Do not convert dependencies into SMT formulas.")
+@click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
+@click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for translating the dependencies.')
+@click.option('--translate-only', '-p', default="", help='Package to convert - Do not convert all the other ones.')
+def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
     """
-    Main procedure
-    """
+    Tool that converts the prepocessed gentoo files
 
+    INPUT_DIR directory containing the mspl and spl directories
+    TARGET_DIR output directory
+    """
     global map_name_id
     global map_id_name
     global mspl
     global TO_SMT_DIRECTLY
 
-    cores_to_use = max(1,multiprocessing.cpu_count()-1)
-
-    try:
-        opts, args = getopt.getopt(argv,"hvp:",["help","verbose","no_opt","par="])
-    except getopt.GetoptError as err:
-        print str(err)
-        usage()
-        sys.exit(1)
-    for opt, arg in opts:
-        if opt == '-h':
-            usage()
-            sys.exit()
-        elif opt in ("--no_opt"):
-            TO_SMT_DIRECTLY = False
-        elif opt in ("-p", "--par"):
-            cores_to_use = int(arg)
-        elif opt in ("-v", "--verbose"):
-            logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-            logging.info("Verbose output.")
-
-    if len(args) != 2:
-      print "2 argument are required"
-      print(__doc__)
-      sys.exit(1)
-
-    input_dir = os.path.abspath(args[0])
-    target_dir = os.path.abspath(args[1])
+    if par > 1:
+        cores_to_use = max(par, multiprocessing.cpu_count())
+    else:
+        cores_to_use = max(1, multiprocessing.cpu_count() - 1)
+    if verbose:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+        logging.info("Verbose output.")
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
@@ -385,21 +373,17 @@ def main(argv):
 
     logging.info("Start converting files of the MSPL. Skipping existing ones")
 
-    # test instances
+    if translate_only:
+        convert(translate_only, target_dir)
+    else:
+        to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
+        # if more than one thread is used python goes into segmentation fault
+        logging.info("Starting to convert packages using " + unicode(cores_to_use) + " processes.")
+        logging.info("Number of packages to convert: " + unicode(len(to_convert)))
 
-    #convert("sys-libs/db-4.5.20_p2-r1", target_dir)
-    # convert("dev-db/oracle-instantclient-basic-10.2.0.3-r1", target_dir)
-    # convert("app-dicts/sword-asv-1.3", target_dir)
-    # exit(0)
-
-    to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
-    # if more than one thread is used python go into segmentation fault
-    logging.info("Starting to convert packages using " + unicode(cores_to_use) + " processes.")
-    logging.info("Number of packages to convert: " + unicode(len(to_convert)))
-
-    pool = multiprocessing.Pool(cores_to_use)
-    pool.map(worker,[(x,target_dir) for x in to_convert])
+        pool = multiprocessing.Pool(cores_to_use)
+        pool.map(worker,[(x,target_dir) for x in to_convert])
     logging.info("Execution terminated.")
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

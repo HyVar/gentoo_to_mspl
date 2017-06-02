@@ -28,7 +28,7 @@ def match_package_version(template, operator, s):
     if operator == "=":
         template = re.sub('\.','\\\.',template)
         template = re.sub('\*', '.*', template)
-        if re.match(template,s):
+        if re.match(template + "$",s):
             return True
         else:
             return False

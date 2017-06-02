@@ -1,18 +1,3 @@
-"""
-reconfigure.py:
-
-Tool that taking in input the gentoo mspl calls hyvar-rec producing a valid configuration, if any
-
-Usage: reconfigure.py [options]
-    <directory containing the mspl>
-    <request package list>
-    <configuration_file>
-    <new_configuration_file>
-    <package_use_file>
-    <emerge_commands_file>
-    <environment>
- --url url of the hyvar-rec service (e.g. http://158.37.63.154:80)
-"""
 __author__ = "Jacopo Mauro"
 __copyright__ = "Copyright 2017, Jacopo Mauro"
 __license__ = "ISC"
@@ -28,11 +13,10 @@ import settings
 import logging
 import os
 import re
-import utils
-import getopt
-from subprocess import Popen,PIPE
+from subprocess import PIPE
 import psutil
 import requests
+import click
 
 # Global variables
 
@@ -65,7 +49,7 @@ def read_json(json_file):
     return data
 
 
-def run_hyvar(json_data):
+def run_hyvar(json_data,par,explain_modality):
     """
     Run hyvar locally assuming that there is a command hyvar-rec
     """
@@ -73,9 +57,12 @@ def run_hyvar(json_data):
     with open(file_name,"w") as f:
         json.dump(json_data, f)
         # json.dump(json_data, f,indent=1)
-    # cmd = ["hyvar-rec", "--explain", file_name]
-    #cmd = ["hyvar-rec","-p","3",file_name]
-    cmd = ["hyvar-rec", file_name]
+    cmd = ["hyvar-rec"]
+    if par > 1:
+        cmd += ["-p",unicode(par)]
+    if explain_modality:
+        cmd.append("--explain")
+    cmd.append(file_name)
     logging.debug("Running command " + unicode(cmd))
     process = psutil.Popen(cmd,stdout=PIPE,stderr=PIPE)
     out, err = process.communicate()
@@ -84,6 +71,9 @@ def run_hyvar(json_data):
     logging.debug('Stderr of ' + unicode(cmd))
     logging.debug(err)
     logging.debug('Return code of ' + unicode(cmd) + ': ' + str(process.returncode))
+    # in explain modality prints the output to detect which constraints are unsat
+    if explain_modality:
+        print(out)
     return json.loads(out)
 
 def run_remote_hyvar(json_data,url):
@@ -115,7 +105,7 @@ def load_mspl(mspl_dir):
 def get_transitive_closure_of_dependencies(pkgs):
     # returns the transitive closure of the dependencies as the set of packages to configure
     # dependencies left to configure is left as an empty set
-    # todo the graph is not needed if we just want the close of the dependencies
+    # the graph is not needed if we just want the close of the dependencies
     configures = set(pkgs)
     to_check = pkgs
     checked = set()
@@ -155,8 +145,7 @@ def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_s
     """
     Given a list of packages it creates its hyvarrec SPL
     """
-    # todo handle intial configuration
-    # read list of configures and depends for all packages
+    # todo read list of configures and depends for all packages
 
     logging.info("Computing the SPL to generate")
     spls = {}
@@ -343,46 +332,62 @@ def get_conf_with_negative_use_flags(conf):
     return data
 
 
-def main(argv):
+
+@click.command()
+@click.argument(
+    'input_dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
+@click.argument(
+    'request_file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
+@click.argument(
+    'configuration_file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
+@click.argument(
+    'new_configuration_file',
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+@click.argument(
+    'package_use_file',
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+@click.argument(
+    'emerge_commands_file',
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+@click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
+@click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
+@click.option('--keep', '-k', is_flag=True, help="Do not delete intermediate files.")
+@click.option('--explain', is_flag=True, help="Run HyVarRec in explanation mode.")
+@click.option('--url', '-r', default="", help='URL of the remote hyvarrec to use if available (local command otherwise used).')
+@click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for running the local HyVarRec.')
+def main(input_dir,
+         request_file,
+         configuration_file,
+         new_configuration_file,
+         package_use_file,
+         emerge_commands_file,
+         environment,
+         verbose,
+         keep,
+         explain,
+         url,
+         par):
     """
-    Main procedure
+        input_dir -> Input directory containing the hyvar mspl json translation files
+        request_file -> File containing the request
+        configuration_file -> File containing the current configuration
+        new_configuration_file -> File containing the new_configuration_file that will be generated
+        package_use_file -> File containing the package.use file that will be generated and copied into the guest
+        emerge_commands_file -> File containing the script to run in the guest to generate the configuration
     """
 
     global map_name_id
     global mspl
     global KEEP
-    url = ""
 
-    try:
-        opts, args = getopt.getopt(argv,"hvk",["help","verbose", "keep","url="])
-    except getopt.GetoptError as err:
-        print str(err)
-        print(__doc__)
-        sys.exit(1)
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            print(__doc__)
-            sys.exit()
-        if opt in ("-k", "--keep"):
-            KEEP = True
-        if opt in ("--url"):
-            url = arg
-        elif opt in ("-v", "--verbose"):
-            logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-            logging.info("Verbose output.")
-
-    if len(args) != 7:
-       print "7 argument are required, " + unicode(len(args)) + " found"
-       print(__doc__)
-       sys.exit(1)
-
-    input_dir = os.path.abspath(args[0])
-    request_file = os.path.abspath(args[1])
-    configuration_file = os.path.abspath(args[2])
-    new_configuration_file = os.path.abspath(args[3])
-    package_use_file = os.path.abspath(args[4])
-    emerge_commands_file = os.path.abspath(args[5])
-    environment = args[6]
+    if keep:
+        KEEP = True
+    if verbose:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+        logging.info("Verbose output.")
 
     logging.info("Load the MSPL. This may take a while.")
     load_mspl(input_dir)
@@ -429,7 +434,7 @@ def main(argv):
         if url:
             json_result = run_remote_hyvar(job["json"],url)
         else:
-            json_result = run_hyvar(job["json"])
+            json_result = run_hyvar(job["json"],par,explain)
         #logging.debug("Answer obtained: " + unicode(json_result))
         if json_result["result"] != "sat":
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
@@ -464,7 +469,7 @@ def main(argv):
     logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
     logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
     logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
-    print json.dumps(configuration_diff,indent=1)
+    print(json.dumps(configuration_diff,indent=1))
 
     logging.debug("Generate emerge commands to run.")
     with open(emerge_commands_file, "w") as f:
@@ -487,9 +492,9 @@ def main(argv):
 
     logging.info("Cleaning.")
     clean()
-    logging.info("Execution terminated correctly.")
+    logging.info("Execution gterminated correctly.")
 
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
