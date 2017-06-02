@@ -136,6 +136,8 @@ TODO:
  Both: change world structure file to allow user to disinstall packages + extend capabilities (version,slots)
  
  Michael: correct generation of world from gentoo also translating the profile in hyvarrec
+
+ Both: find a way to deal with necessary packages (should be easy), and global use flags preference (more complex)
  
  Michael:  (packages are not separted by space for jacopo)
  The constraint in md5-cache are well translated (new lines and commas)
@@ -154,10 +156,10 @@ TODO:
  
  Michael: contact gentoo community
  
- Passoword in scripts
+ Password in scripts
 
  
 Task:
 ------------------------ 
-Find configuration from wichi installing something can not be done in portage easily
+Find configuration from which installing something can not be done in portage easily
 
