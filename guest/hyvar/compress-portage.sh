@@ -20,7 +20,7 @@ for path in $(find /var/db/pkg -name "*.ebuild"); do
   mkdir -p ${PACKAGE}
   cp ${path} ${PACKAGE} 
 done
-egencache --update --repo
+egencache --update --repo deprecated
 
 
 tar cvfj gen/portage.tar.bz2 /usr/portage/metadata/md5-cache /tmp/deprecated/metadata/md5-cache
