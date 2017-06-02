@@ -254,10 +254,16 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
 ast_translator = SPLParserTranslateConstraints()
 
 def parse_spl(spl):
+    """
+    this function translates the constraints into our AST, and simplifies them
+    """
     local_ast = ast_translator.visitRequired(SPLParserlocal(spl['fm']['local']))
     external_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['external']))
     runtime_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['runtime']))
-    return (spl['name'], local_ast, external_ast, runtime_ast)
+    # simplify the constraint
+    local_ast = list(set(local_ast))
+    combined_ast = list(set(external_ast + runtime_ast))
+    return (spl['name'], local_ast, combined_ast)
 
 def parse_mspl():
     global mspl
@@ -374,9 +380,10 @@ class ASTVisitor(object):
         return self.CombineValue(self.visitDependEL(x),y)
 
 ######################################################################
-### FUNCTIONS TO CREATE THE NAME <-> ID DICTIONARY
+### FUNCTIONS TO GET THE INFORMATION FROM THE MSPL
 ######################################################################
 
+# mapping, configures, package groups
 
 
 def generate_name_mapping(spl):
