@@ -336,9 +336,10 @@ def worker(pair):
 @click.option('--translate-only', '-p', default="", help='Package to convert - Do not convert all the other ones.')
 def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
     """
-    Tool that converts the prepocessed gentoo files
+    Tool that converts the gentoo files
 
     INPUT_DIR directory containing the mspl and spl directories
+
     TARGET_DIR output directory
     """
     global map_name_id

@@ -371,12 +371,19 @@ def main(input_dir,
          url,
          par):
     """
-        input_dir -> Input directory containing the hyvar mspl json translation files
-        request_file -> File containing the request
-        configuration_file -> File containing the current configuration
-        new_configuration_file -> File containing the new_configuration_file that will be generated
-        package_use_file -> File containing the package.use file that will be generated and copied into the guest
-        emerge_commands_file -> File containing the script to run in the guest to generate the configuration
+    Uses HyVarRec to produce a valid configuration of packages to install.
+
+    INPUT_DIR Input directory containing the hyvar mspl json translation files
+
+    REQUEST_FILE File containing the request
+
+    CONFIGURATION_FILE File containing the current configuration
+
+    NEW_CONFIGURATION_FILE File containing the new_configuration_file that will be generated
+
+    PACKAGE_USE_FILE File containing the package.use file that will be generated and copied into the guest
+
+    EMERGE_COMMANDS_FILE File containing the script to run in the guest to generate the configuration
     """
 
     global map_name_id
