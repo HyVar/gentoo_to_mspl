@@ -15,18 +15,19 @@ __maintainer__ = "Jacopo Mauro"
 __email__ = "mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
+import os
+import multiprocessing
+import multiprocessing.dummy
+import utils
 
 import json
 import sys
-import settings
 import logging
-import os
 import re
 import dep_translator
 import getopt
 import z3
 import SpecificationGrammar.SpecTranslator as SpecTranslator
-import multiprocessing
 
 def usage():
     """Print usage"""
@@ -38,9 +39,12 @@ def usage():
 #####################################################################################
 
 # stores the json info related to the mspl produced processing the gentoo files
-mspl = {}
+mspl = None
+# stores the ast of the spl's constraints
+asts = None
+
 # stores the package group
-pgroups = set()
+pgroups = None
 
 ## TOOL SETTINGS
 # encode into z3 SMT representation directly
@@ -94,10 +98,11 @@ def is_base_package(package_name):
 ### FUNCTIONS TO LOAD A PORTAGE MD5-CACHE REPOSITORY
 ######################################################################
 
-def construct_spl(name, versions, environment, slots, features, fm_local, fm_external, fm_runtime):
+def construct_spl(names, versions, environment, slots, features, fm_local, fm_external, fm_runtime):
     """
     create the spl structure from the extracted information
     """
+    name, group_name = names
     version_all, version, revision = versions
     environment = environment.split() if environment else ["*"]
     slots = slots.split("/") if slots else [0, 0]
@@ -109,7 +114,7 @@ def construct_spl(name, versions, environment, slots, features, fm_local, fm_ext
     fm_local = fm_local if fm_local else ""     
     fm_external = fm_external if fm_external else ""    
     fm_runtime = fm_runtime if fm_runtime else ""
-    data = { 'name': name, 'features': features, 'environment': environment,
+    data = { 'name': name, 'group_name': group_name, 'features': features, 'environment': environment,
         'fm': { 'local': fm_local, 'external': fm_external, 'runtime': fm_runtime },
         'versions': { 'full': str(version_all), 'base': str(version), 'revision': str(revision) },
         'slots': { 'slot': slot, 'subslot': subslot } }
@@ -132,24 +137,24 @@ def load_file_egencache(filepath):
             array = string.split(line, "=", 1)
             data_tmp[array[0]] = array[1][:-1] # remove the \n at the end of the line
     # 3. return the data
-    versions = (version_all, version, revision)
-    mspl[name] = construct_spl(
-            name,
-            versions,
+    return construct_spl(
+            (name, category + "/" + package ),
+            (version_all, version, revision),
             data_tmp.get('KEYWORDS'),
             data_tmp.get('SLOT'),
             data_tmp.get('IUSE'),
             data_tmp.get('REQUIRED_USE'),
             data_tmp.get('DEPEND'),
             data_tmp.get('RDEPEND'))
-    pgroups.add(category + "/" + package)
+      
 
 def load_repository_egencache(path):
     """
     this function loads a full portage egencache repository.
     """
-    pool = multiprocessing.Pool(available_core)
-    pool.map(load_file_egencache,get_egencache_files(path))
+    global mspl
+    pool = multiprocessing.dummy.Pool(available_core)
+    mspl = pool.map(load_file_egencache, get_egencache_files(path))
 
 
 ######################################################################
@@ -165,20 +170,140 @@ class SPLParserErrorListener(ErrorListener):
 
 syntax_error_listener = SPLParserErrorListener()
 
-def SPLParserlocal(self, to_parse):
+def SPLParserlocal(to_parse):
     parser = __SPLParserparser(to_parse)
     return parser.required()
 
-def SPLParserexternal(self, to_parse):
+def SPLParserexternal(to_parse):
     parser = __SPLParserparser(to_parse)
     return parser.depend()
 
-def __SPLParserparser(self, to_parse):
+def __SPLParserparser(to_parse):
     lexer = DepGrammarLexer(InputStream(to_parse))
     lexer._listeners = [ syntax_error_listener ]
     parser = DepGrammarParser(CommonTokenStream(lexer))
     parser._listeners = [ syntax_error_listener ]
     return parser
+
+lass SPLParserGetUses(DepGrammarVisitor):
+    """
+    this class fill the dictionary from an spl's constraints
+    """
+    def __init__(self):
+        super(DepGrammarVisitor, self).__init__()
+    def visitRequired(self, ctx):
+        return [ self.visitRequiredEL()self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#requiredSIMPLE.
+    def visitRequiredSIMPLE(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#requiredCONDITION.
+    def visitRequiredCONDITION(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#requiredCHOICE.
+    def visitRequiredCHOICE(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#requiredINNER.
+    def visitRequiredINNER(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#depend.
+    def visitDepend(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependSIMPLE.
+    def visitDependSIMPLE(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependCONDITION.
+    def visitDependCONDITION(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependCHOICE.
+    def visitDependCHOICE(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#dependINNER.
+    def visitDependINNER(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#choice.
+    def visitChoice(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#condition.
+    def visitCondition(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#atom.
+    def visitAtom(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#version_op.
+    def visitVersion_op(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotSIMPLE.
+    def visitSlotSIMPLE(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotFULL.
+    def visitSlotFULL(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotEQ.
+    def visitSlotEQ(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotSTAR.
+    def visitSlotSTAR(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#slotSIMPLEEQ.
+    def visitSlotSIMPLEEQ(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#selection.
+    def visitSelection(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#prefix.
+    def visitPrefix(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#preference.
+    def visitPreference(self, ctx):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DepGrammarParser#suffix.
+    def visitSuffix(self, ctx):
+        return self.visitChildren(ctx)
+
 
 def parse_spl(spl):
     spl['fm']['local-ast'] = SPLParserlocal(spl['fm']['local'])
