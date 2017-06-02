@@ -1,189 +1,152 @@
-#!/usr/bin/python
-
-
 """
-utils.py: this file contains utility functions and classes for translating the gentoo's ebuild in well-formed Dependent SPL and processing them
+utils.py: file containing some variables used by other modules 
 """
-
-__author__ = "Jacopo Mauro"
-__copyright__ = "Copyright 2017, Jacopo Mauro"
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
 __license__ = "ISC"
 __version__ = "0.1"
 __maintainer__ = "Jacopo Mauro"
 __email__ = "mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
-import logging
-import settings
 import re
+import uuid
+import multiprocessing
 
-import networkx
+######################################################################
+### GENTOO RELATED INFORMATION AND FUNCTIONS
+######################################################################
 
+PACKAGE_NAME_SEPARATOR = '/'
+VERSION_RE = "-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$"
 
-def preprocess(mspl,initial_configuration,package_request):
-    # crate graph with no loops
-    graph = create_graph(mspl,initial_configuration,package_request)
-    # add information about descendants
-    reachability_analysis(graph,mspl)
-
-
-class Node:
-    def __init__(self, name):
-        self.names = set([name])
-
-    def add_names(self,names):
-        self.names.update(names)
-
-def merge_nodes(graph,nodes):
-
-    in_edges = set()
-    out_edges = set()
-
-    for x in graph.in_edges(nodes):
-        if x[0] not in nodes:
-            in_edges.update([x[0]])
-        #     logging.debug("Removing edge " + unicode((x[0].names,x[1].names)))
-        # else:
-        #     logging.debug("Removing self edge " + unicode((x[0].names, x[1].names)))
-        graph.remove_edge(*x)
-
-    for x in graph.out_edges(nodes):
-        if x[1] not in nodes:
-            out_edges.update([x[1]])
-        #     logging.debug("Removing edge " + unicode((x[0].names, x[1].names)))
-        # else:
-        #     logging.debug("Removing self edge " + unicode((x[0].names, x[1].names)))
-        graph.remove_edge(*x)
-
-    names = set()
-    for i in nodes:
-        names.update(i.names)
-        graph.remove_node(i)
-
-    node = Node(names.pop())
-    node.add_names(names)
-    graph.add_node(node)
-
-    if in_edges:
-        for i in in_edges:
-            graph.add_edge(i,node)
-            # logging.debug("Creating edge " + unicode((i.names, node.names)))
-    if out_edges:
-        for i in out_edges:
-            graph.add_edge(node,i)
-            # logging.debug("Creating edge " + unicode((node.names, i.names)))
-    return node
+def process_environment_name(s):
+    if s == "**":
+        return "*"
+    if s[0] == "~":  # testing env are equivalent for us to stable env
+        return s[1:]
+    return s
 
 
-def create_graph(mspl,initial_configuration,package_request):
-    graph = networkx.DiGraph()
+######################################################################
+### FILES RELATED INFORMATION AND FUNCTIONS
+######################################################################
 
-    added = {}
-    to_process = set()
+TEMP_DIR = 'tmp'
+NAME_MAP_FILE = 'name_maps.json'
 
-    # add nodes for the intial configuration that are installed
-    for i in initial_configuration.keys():
-        name = re.sub(settings.VERSION_RE,"",i)
-        if name in mspl:
-            node = Node(name)
-            graph.add_node(node)
-            to_process.add(name)
-            added[name] = node
-        else:
-            logging.warning("The information about the installed package " + i + "(" + name + ") can not be found." +
-                            "This package will be ignored.")
+# List of the temp files.
+__tmp_files = []
+__tmp_files_lock = multiprocessing.Lock()
 
-    # add root node dependencies
-    for i in package_request:
-        v_name = re.sub(settings.VERSION_RE, "", i)
-        if v_name in mspl:
-            if i not in added:
-                if v_name not in added:
-                    node = Node(v_name)
-                    graph.add_node(node)
-                    added[v_name] = node
-                    to_process.add(v_name)
-                added[i] = added[v_name]
-                to_process.add(i)
-
-    # add edges and nodes (only base packages, not versions)
-    # configures add also a link
-    # dependencies add just a node
-    while to_process:
-        u_name = to_process.pop()
-        for i in mspl[u_name]['configures']:
-            v_name = re.sub(settings.VERSION_RE, "", i)
-            if v_name in mspl:
-                if i not in added:
-                    if v_name not in added:
-                        node = Node(v_name)
-                        graph.add_node(node)
-                        added[v_name] = node
-                        to_process.add(v_name)
-                    added[i] = added[v_name]
-                    to_process.add(i)
-                if not u_name.startswith(v_name):
-                    graph.add_edge(added[u_name], added[i])
-            else:
-                logging.warning("The package " + u_name + " requires the configuration of package " + i +
-                                " which is not found. Skipping this dependency.")
-        for i in mspl[u_name]["dependencies"]:
-            v_name = re.sub(settings.VERSION_RE, "", i)
-            if v_name in mspl:
-                if i not in added:
-                    if v_name not in added:
-                        node = Node(v_name)
-                        graph.add_node(node)
-                        added[v_name] = node
-                        to_process.add(v_name)
-                    added[i] = added[v_name]
-                    to_process.add(i)
-            else:
-                logging.warning("The package " + u_name + " requires the dependency of package " + i +
-                                " which is not found. Skipping this dependency.")
-
-    logging.debug("Graph created with " + unicode(graph.number_of_nodes()) + " nodes and " +
-                  unicode(graph.size()) + " edges")
-
-    # merge loops, if any
-    # use simple_cycles to start procedure (find_cycle seems to have a bug and does not find all the cycles)
-    cycle = next(networkx.simple_cycles(graph),[])
-    while cycle:
-        logging.debug("Find cycle of length " + unicode(len(cycle)))
-        # logging.debug(unicode([ (x[0].names,x[1].names) for x in cycle]))
-        node = merge_nodes(graph,cycle)
-        logging.debug("Graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
-                      unicode(graph.size()) + " edges")
-        try:
-            cycle = [ x[0] for x in networkx.find_cycle(graph,source=node,orientation='original')]
-        except networkx.exception.NetworkXNoCycle:
-            cycle = []
-        while cycle:
-            logging.debug("Find cycle of length " + unicode(len(cycle)))
-            node = merge_nodes(graph, cycle)
-            logging.debug("Graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
-                          unicode(graph.size()) + " edges")
-            try:
-                cycle = [x[0] for x in networkx.find_cycle(graph,source=node,orientation='original')]
-            except networkx.exception.NetworkXNoCycle:
-                cycle = []
-        # to make sure every cycle has been captured
-        cycle = next(networkx.simple_cycles(graph), [])
-
-    logging.debug("Final graph has " + unicode(graph.number_of_nodes()) + " nodes and " +
-                  unicode(graph.size()) + " edges")
-
-    return graph
+def get_new_temp_file(extension):
+    global __tmp_files_lock
+    global __tmp_files
+    name = '/tmp/' + uuid.uuid4().hex + '.' + extension
+    #__tmp_files_lock.acquire()
+    __tmp_files.append(name)
+    #__tmp_files_lock.release()
+    return name
 
 
-def reachability_analysis(graph,mspl):
-    for i in graph.nodes():
-        nodes = networkx.descendants(graph,i)
+######################################################################
+### DICTIONARY GENERATION
+######################################################################
 
-        pkgs = []
-        for j in nodes:
-            pkgs.extend(list(j.names))
-        for j in i.names:
-            mspl[j]["descendants"] = pkgs
-            mspl[j]["loop"] = list(i.names)
+# stores the mapping between names and ids
+map_name_id = {'package': {}, 'flag': {}, 'slot': {}, 'subslot': {}, 'context': {}}
+
+# stores the mapping between ids and names
+map_id_name = {}
+
+__id_current = 0
+def __get_id():
+    global __id_current
+    __id_current = __id_current + 1
+    return unicode(__id_current)
+
+__map_update_lock = multiprocessing.RLock()
+def update_map(kind, package, name):
+    global __map_update_lock
+    global __id_current
+    global map_name_id
+    global map_id_name
+    __map_update_lock.acquire()
+    if package not in map_name_id[kind]:
+        update_map_spl(package)
+    id = __get_id()
+    map_name_id[kind][package][name] = id
+    map_id_name[id] = {'type': kind, 'name': name, 'package': package}
+    __map_update_lock.release()
+
+def update_map_spl(name):
+    if package not in map_name_id['package']:
+        __map_update_lock.acquire()
+        id = __get_id()
+        map_name_id['package'][name] = id
+        map_id_name[id] = {'type': 'package', 'name': name}
+        map_name_id['flag'][name] = {}
+        map_name_id['slot'][name] = {}
+        map_name_id['subslot'][name] = {}
+        __map_update_lock.release()
+
+
+######################################################################
+### TRANSLATION SIMPLIFICATION FUNCTIONS
+######################################################################
+
+def get_hyvar_or(ls):
+    ls = [x for x in ls if x != "false"]
+    if "true" in ls:
+        return "true"
+    s = "("
+    if ls:
+        s += "( " + ls[0] + ")"
+        for i in ls[1:]:
+            s += " or (" + i + ")"
+    else:
+        return "false"
+    return s + ")"
+
+def get_hyvar_and(ls):
+    ls = [x for x in ls if x != "true"]
+    if "false" in ls:
+        return "false"
+    s = "("
+    if ls:
+        s += "( " + ls[0] + ")"
+        for i in ls[1:]:
+            s += " and (" + i + ")"
+    else:
+        return "true"
+    return s + ")"
+
+
+def get_hyvar_impl(x,y):
+    if x == "false" or y == "true":
+        return "true"
+    if y == "false":
+        return "true"
+    if x == "true":
+        return "( " + y + ")"
+    else:
+        return "( " + x + " impl " + y + ")"
+
+def get_hyvar_package(id):
+    return "feature[p" + id + "]"
+
+def get_hyvar_flag(id):
+    return "feature[f" + id + "]"
+
+def get_hyvar_context():
+    return "context[c]"
+
+
+def get_hyvar_slot(id):
+    return "attribute[s" + id + "]"
+
+def get_hyvar_subslot(id):
+    return "attribute[ss" + id + "]"
+
+
 

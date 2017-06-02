@@ -29,12 +29,6 @@ def usage():
 ### GLOBAL VARVIABLES
 #####################################################################################
 
-# stores the mapping between names and ids
-map_name_id = {'package': {}, 'flag': {}, 'slot': {}, 'subslot': {}, 'context': {}}
-
-# stores the mapping between ids and names
-map_id_name = {}
-
 # stores the json info related to the mspl produced processing the gentoo files
 mspl = {}
 # stores the package group
@@ -191,212 +185,61 @@ def parse_mspl():
 ### FUNCTIONS TO CREATE THE NAME <-> ID DICTIONARY
 ######################################################################
 
-__id_current = 0
-__id_lock = Lock.Lock()
-def get_new_id():
-    with __id_lock.lock:
-        res = __id_current
-        __id_current += 1
-    return res
+# note that ANTLR4 visitors are thread safe
+class SPLParserGetUses(DepGrammarVisitor):
+    """
+    this class fill the dictionary from an spl's constraints
+    """
+    def __init__(self):
+        super(DepGrammarVisitor, self).__init__()
+    def visit_spl(self, spl):
+        self.name = spl['name']
+        self.visitRequired(spl['fm']['local-ast'])
+        self.visitDepend(spl['fm']['external-ast'])
+        self.visitDepend(spl['fm']['runtime-ast'])
+    def visitCondition(self, ctx):
+        use = ctx.getID().getText()
+        utils.update_map('flag', self.name, use)
+    def visitAtom(self, ctx):
+        self.package = ctx.getID().getText()
+    def visitSelection(self, ctx):
+        use = ctx.getID().getText()        
+        utils.update_map('flag', self.package, use)
 
-def generate_name_mapping_file(spl, target_dir):
+
+def generate_name_mapping(spl):
     """
     Fill the name mapping file with information from one spl
     """
-    global map_name_id
-    global map_id_name
     name = spl['name']
-    id = get_new_id()
-    map_name_id["package"][name] = id
-    map_id_name[id] = {"type": "package", "name": name}
-    map_name_id["flag"][name] = {}
-    map_name_id["slot"][name] = {}
-    map_name_id["subslot"][name] = {}
+    utils.update_map_spl(name)
     # 1. features
     if trust_feature_declaration:
-        for feature in spl['features']:
-            id = get_new_id()
-            map_name_id["flag"][name][feature] = id
-            map_id_name[id] = {"type": "flag", "name": feature, "package": name}
+        for use in spl['features']:
+            utils.update_map('flag', package, use)
     else:
-        # need a visitor for this
-        pass
+        SPLParserGetUses().visit_spl(spl)
     # 2. slots
-missing id to name for slots and environment: is it an error
-
-##########################################################
-##########################################################
-
-
-            # add flags
-            for j in spl[i]["features_used"]["external"].values():
-                for k in j:
-                    if k not in map_name_id["flag"][i]:
-                        id = settings.get_new_id()
-                        map_name_id["flag"][i][k] = id
-                        map_id_name[id] = {"type": "flag", "name": k, "package": i}
-            for j in spl[i]["features_used"]["local"]:
-                id = settings.get_new_id()
-                map_name_id["flag"][i][j] = id
-                map_id_name[id] = {"type": "flag", "name": j, "package": i}
-            # consider also the flags in the "features" key of the mspl
-            for j in [x for x in mspl[i]["features"] if x != "__main__"]:
-                if j not in map_name_id["flag"][i]:
-                    id = settings.get_new_id()
-                    map_name_id["flag"][i][j] = id
-                    map_id_name[id] = {"type": "flag", "name": j, "package": i}
-            # add slots and subslots
-            j = mspl[i]["features"]["__main__"]
-            # process slots (conversion from name into a range of integers)
-            counter = 0
-            for k in mspl[i]["features"]["__main__"]["slots"]:
-                map_name_id["slot"][i][k] = counter
-                counter += 1
-            if counter > 1:
-                logging.error("Find more than one slot for package " + i)
-            # process subslots (conversion from name into a range of integers)
-            counter = 0
-            for k in mspl[i]["features"]["__main__"]["subslots"]:
-                map_name_id["subslot"][i][k] = counter
-                counter += 1
-            if counter > 1:
-                logging.error("Find more than one subslot for package " + i)
-        # process environment (conversion from name into a range of integers)
-        for j in mspl[i]["environment"]:
-            name = settings.process_envirnoment_name(j)
-            # consider only envirnoments that we are sure the component can be installed
-            # * and ** are treated the same, ~x and x are treated the same
-            if not name.startswith("-"):
-                if not name in map_name_id["context"]:
-                    map_name_id["context"][name] = len(map_name_id["context"])
-    logging.info("Write map of names in " + settings.NAME_MAP_FILE)
-    with open(os.path.join(target_dir, settings.NAME_MAP_FILE), 'w') as f:
-        json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
+    utils.update_map('slot', name, spl['slots']['slot'])
+    utils.update_map('subslot', name, spl['slots']['subslot'])
+    # 3. keywords
+    for keyword in spl['environment']:
+            name = utils.update_map('context',keyword)
 
 
-
-
-##########################################################
-##########################################################
-##########################################################
-
-
-
-
-
-
-def read_json(json_file):
+def generate_name_mapping(target_dir):
     """
-    loads the json file
+    this function extracts the name mapping from the loaded mspl, and save it in the specified directory.
     """
-    with open(json_file) as data_file:
-        data = json.load(data_file)
-    return data
+    pool = multiprocessing.Pool(available_core)
+    pool.map(generate_name_mapping,mspl.values())
+    utils.finish_update_map(target_dir)
 
 
-def load_mspl(mspl_dir):
-    """
-    loads in memory the json files of the mspl in the directory mspl_dir
-    """
-    global mspl
-    dirs = os.listdir(mspl_dir)
-    for i in dirs:
-        logging.debug("Loading json files from dir " + i)
-        files = os.listdir(os.path.join(mspl_dir,i))
-        for f in files:
-            mspl[i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)] = read_json(os.path.join(mspl_dir,i,f))
+######################################################################
+### FUNCTIONS FOR MSPL TRANSLATION
+######################################################################
 
-
-def load_spl(spl_dir):
-    """
-    loads in memory the json files of the mspl in the directory mspl_dir
-    """
-    global spl
-    dirs = os.listdir(spl_dir)
-    for i in dirs:
-        logging.debug("Loading json files from dir " + i)
-        files = os.listdir(os.path.join(spl_dir,i))
-        for f in files:
-            spl[i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)] = read_json(os.path.join(spl_dir,i,f))
-            # TODO ask michael to avoid to generate this info
-            del(spl[i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)]["dependencies"])
-
-
-
-
-
-
-def generate_name_mapping_file(target_dir):
-    """
-    Generates the name mapping file
-    Requires the load of the mspl
-    """
-    global mspl
-    global map_name_id
-    global map_id_name
-    for i in mspl.keys():
-        id = settings.get_new_id()
-        map_name_id["package"][i] = id
-        map_id_name[id] = {"type": "package", "name": i}
-        map_name_id["flag"][i] = {}
-        map_name_id["slot"][i] = {}
-        map_name_id["subslot"][i] = {}
-        if not is_base_package(i):
-            # add flags
-            for j in spl[i]["features_used"]["external"].values():
-                for k in j:
-                    if k not in map_name_id["flag"][i]:
-                        id = settings.get_new_id()
-                        map_name_id["flag"][i][k] = id
-                        map_id_name[id] = {"type": "flag", "name": k, "package": i}
-            for j in spl[i]["features_used"]["local"]:
-                id = settings.get_new_id()
-                map_name_id["flag"][i][j] = id
-                map_id_name[id] = {"type": "flag", "name": j, "package": i}
-            # consider also the flags in the "features" key of the mspl
-            for j in [x for x in mspl[i]["features"] if x != "__main__"]:
-                if j not in map_name_id["flag"][i]:
-                    id = settings.get_new_id()
-                    map_name_id["flag"][i][j] = id
-                    map_id_name[id] = {"type": "flag", "name": j, "package": i}
-            # add slots and subslots
-            j = mspl[i]["features"]["__main__"]
-            # process slots (conversion from name into a range of integers)
-            counter = 0
-            for k in mspl[i]["features"]["__main__"]["slots"]:
-                map_name_id["slot"][i][k] = counter
-                counter += 1
-            if counter > 1:
-                logging.error("Find more than one slot for package " + i)
-            # process subslots (conversion from name into a range of integers)
-            counter = 0
-            for k in mspl[i]["features"]["__main__"]["subslots"]:
-                map_name_id["subslot"][i][k] = counter
-                counter += 1
-            if counter > 1:
-                logging.error("Find more than one subslot for package " + i)
-        # process environment (conversion from name into a range of integers)
-        for j in mspl[i]["environment"]:
-            name = settings.process_envirnoment_name(j)
-            # consider only envirnoments that we are sure the component can be installed
-            # * and ** are treated the same, ~x and x are treated the same
-            if not name.startswith("-"):
-                if not name in map_name_id["context"]:
-                    map_name_id["context"][name] = len(map_name_id["context"])
-    logging.info("Write map of names in " + settings.NAME_MAP_FILE)
-    with open(os.path.join(target_dir, settings.NAME_MAP_FILE), 'w') as f:
-        json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
-
-
-# function to encode SMT expression into SMTLIB
-# ; benchmark
-# (set-info :status unknown)
-# (set-logic QF_LIA)
-# (declare-fun b () Int)
-# (declare-fun a () Int)
-# (assert ...)
-# (check-sat)
-# // empty line
 def toSMT2(f, status="unknown", name="benchmark", logic=""):
   v = (z3.Ast * 0)()
   return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
