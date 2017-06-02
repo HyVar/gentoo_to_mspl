@@ -176,84 +176,52 @@ def __SPLParserparser(to_parse):
     parser._listeners = [ syntax_error_listener ]
     return parser
 
-lass SPLParserGetUses(DepGrammarVisitor):
+class SPLParserTranslateConstraints(DepGrammarVisitor):
     """
-    this class fill the dictionary from an spl's constraints
+    this class translates the ANTLR4 AST in our own AST
     """
     def __init__(self):
         super(DepGrammarVisitor, self).__init__()
     def visitRequired(self, ctx):
-        return [ self.visitRequiredEL()self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#requiredSIMPLE.
+        return [ child.accept(self) for child in ctx.requiredEL() ]
     def visitRequiredSIMPLE(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#requiredCONDITION.
+        return { 'type': "rsimple", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
     def visitRequiredCONDITION(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#requiredCHOICE.
+        return { 'type': "rcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitRequiredCHOICE(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#requiredINNER.
+        return { 'type': "rchoice", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitRequiredINNER(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
 
-
-    # Visit a parse tree produced by DepGrammarParser#depend.
     def visitDepend(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#dependSIMPLE.
+        return [ child.accept(self) for child in ctx.dependEL() ]
     def visitDependSIMPLE(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#dependCONDITION.
+        return { 'type': "dsimple", 'atom': ctx.atom().accept(self) } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {}) + ({ 'not': ctx.BLOCK()) } if ctx.BLOCK() else {})
     def visitDependCONDITION(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#dependCHOICE.
+        return { 'type': "dcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitDependCHOICE(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#dependINNER.
+        return { 'type': "dchoice", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitDependINNER(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
 
-
-    # Visit a parse tree produced by DepGrammarParser#choice.
     def visitChoice(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#condition.
+        return ( { 'type': "or" } if ctx.OR() else ({ 'type': "one-max" } if ctx.ONEMAX() else ({ 'type': "xor" })) )
     def visitCondition(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "condition", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
 
-
-    # Visit a parse tree produced by DepGrammarParser#atom.
     def visitAtom(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "atom", 'package': ctx.ID() }
+            + (ctx.version_op().accept(self) if ctx.version_op() else {})
+            + ({ 'times': ctx.TIMES()) } if ctx.TIMES() else {})
+            + ({ 'slots': ctx.slot_spec().accept(self) } if ctx.slot_spec() else {})
+            + ([child.accept(self) for ctx.selection()] if ctx.selection() else {})
 
-
-    # Visit a parse tree produced by DepGrammarParser#version_op.
     def visitVersion_op(self, ctx):
-        return self.visitChildren(ctx)
+        return ({ 'LEQ': "<=" } if ctx.LEQ() else ({ 'LT': "<" } if ctx.LT() else ({ 'GT': ">" } if ctx.GT() else
+            ({ 'GEQ': ">=" } if ctx.GEQ() else ({ 'EQ': "=" } if ctx.EQ() else ({ 'NEQ': "!=" } if ctx.NEQ() else ({ 'REV': "~"})))))))
 
-
-    # Visit a parse tree produced by DepGrammarParser#slotSIMPLE.
     def visitSlotSIMPLE(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "ssimple", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
 
 
     # Visit a parse tree produced by DepGrammarParser#slotFULL.

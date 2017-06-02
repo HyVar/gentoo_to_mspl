@@ -10,7 +10,7 @@ options { tokenVocab=DepGrammarLexer; }
 required: requiredEL* ;
 
 requiredEL:
-    NOT? use=ID                                          #requiredSIMPLE
+    NOT? use=ID                                       #requiredSIMPLE
   | condition LPAREN requiredEL* RPAREN               #requiredCONDITION
   | choice LPAREN requiredEL* RPAREN                  #requiredCHOICE
   | LPAREN requiredEL* RPAREN                         #requiredINNER
@@ -37,9 +37,8 @@ version_op: LEQ | LT | GT | GEQ | EQ | NEQ | REV ;
 slot_spec:
     slot=ID                                   #slotSIMPLE
   | slot=ID DIV subslot=ID                    #slotFULL
-  | EQ                                        #slotEQ
+  | slot=ID? EQ                               #slotEQ
   | TIMES                                     #slotSTAR
-  | slot=ID EQ                                #slotSIMPLEEQ
   ;
 
 selection: prefix? use=ID preference? suffix? ;
