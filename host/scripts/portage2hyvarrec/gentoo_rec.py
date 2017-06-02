@@ -85,6 +85,7 @@ def is_base_package(package_name):
     """
     return "implementations" in mspl[package_name]
 
+
 ######################################################################
 ### FUNCTIONS TO LOAD A PORTAGE MD5-CACHE REPOSITORY
 ######################################################################
@@ -185,7 +186,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitRequired(self, ctx):
         return [ child.accept(self) for child in ctx.requiredEL() ]
     def visitRequiredSIMPLE(self, ctx):
-        return { 'type': "rsimple", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
+        return { 'type': "rsimple", 'use': ctx.ID().getText() } + ({ 'not': ctx.NOT().getText()) } if ctx.NOT() else {})
     def visitRequiredCONDITION(self, ctx):
         return { 'type': "rcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitRequiredCHOICE(self, ctx):
@@ -196,107 +197,186 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitDepend(self, ctx):
         return [ child.accept(self) for child in ctx.dependEL() ]
     def visitDependSIMPLE(self, ctx):
-        return { 'type': "dsimple", 'atom': ctx.atom().accept(self) } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {}) + ({ 'not': ctx.BLOCK()) } if ctx.BLOCK() else {})
+        return { 'type': "dsimple", 'atom': ctx.atom().accept(self) }
+            + ({ 'not': ctx.NOT().getText()) } if ctx.NOT() else {})
+            + ({ 'block': ctx.BLOCK().getText()) } if ctx.BLOCK() else {})
     def visitDependCONDITION(self, ctx):
-        return { 'type': "dcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
+        return { 'type': "dcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.dependEL() ] }
     def visitDependCHOICE(self, ctx):
-        return { 'type': "dchoice", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
+        return { 'type': "dchoice", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
     def visitDependINNER(self, ctx):
-        return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
+        return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
 
     def visitChoice(self, ctx):
         return ( { 'type': "or" } if ctx.OR() else ({ 'type': "one-max" } if ctx.ONEMAX() else ({ 'type': "xor" })) )
     def visitCondition(self, ctx):
-        return { 'type': "condition", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
+        return { 'type': "condition", 'use': ctx.ID().getText() } + ({ 'not': ctx.NOT().getText()) } if ctx.NOT() else {})
 
     def visitAtom(self, ctx):
-        return { 'type': "atom", 'package': ctx.ID() }
-            + (ctx.version_op().accept(self) if ctx.version_op() else {})
-            + ({ 'times': ctx.TIMES()) } if ctx.TIMES() else {})
+        return { 'type': "atom", 'package': ctx.ID().getText() }
+            + ({ 'version_op': ctx.version_op().accept(self) } if ctx.version_op() else {})
+            + ({ 'times': ctx.TIMES().getText()) } if ctx.TIMES() else {})
             + ({ 'slots': ctx.slot_spec().accept(self) } if ctx.slot_spec() else {})
-            + ([child.accept(self) for ctx.selection()] if ctx.selection() else {})
+            + ({ 'selection': [child.accept(self) for ctx.selection()] } if ctx.selection() else {})
 
     def visitVersion_op(self, ctx):
         return ({ 'LEQ': "<=" } if ctx.LEQ() else ({ 'LT': "<" } if ctx.LT() else ({ 'GT': ">" } if ctx.GT() else
             ({ 'GEQ': ">=" } if ctx.GEQ() else ({ 'EQ': "=" } if ctx.EQ() else ({ 'NEQ': "!=" } if ctx.NEQ() else ({ 'REV': "~"})))))))
 
     def visitSlotSIMPLE(self, ctx):
-        return { 'type': "ssimple", 'use': ctx.ID() } + ({ 'not': ctx.NOT()) } if ctx.NOT() else {})
-
-
-    # Visit a parse tree produced by DepGrammarParser#slotFULL.
+        return { 'type': "ssimple", 'slot': ctx.ID().getText() } + ({ 'not': ctx.NOT().getText()) } if ctx.NOT() else {})
     def visitSlotFULL(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#slotEQ.
+        return { 'type': "sfull", 'slot': ctx.ID(0).getText(), 'subslot': ctx.ID(1).getText() }
     def visitSlotEQ(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#slotSTAR.
+        return { 'type': "seq" } + ({ 'slot': ctx.ID().getText() } if ctx.ID() else {})
     def visitSlotSTAR(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "sstar" }
 
-
-    # Visit a parse tree produced by DepGrammarParser#slotSIMPLEEQ.
-    def visitSlotSIMPLEEQ(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#selection.
     def visitSelection(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#prefix.
+        return { 'type': "selection", 'use': ctx.ID().getText() }
+             + ({ 'prefix': ctx.prefix().accept(self) } if ctx.prefix() else {})
+             + ({ 'preference': ctx.preference().accept(self) } if ctx.preference() else {})
+             + ({ 'suffix': ctx.suffix().accept(self) } if ctx.suffix() else {})
     def visitPrefix(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#preference.
+        return { 'type': "prefix" }
+            + ({ 'NOT': ctx.NOT().getText()) } if ctx.NOT() else {})
+            + ({ 'MINUS': ctx.MINUS().getText()) } if ctx.MINUS() else {})
+            + ({ 'PLUS': ctx.PLUS().getText()) } if ctx.PLUS() else {})
     def visitPreference(self, ctx):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DepGrammarParser#suffix.
+        return { 'type': "preference" }
+            + ({ 'MINUS': ctx.MINUS().getText()) } if ctx.MINUS() else {})
+            + ({ 'PLUS': ctx.PLUS().getText()) } if ctx.PLUS() else {})
     def visitSuffix(self, ctx):
-        return self.visitChildren(ctx)
+        return { 'type': "suffix" }
+            + ({ 'IMPLIES': ctx.IMPLIES().getText()) } if ctx.IMPLIES() else {})
+            + ({ 'EQ': ctx.EQ().getText()) } if ctx.EQ() else {})
 
+ast_translator = SPLParserTranslateConstraints()
 
 def parse_spl(spl):
-    spl['fm']['local-ast'] = SPLParserlocal(spl['fm']['local'])
-    spl['fm']['external-ast'] = SPLParserexternal(spl['fm']['external'])
-    spl['fm']['runtime-ast'] = SPLParserexternal(spl['fm']['runtime'])
+    local_ast = ast_translator.visitRequired(SPLParserlocal(spl['fm']['local']))
+    external_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['external']))
+    runtime_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['runtime']))
+    return (spl['name'], local_ast, external_ast, runtime_ast)
 
 def parse_mspl():
-    for spl in mspl.values():
-        parse_spl(spl)
+    global mspl
+    global asts
+    pool = multiprocessing.dummy.Pool(available_core)
+    asts = pool.map(parse_spl, mspl)
+
+######################################################################
+### BASE VISITOR FOR OUR AST
+######################################################################
+
+class ASTVisitor(object):
+    """
+    this is the base Visitr class for our AST
+    """
+    def DefaultValue(self):
+        return None
+    def CombineValue(self, value1, value2):
+        return value2
+
+    def visitRequired(self, ctx):
+        return reduce(self.__mapvisitRequiredEL, ctx, self.DefaultValue())
+    def visitRequiredEL(self, ctx):
+        if ctx['type'] == "rsimple":
+            self.visitRequiredSIMPLE(ctx)
+        elif ctx['type'] == "rcondition":
+            self.visitRequiredCONDITION(ctx)
+        elif ctx['type'] == "rchoice":
+            self.visitRequiredCHOICE(ctx)
+        elif ctx['type'] == "rinner":
+            self.visitRequiredINNER(ctx)
+    def visitRequiredSIMPLE(self, ctx):
+        return self.DefaultValue()
+    def visitRequiredCONDITION(self, ctx):
+        return reduce(self.__mapvisitRequiredEL, ctx['els'], self.visitCondition(ctx['rcondition']))
+    def visitRequiredCHOICE(self, ctx):
+        return reduce(self.__mapvisitRequiredEL, ctx['els'], self.DefaultValue())
+    def visitRequiredINNER(self, ctx):
+        return reduce(self.__mapvisitRequiredEL, ctx['els'], self.DefaultValue())
+
+    def visitDepend(self, ctx):
+        return reduce((lambda x,y: self.CombineValue(self.visitDependEL(x),y)), ctx, self.DefaultValue())
+    def visitDependEL(self, ctx):
+        if ctx['type'] == "dsimple":
+            self.visitDependSIMPLE(ctx)
+        elif ctx['type'] == "dcondition":
+            self.visitDependCONDITION(ctx)
+        elif ctx['type'] == "dchoice":
+            self.visitDependCHOICE(ctx)
+        elif ctx['type'] == "dinner":
+            self.visitDependINNER(ctx)
+    def visitDependSIMPLE(self, ctx):
+        return self.visitAtom(ctx['atom'])
+    def visitDependCONDITION(self, ctx):
+        return reduce(self.__mapvisitDependEL, ctx['els'], self.visitCondition(ctx['dcondition']))
+    def visitDependCHOICE(self, ctx):
+        return reduce(self.__mapvisitDependEL, ctx['els'], self.DefaultValue())
+    def visitDependINNER(self, ctx):
+        return reduce(self.__mapvisitDependEL, ctx, self.DefaultValue())
+
+    def visitChoice(self, ctx):
+        return self.DefaultValue()
+    def visitCondition(self, ctx):
+        return self.DefaultValue()
+
+    def visitAtom(self, ctx):
+        res = self.DefaultValue()
+        if 'version_op' in ctx:
+            self.CombineValue(res, self.visitVersion_op(ctx['version_op']))
+        if 'slots' in ctx:
+            self.CombineValue(res, self.visitSlot(ctx['slots']))
+        if 'selection' in ctx:
+            self.CombineValue(res, self.visitSelection(ctx['selection']))
+        return res
+
+    def visitVersion_op(self, ctx):
+        return self.DefaultValue()
+    def visitSlot(self, ctx):
+        if ctx['type'] == "ssimple":
+            self.visitSlotSIMPLE(ctx)
+        elif ctx['type'] == "sfull":
+            self.visitSlotFULL(ctx)
+        elif ctx['type'] == "seq":
+            self.visitSlotEQ(ctx)
+        elif ctx['type'] == "sstar":
+            self.visitSlotSTAR(ctx)
+    def visitSlotSIMPLE(self, ctx):
+        return self.DefaultValue()
+    def visitSlotFULL(self, ctx):
+        return self.DefaultValue()
+    def visitSlotEQ(self, ctx):
+        return self.DefaultValue()
+    def visitSlotSTAR(self, ctx):
+        return self.DefaultValue()
+
+    def visitSelection(self, ctx):
+        res = self.DefaultValue()
+        if 'prefix' in ctx:
+            self.CombineValue(res, self.visitPrefix(ctx['prefix']))
+        if 'preference' in ctx:
+            self.CombineValue(res, self.visitPreference(ctx['preference']))
+        if 'suffix' in ctx:
+            self.CombineValue(res, self.visitSuffix(ctx['suffix']))
+        return res
+    def visitPrefix(self, ctx):
+        return self.DefaultValue()
+    def visitPreference(self, ctx):
+        return self.DefaultValue()
+    def visitSuffix(self, ctx):
+        return self.DefaultValue()
+    def __mapvisitRequiredEL(x,y):
+        return self.CombineValue(self.visitRequiredEL(x),y)
+    def __mapvisitDependEL(x,y):
+        return self.CombineValue(self.visitDependEL(x),y)
 
 ######################################################################
 ### FUNCTIONS TO CREATE THE NAME <-> ID DICTIONARY
 ######################################################################
 
-# note that ANTLR4 visitors are thread safe
-class SPLParserGetUses(DepGrammarVisitor):
-    """
-    this class fill the dictionary from an spl's constraints
-    """
-    def __init__(self):
-        super(DepGrammarVisitor, self).__init__()
-    def visit_spl(self, spl):
-        self.name = spl['name']
-        self.visitRequired(spl['fm']['local-ast'])
-        self.visitDepend(spl['fm']['external-ast'])
-        self.visitDepend(spl['fm']['runtime-ast'])
-    def visitCondition(self, ctx):
-        use = ctx.getID().getText()
-        utils.update_map('flag', self.name, use)
-    def visitAtom(self, ctx):
-        self.package = ctx.getID().getText()
-    def visitSelection(self, ctx):
-        use = ctx.getID().getText()        
-        utils.update_map('flag', self.package, use)
 
 
 def generate_name_mapping(spl):
