@@ -43,7 +43,7 @@ to_smt = True
 # trust feature declaration in portage file
 trust_feature_declaration = True
 # number of core to use
-available_core = 3
+available_cores = 3
 
 ######################################################################
 ### FUNCTIONS UTILS
@@ -145,7 +145,7 @@ def load_repository_egencache(path):
     this function loads a full portage egencache repository.
     """
     global mspl
-    pool = multiprocessing.dummy.Pool(available_core)
+    pool = multiprocessing.dummy.Pool(available_cores)
     mspl = pool.map(load_file_egencache, get_egencache_files(path))
 
 
@@ -268,7 +268,7 @@ def parse_spl(spl):
 def parse_mspl():
     global mspl
     global asts
-    pool = multiprocessing.dummy.Pool(available_core)
+    pool = multiprocessing.dummy.Pool(available_cores)
     asts = pool.map(parse_spl, mspl)
 
 ######################################################################
@@ -410,7 +410,7 @@ def generate_name_mapping(target_dir):
     """
     this function extracts the name mapping from the loaded mspl, and save it in the specified directory.
     """
-    pool = multiprocessing.Pool(available_core)
+    pool = multiprocessing.Pool(available_cores)
     pool.map(generate_name_mapping,mspl.values())
     utils.finish_update_map(target_dir)
 
@@ -613,9 +613,9 @@ def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
     global to_smt
 
     if par > 1:
-        cores_to_use = max(par, multiprocessing.cpu_count())
+        available_cores = max(par, multiprocessing.cpu_count())
     else:
-        cores_to_use = max(1, multiprocessing.cpu_count() - 1)
+        available_cores = max(1, multiprocessing.cpu_count() - 1)
     if verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
         logging.info("Verbose output.")
@@ -644,10 +644,10 @@ def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
     else:
         to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
         # if more than one thread is used python goes into segmentation fault
-        logging.info("Starting to convert packages using " + unicode(cores_to_use) + " processes.")
+        logging.info("Starting to convert packages using " + unicode(available_cores) + " processes.")
         logging.info("Number of packages to convert: " + unicode(len(to_convert)))
 
-        pool = multiprocessing.Pool(cores_to_use)
+        pool = multiprocessing.Pool(available_cores)
         pool.map(worker,[(x,target_dir) for x in to_convert])
     logging.info("Execution terminated.")
 
