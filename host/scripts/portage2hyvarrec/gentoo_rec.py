@@ -35,6 +35,11 @@ mspl = None
 asts = None
 # stores the package group
 dependencies = None
+# stores the ids of all the elements in the mspl
+map_name_id = None
+map_id_name = None
+# stores the package groups
+package_groups = None
 
 ## TOOL SETTINGS
 # encode into z3 SMT representation directly
@@ -424,7 +429,7 @@ class GenerateUseMappingsAST(ASTVisitor):
     def DefaultValue(self):
         return {}
     def CombineValue(self, value1, value2):
-        return {k:(value1[k] if k in value1 else []) + (value2[k] if k in value2 else []) for k in value1.keys() + value2.keys() }
+        return utils.combine_dicts(value1, value2, [])
 
     def visitRequiredSIMPLE(self, ctx):
         return { self.spl_name: [ ctx['use'] ] }
@@ -449,6 +454,23 @@ def generate_use_mappings_ast(ast_el):
             update_mappings(mappings, 'flag', spl_name, use)
     return mappings
 
+def generate_name_mappings(pool):
+    global mspl
+    global asts
+    global map_name_id
+    global map_id_name
+    mappings_list = pool.map(generate_name_mappings_spl,mspl)
+    if not trust_feature_declaration:
+        mappings_list = mappings_list + pool.map(generate_use_mappings_ast,asts)
+    map_id_name, map_name_id = create_empty_name_mappings()
+    for local_map_id_name, local_map_name_id in mappings_list:
+        map_id_name.update(local_map_id_name)
+        map_name_id['package'].update(local_map_name_id['package'])
+        map_name_id['context'].update(local_map_name_id['context'])
+        map_name_id['flag'] = utils.combine_dicts(map_name_id['flag'], local_map_name_id['flag'], {})
+        map_name_id['slot'] = utils.combine_dicts(map_name_id['slot'], local_map_name_id['slot'], {})
+        map_name_id['subslot'] = utils.combine_dicts(map_name_id['subslot'], local_map_name_id['subslot'], {})
+
 
 # extracting dependencies from the ast
 class GenerateDependenciesAST(ASTVisitor):
@@ -468,65 +490,47 @@ def generate_dependencies_ast(ast_el):
     dependencies = visitor.visitDepend(combined_ast)
     return (spl_name, set(dependencies))
 
-# generate the group packages
-def generate_group_package():
+def generate_dependencies(pool):
+    global asts
+    global dependencies
+    dependencies = pool.map(generate_dependencies_ast,asts)
+
+# extracting package groups
+def generate_package_groups(pool):
     global mspl
-    pool = multiprocessing.Pool(available_cores)
+    global package_groups
     information_list = pool.map((lambda spl: ( spl['group_name'], spl['versions']['full'], spl['name'])), mspl)
-    res = {}
+    package_groups = {}
     for group_name, version, spl_name in information_list:
-        if group_name in res:
-            res[group_name][version] = spl_name
+        if group_name in package_groups:
+            package_groups[group_name][version] = spl_name
+            package_groups[group_name]['dependencies'].add(spl_name)
         else:
-        res[group_name] = {version: spl_name}
-    return res 
+        package_groups[group_name] = {version: spl_name, 'dependencies': [spl_name]}
 
 # Main Generation function
-def generate_all_information():
+def generate_all_information(target_dir):
     """
     Fill the name mapping file with information from one spl
     """
-    global mspl
-    global asts
-    global dependencies
     pool = multiprocessing.Pool(available_cores)
     # 1. generate the name mappings
-    mappings_list = pool.map(generate_name_mappings_spl,mspl)
-    if not trust_feature_declaration:
-        mappings_list = mappings_list + pool.map(generate_use_mappings_ast,mspl)
-    map_id_name, map_name_id = create_empty_name_mappings()
-    for local_map_id_name, local_map_name_id in mappings_list:
-
+    global map_name_id
+    global map_id_name
+    generate_name_mappings(pool)
+    logging.info("Write map of names in " + utils.NAME_MAP_FILE)
+    with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
+        json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
     # 2. generate the dependencies
-
+    global mspl
+    global dependencies
+    generate_dependencies(pool)
+    for spl_name, deps in dependencies:
+        mspl[spl_name]['dependencies'] = deps
     # 3. generate the package groups
-
-
-    name = spl['name']
-    utils.update_map_spl(name)
-    # 1. features
-    if trust_feature_declaration:
-        for use in spl['features']:
-            utils.update_map('flag', package, use)
-    else:
-        SPLParserGetUses().visit_spl(spl)
-    # 2. slots
-    utils.update_map('slot', name, spl['slots']['slot'])
-    utils.update_map('subslot', name, spl['slots']['subslot'])
-    # 3. keywords
-    for keyword in spl['environment']:
-            keyword = utils.process_keyword(keyword)
-            if not name.startswith("-"):
-                name = utils.update_map('context',keyword)
-
-
-def generate_name_mapping(target_dir):
-    """
-    this function extracts the name mapping from the loaded mspl, and save it in the specified directory.
-    """
-    pool = multiprocessing.Pool(available_cores)
-    pool.map(generate_name_mapping,mspl.values())
-    utils.finish_update_map(target_dir)
+    global package_groups
+    generate_package_groups(pool)
+    mspl.update(package_groups)
 
 
 ######################################################################

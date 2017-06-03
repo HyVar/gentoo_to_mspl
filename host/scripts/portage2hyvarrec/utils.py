@@ -13,6 +13,9 @@ import re
 import uuid
 import multiprocessing
 
+def combine_dicts(dict1, dict2, default):
+    return {k:(dict1[k] if k in dict1 else default) + (dict2[k] if k in dict2 else default) for k in set(dict1.keys() + dict2.keys()) }
+
 ######################################################################
 ### GENTOO RELATED INFORMATION AND FUNCTIONS
 ######################################################################
@@ -63,26 +66,9 @@ def new_id():
     global __id_current
     global __id_current_lock
     with __id_current_lock:
+        res = __id_current
         __id_current = __id_current + 1
-    return unicode(__id_current)
-
-
-def finish_map(target_dir):
-    global map_name_id
-    global map_id_name
-    map_name_id = {'package': map_name_id_package,
-        'flag': map_name_id_flag,
-        'slot': map_name_id_slot,
-        'subslot': map_name_id_subslot,
-        'context': map_name_id_context }
-    logging.info("Write map of names in " + utils.NAME_MAP_FILE)
-    with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
-        json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
-
-            if not name.startswith("-"):
-                if not name in map_name_id['context']:
-                    map_name_id["context"][name] = len(map_name_id["context"])
-
+    return unicode(res)
 
 ######################################################################
 ### TRANSLATION SIMPLIFICATION FUNCTIONS
