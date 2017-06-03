@@ -20,7 +20,9 @@ import multiprocessing
 PACKAGE_NAME_SEPARATOR = '/'
 VERSION_RE = "-[0-9]+(\.[0-9]+)*[a-zA-Z]?((_alpha|_beta|_pre|_rc|_p)[0-9]*)*(-r[0-9]+)?$"
 
-def process_environment_name(s):
+# consider only envirnoments that we are sure the component can be installed
+# * and ** are treated the same, ~x and x are treated the same
+def process_keyword(s):
     if s == "**":
         return "*"
     if s[0] == "~":  # testing env are equivalent for us to stable env
@@ -50,58 +52,20 @@ def get_new_temp_file(extension):
 
 
 ######################################################################
-### DICTIONARY GENERATION
+### ID GENERATION
 ######################################################################
 
-# stores the mapping between names and ids
-map_name_id_package = {}
-map_name_id_flag = {}
-map_name_id_slot = {}
-map_name_id_subslot = {}
-map_name_id_context = {}
-
-map_name_id = {'package': {}, 'flag': {}, 'slot': {}, 'subslot': {}, 'context': {}}
-
-# stores the mapping between ids and names
-map_id_name = {}
-
-# how to deal efficiently with concurrency?
 
 __id_current = 0
-def __get_id():
+__id_current_lock = multiprocessing.Lock()
+
+def new_id():
     global __id_current
-    __id_current = __id_current + 1
+    global __id_current_lock
+    with __id_current_lock:
+        __id_current = __id_current + 1
     return unicode(__id_current)
 
-__map_update_lock = multiprocessing.Lock()
-def update_map_package(kind, package):
-    global
-def update_map_use(kind, package, name):
-def update_map_slot(kind, package, name):
-def update_map_subslot(kind, package, name):
-def update_map_context(kind, name):
-    global __map_update_lock
-    global __id_current
-    global map_name_id
-    global map_id_name
-    __map_update_lock.acquire()
-    if package not in map_name_id[kind]:
-        update_map_spl(package)
-    id = __get_id()
-    map_name_id[kind][package][name] = id
-    map_id_name[id] = {'type': kind, 'name': name, 'package': package}
-    __map_update_lock.release()
-
-def update_map_spl(name):
-    if package not in map_name_id['package']:
-        __map_update_lock.acquire()
-        id = __get_id()
-        map_name_id['package'][name] = id
-        map_id_name[id] = {'type': 'package', 'name': name}
-        map_name_id['flag'][name] = {}
-        map_name_id['slot'][name] = {}
-        map_name_id['subslot'][name] = {}
-        __map_update_lock.release()
 
 def finish_map(target_dir):
     global map_name_id
@@ -115,8 +79,6 @@ def finish_map(target_dir):
     with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
         json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
 
-            # consider only envirnoments that we are sure the component can be installed
-            # * and ** are treated the same, ~x and x are treated the same
             if not name.startswith("-"):
                 if not name in map_name_id['context']:
                     map_name_id["context"][name] = len(map_name_id["context"])
