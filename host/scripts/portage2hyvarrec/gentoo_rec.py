@@ -86,7 +86,7 @@ def get_egencache_files(path):
     """
     files = []
     for root, dirnames, filenames in os.walk(path):
-        files.extend([os.path.join(root, filename)] for filename in filenames)
+        files.extend([os.path.join(root, filename) for filename in filenames])
     return files
 
 def is_base_package(package_name):
@@ -157,7 +157,7 @@ def load_repository_egencache(path):
     this function loads a full portage egencache repository.
     """
     global mspl
-    pool = multiprocessing.dummy.Pool(available_cores)
+    pool = multiprocessing.Pool(available_cores)
     mspl = pool.map(load_file_egencache, get_egencache_files(path))
 
 

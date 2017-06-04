@@ -16,16 +16,18 @@ def constraint_test():
 	print(json.dumps(ast_local, sort_keys=True, indent=4, separators=(',', ': ')))
 
 # Single test
-test_filename = "dev-games/ogre-1.9.0-r1"
-test_file_path = os.path.join(path_to_data, test_filename)
+test_filename1 = "dev-games/ogre-1.9.0-r1"
+test_file1_path = os.path.join(path_to_data, test_filename1)
+test_filename2 = "media-libs/mesa-9.0.0"
+test_file2_path = os.path.join(path_to_data, test_filename2)
 pool = None
 
-def single_test():
+def simple_test():
 	global pool
-	global test_file_path
+	global test_file1_path
 	gentoo_rec.trust_feature_declaration = False
 	print("Translated SPL:")
-	spl = gentoo_rec.load_file_egencache(test_file_path)
+	spl = gentoo_rec.load_file_egencache(test_file1_path)
 	print("===============")
 	print(json.dumps(spl, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
@@ -51,7 +53,33 @@ def single_test():
 	print(json.dumps(gentoo_rec.package_groups, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
 
+def double_test():
+	global pool
+	gentoo_rec.mspl = pool.map(gentoo_rec.load_file_egencache, [test_file1_path, test_file2_path])
+	gentoo_rec.generate_all_information("tmp/")
+	print(json.dumps(gentoo_rec.mspl, sort_keys=True, indent=4, separators=(',', ': ')))
+
+lock = multiprocessing.Lock()
+def find_direct_reference():
+	global pool
+	print("loading repository")
+	gentoo_rec.load_repository_egencache(path_to_data)
+	print("parsing the asts")
+	gentoo_rec.parse_mspl()
+	print("generating the dependencies")
+	gentoo_rec.generate_dependencies(pool)
+	print("analysing links")
+	pool.map(__tmp, gentoo_rec.dependencies.iteritems())
+
+def __tmp(k,v):
+	global lock
+	for dep in v:
+		if dep in gentoo_rec.dependencies:
+			with lock:
+				print(k + " -> " + dep)
+
 if __name__ == "__main__":
 	multiprocessing.freeze_support()
-	pool = multiprocessing.Pool(2)
-	single_test()
+	pool = multiprocessing.Pool(5)
+	gentoo_rec.available_cores = 5
+	find_direct_reference()
