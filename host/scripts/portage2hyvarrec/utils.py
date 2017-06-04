@@ -13,8 +13,16 @@ import re
 import uuid
 import multiprocessing
 
-def combine_dicts(dict1, dict2, default):
-    return {k:(dict1[k] if k in dict1 else default) + (dict2[k] if k in dict2 else default) for k in set(dict1.keys() + dict2.keys()) }
+def inline_combine_dicts(dict1, dict2, inline_combine):
+    for k,v in dict2.iteritems():
+        if k in dict1:
+            inline_combine(dict1[k], dict2[k])
+        else:
+            dict1[k] = dict2[k]
+def inline_combine_lists(l1,l2):
+    return l1.extend(l2)
+def inline_combine_drop(val1, val2):
+    pass
 
 ######################################################################
 ### GENTOO RELATED INFORMATION AND FUNCTIONS
@@ -55,6 +63,18 @@ def get_new_temp_file(extension):
 
 
 ######################################################################
+### LIST COMPACTION
+######################################################################
+
+def compact_list(l):
+    l = sorted(l)
+    res = [] if len(l) == 0 else [l[0]]
+    for v1, v2 in zip(l, l[1:]):
+        if v1 != v2:
+            res.append(v2)
+    return res
+
+######################################################################
 ### ID GENERATION
 ######################################################################
 
@@ -69,6 +89,7 @@ def new_id():
         res = __id_current
         __id_current = __id_current + 1
     return unicode(res)
+
 
 ######################################################################
 ### TRANSLATION SIMPLIFICATION FUNCTIONS

@@ -29,7 +29,7 @@ choice: OR | ONEMAX | XOR ;
 condition: NOT? use=ID IMPLIES;
 
 atom:
-  version_op? package=ID  TIMES? (COLON slot_spec)? (LBRACKET selection (COMMA selection)* RBRACKET)?
+  version_op? category=ID DIV package=ID TIMES? (COLON slot_spec)? (LBRACKET selection (COMMA selection)* RBRACKET)?
   ;
 
 version_op: LEQ | LT | GT | GEQ | EQ | NEQ | REV ;

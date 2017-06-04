@@ -46,7 +46,7 @@ COLON : ':' ;
 COMMA : ',' ;
 
 // simplified identifiers
-ID    : [a-zA-Z0-9._@][a-zA-Z0-9._'-'+@]*;
+ID    : [a-zA-Z0-9._@][a-zA-Z0-9._\-+@]*;
 
 
 // identifiers
