@@ -1,0 +1,1074 @@
+Translated SPL:
+===============
+{
+    "environment": [
+        "amd64",
+        "~arm",
+        "x86"
+    ],
+    "features": {
+        "boost": {},
+        "cg": {},
+        "doc": {},
+        "double-precision": {},
+        "examples": {},
+        "freeimage": {},
+        "gl3plus": {},
+        "gles2": {},
+        "gles3": {},
+        "ois": {},
+        "opengl": {},
+        "poco": {},
+        "profile": {},
+        "tbb": {},
+        "threads": {},
+        "tools": {},
+        "zip": {}
+    },
+    "fm": {
+        "external": "media-libs/freetype:2 virtual/opengl virtual/glu x11-libs/libX11 x11-libs/libXaw x11-libs/libXrandr x11-libs/libXt boost? ( dev-libs/boost:= ) cg? ( media-gfx/nvidia-cg-toolkit ) freeimage? ( media-libs/freeimage ) gles2? ( >=media-libs/mesa-9.0.0[gles2] ) gles3? ( >=media-libs/mesa-10.0.0[gles2] ) gl3plus? ( >=media-libs/mesa-9.2.5 ) ois? ( dev-games/ois ) threads? ( poco? ( dev-libs/poco ) tbb? ( dev-cpp/tbb ) ) tools? ( dev-libs/tinyxml[stl] ) zip? ( sys-libs/zlib dev-libs/zziplib ) x11-proto/xf86vidmodeproto virtual/pkgconfig doc? ( app-doc/doxygen ) sys-devel/make >=dev-util/cmake-3.7.2",
+        "local": "threads? ( ^^ ( boost poco tbb ) ) examples? ( ois ) poco? ( threads ) tbb? ( threads ) ?? ( gl3plus ( || ( gles2 gles3 ) ) ) gles3? ( gles2 ) gl3plus? ( opengl )",
+        "runtime": "media-libs/freetype:2 virtual/opengl virtual/glu x11-libs/libX11 x11-libs/libXaw x11-libs/libXrandr x11-libs/libXt boost? ( dev-libs/boost:= ) cg? ( media-gfx/nvidia-cg-toolkit ) freeimage? ( media-libs/freeimage ) gles2? ( >=media-libs/mesa-9.0.0[gles2] ) gles3? ( >=media-libs/mesa-10.0.0[gles2] ) gl3plus? ( >=media-libs/mesa-9.2.5 ) ois? ( dev-games/ois ) threads? ( poco? ( dev-libs/poco ) tbb? ( dev-cpp/tbb ) ) tools? ( dev-libs/tinyxml[stl] ) zip? ( sys-libs/zlib dev-libs/zziplib )"
+    },
+    "group_name": "dev-games/ogre",
+    "name": "dev-games/ogre-1.9.0-r1",
+    "slots": {
+        "slot": "0",
+        "subslot": "1.9.0"
+    },
+    "versions": {
+        "base": "1.9.0",
+        "full": "1.9.0-r1",
+        "revision": "r1"
+    }
+}
+===============
+Translated AST:
+===============
+{
+    "combined": [
+        {
+            "atom": {
+                "package": "media-libs/freetype",
+                "slots": {
+                    "slot": "2",
+                    "type": "ssimple"
+                },
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "virtual/opengl",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "virtual/glu",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libX11",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXaw",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXrandr",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXt",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "boost"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-libs/boost",
+                        "slots": {
+                            "type": "seq"
+                        },
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "cg"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-gfx/nvidia-cg-toolkit",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "freeimage"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/freeimage",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gles2"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-9.0.0",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "gles2"
+                            }
+                        ],
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gles3"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-10.0.0",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "gles2"
+                            }
+                        ],
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gl3plus"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-9.2.5",
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "ois"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-games/ois",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "threads"
+            },
+            "els": [
+                {
+                    "condition": {
+                        "type": "condition",
+                        "use": "poco"
+                    },
+                    "els": [
+                        {
+                            "atom": {
+                                "package": "dev-libs/poco",
+                                "type": "atom"
+                            },
+                            "type": "dsimple"
+                        }
+                    ],
+                    "type": "dcondition"
+                },
+                {
+                    "condition": {
+                        "type": "condition",
+                        "use": "tbb"
+                    },
+                    "els": [
+                        {
+                            "atom": {
+                                "package": "dev-cpp/tbb",
+                                "type": "atom"
+                            },
+                            "type": "dsimple"
+                        }
+                    ],
+                    "type": "dcondition"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "tools"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-libs/tinyxml",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "stl"
+                            }
+                        ],
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "zip"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "sys-libs/zlib",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                },
+                {
+                    "atom": {
+                        "package": "dev-libs/zziplib",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "atom": {
+                "package": "x11-proto/xf86vidmodeproto",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "virtual/pkgconfig",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "doc"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "app-doc/doxygen",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "atom": {
+                "package": "sys-devel/make",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "dev-util/cmake-3.7.2",
+                "type": "atom",
+                "version_op": {
+                    "type": "geq"
+                }
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "media-libs/freetype",
+                "slots": {
+                    "slot": "2",
+                    "type": "ssimple"
+                },
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "virtual/opengl",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "virtual/glu",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libX11",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXaw",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXrandr",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "atom": {
+                "package": "x11-libs/libXt",
+                "type": "atom"
+            },
+            "type": "dsimple"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "boost"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-libs/boost",
+                        "slots": {
+                            "type": "seq"
+                        },
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "cg"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-gfx/nvidia-cg-toolkit",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "freeimage"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/freeimage",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gles2"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-9.0.0",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "gles2"
+                            }
+                        ],
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gles3"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-10.0.0",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "gles2"
+                            }
+                        ],
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gl3plus"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "media-libs/mesa-9.2.5",
+                        "type": "atom",
+                        "version_op": {
+                            "type": "geq"
+                        }
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "ois"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-games/ois",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "threads"
+            },
+            "els": [
+                {
+                    "condition": {
+                        "type": "condition",
+                        "use": "poco"
+                    },
+                    "els": [
+                        {
+                            "atom": {
+                                "package": "dev-libs/poco",
+                                "type": "atom"
+                            },
+                            "type": "dsimple"
+                        }
+                    ],
+                    "type": "dcondition"
+                },
+                {
+                    "condition": {
+                        "type": "condition",
+                        "use": "tbb"
+                    },
+                    "els": [
+                        {
+                            "atom": {
+                                "package": "dev-cpp/tbb",
+                                "type": "atom"
+                            },
+                            "type": "dsimple"
+                        }
+                    ],
+                    "type": "dcondition"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "tools"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "dev-libs/tinyxml",
+                        "selection": [
+                            {
+                                "type": "selection",
+                                "use": "stl"
+                            }
+                        ],
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "zip"
+            },
+            "els": [
+                {
+                    "atom": {
+                        "package": "sys-libs/zlib",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                },
+                {
+                    "atom": {
+                        "package": "dev-libs/zziplib",
+                        "type": "atom"
+                    },
+                    "type": "dsimple"
+                }
+            ],
+            "type": "dcondition"
+        }
+    ],
+    "local": [
+        {
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "gl3plus"
+                },
+                {
+                    "els": [
+                        {
+                            "els": [
+                                {
+                                    "type": "rsimple",
+                                    "use": "gles2"
+                                },
+                                {
+                                    "type": "rsimple",
+                                    "use": "gles3"
+                                }
+                            ],
+                            "type": "rchoice"
+                        }
+                    ],
+                    "type": "rinner"
+                }
+            ],
+            "type": "rchoice"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "examples"
+            },
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "ois"
+                }
+            ],
+            "type": "rcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gl3plus"
+            },
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "opengl"
+                }
+            ],
+            "type": "rcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "gles3"
+            },
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "gles2"
+                }
+            ],
+            "type": "rcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "poco"
+            },
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "threads"
+                }
+            ],
+            "type": "rcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "tbb"
+            },
+            "els": [
+                {
+                    "type": "rsimple",
+                    "use": "threads"
+                }
+            ],
+            "type": "rcondition"
+        },
+        {
+            "condition": {
+                "type": "condition",
+                "use": "threads"
+            },
+            "els": [
+                {
+                    "els": [
+                        {
+                            "type": "rsimple",
+                            "use": "boost"
+                        },
+                        {
+                            "type": "rsimple",
+                            "use": "poco"
+                        },
+                        {
+                            "type": "rsimple",
+                            "use": "tbb"
+                        }
+                    ],
+                    "type": "rchoice"
+                }
+            ],
+            "type": "rcondition"
+        }
+    ],
+    "name": "dev-games/ogre-1.9.0-r1"
+}
+===============
+Name Mapping:
+===============
+{
+    "map_id_name": {
+        "0": {
+            "name": "dev-games/ogre-1.9.0-r1",
+            "type": "package"
+        },
+        "1": {
+            "name": "profile",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "10": {
+            "name": "examples",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "11": {
+            "name": "tools",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "12": {
+            "name": "doc",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "13": {
+            "name": "threads",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "14": {
+            "name": "tbb",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "15": {
+            "name": "gles2",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "16": {
+            "name": "gles3",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "17": {
+            "name": "gl3plus",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "18": {
+            "name": "0",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "slot"
+        },
+        "19": {
+            "name": "1.9.0",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "subslot"
+        },
+        "2": {
+            "name": "zip",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "20": {
+            "name": "amd64",
+            "type": "context"
+        },
+        "21": {
+            "name": "arm",
+            "type": "context"
+        },
+        "22": {
+            "name": "x86",
+            "type": "context"
+        },
+        "23": {
+            "name": "gles2",
+            "package": "media-libs/mesa-9.0.0",
+            "type": "flag"
+        },
+        "24": {
+            "name": "zip",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "25": {
+            "name": "opengl",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "26": {
+            "name": "freeimage",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "27": {
+            "name": "gles2",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "28": {
+            "name": "cg",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "29": {
+            "name": "poco",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "3": {
+            "name": "opengl",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "30": {
+            "name": "boost",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "31": {
+            "name": "threads",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "32": {
+            "name": "examples",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "33": {
+            "name": "tools",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "34": {
+            "name": "doc",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "35": {
+            "name": "tbb",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "36": {
+            "name": "ois",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "37": {
+            "name": "gles3",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "38": {
+            "name": "gl3plus",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "39": {
+            "name": "stl",
+            "package": "dev-libs/tinyxml",
+            "type": "flag"
+        },
+        "4": {
+            "name": "freeimage",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "40": {
+            "name": "gles2",
+            "package": "media-libs/mesa-10.0.0",
+            "type": "flag"
+        },
+        "5": {
+            "name": "ois",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "6": {
+            "name": "cg",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "7": {
+            "name": "poco",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "8": {
+            "name": "boost",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        },
+        "9": {
+            "name": "double-precision",
+            "package": "dev-games/ogre-1.9.0-r1",
+            "type": "flag"
+        }
+    },
+    "map_name_id": {
+        "context": {
+            "amd64": "20",
+            "arm": "21",
+            "x86": "22"
+        },
+        "flag": {
+            "dev-games/ogre-1.9.0-r1": {
+                "boost": "8",
+                "cg": "6",
+                "doc": "12",
+                "double-precision": "9",
+                "examples": "10",
+                "freeimage": "4",
+                "gl3plus": "17",
+                "gles2": "15",
+                "gles3": "16",
+                "ois": "5",
+                "opengl": "3",
+                "poco": "7",
+                "profile": "1",
+                "tbb": "14",
+                "threads": "13",
+                "tools": "11",
+                "zip": "2"
+            },
+            "dev-libs/tinyxml": {
+                "stl": "39"
+            },
+            "media-libs/mesa-10.0.0": {
+                "gles2": "40"
+            },
+            "media-libs/mesa-9.0.0": {
+                "gles2": "23"
+            }
+        },
+        "package": {
+            "dev-games/ogre-1.9.0-r1": "0"
+        },
+        "slot": {
+            "dev-games/ogre-1.9.0-r1": {
+                "0": "18"
+            }
+        },
+        "subslot": {
+            "dev-games/ogre-1.9.0-r1": {
+                "1.9.0": "19"
+            }
+        }
+    }
+}
+===============
+Dependencies:
+===============
+[
+    [
+        "dev-games/ogre-1.9.0-r1",
+        [
+            "sys-libs/zlib",
+            "virtual/glu",
+            "media-libs/freeimage",
+            "media-libs/mesa-9.0.0",
+            "x11-libs/libXaw",
+            "dev-libs/boost",
+            "media-libs/freetype",
+            "dev-cpp/tbb",
+            "virtual/opengl",
+            "virtual/pkgconfig",
+            "media-libs/mesa-10.0.0",
+            "x11-libs/libX11",
+            "dev-libs/tinyxml",
+            "sys-devel/make",
+            "app-doc/doxygen",
+            "dev-libs/zziplib",
+            "dev-libs/poco",
+            "dev-games/ois",
+            "x11-libs/libXt",
+            "media-libs/mesa-9.2.5",
+            "x11-libs/libXrandr",
+            "media-gfx/nvidia-cg-toolkit",
+            "x11-proto/xf86vidmodeproto",
+            "dev-util/cmake-3.7.2"
+        ]
+    ]
+]
+Package Groups:
+===============
+{
+    "dev-games/ogre": {
+        "dependencies": [
+            "dev-games/ogre-1.9.0-r1"
+        ],
+        "implementations": {
+            "1.9.0-r1": "dev-games/ogre-1.9.0-r1"
+        }
+    }
+}
+===============

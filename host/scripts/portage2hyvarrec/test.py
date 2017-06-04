@@ -34,15 +34,21 @@ def single_test():
 	print("===============")
 	print(json.dumps({'name': spl_name, 'local': local_ast, 'combined': combined_ast}, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
-	print("Generated Information:")
 	gentoo_rec.mspl = [spl]
 	gentoo_rec.asts = [(spl_name, local_ast, combined_ast)]
-	print("  ...")
+	print("Name Mapping:")
 	gentoo_rec.generate_name_mappings(pool)
-	print("  ...")
+	print("===============")
+	print(json.dumps({'map_name_id': gentoo_rec.map_name_id, 'map_id_name': gentoo_rec.map_id_name}, sort_keys=True, indent=4, separators=(',', ': ')))
+	print("===============")
+	print("Dependencies:")
 	gentoo_rec.generate_dependencies(pool)
-	print("  ...")
+	print("===============")
+	print(json.dumps(gentoo_rec.dependencies, sort_keys=True, indent=4, separators=(',', ': ')))
+	print("Package Groups:")
 	gentoo_rec.generate_package_groups(pool)
+	print("===============")
+	print(json.dumps(gentoo_rec.package_groups, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
 
 if __name__ == "__main__":

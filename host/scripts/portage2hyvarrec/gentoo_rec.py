@@ -232,7 +232,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return  res
 
     def visitAtom(self, ctx):
-        res = { 'type': "atom", 'category': ctx.ID(0).getText(), 'package': ctx.ID(1).getText() }
+        res = { 'type': "atom", 'package': ctx.ID(0).getText() + "/" + ctx.ID(1).getText() }
         if ctx.version_op(): res['version_op'] = ctx.version_op().accept(self)
         if ctx.TIMES(): res['times'] = ctx.TIMES().getText()
         if ctx.slot_spec(): res['slots'] = ctx.slot_spec().accept(self)
@@ -471,7 +471,7 @@ class GenerateUseMappingsAST(ASTVisitor):
         self.local_package_name = ctx['package']
         return ASTVisitor.visitAtom(self, ctx)
     def visitSelection(self,ctx):
-        res = {self.local_package_name: list(ctx['use'])}
+        res = {self.local_package_name: [ ctx['use'] ] }
         if 'suffix' in ctx: res[self.spl_name] = [ ctx['use'] ]
         return  res
 
@@ -527,7 +527,7 @@ def generate_dependencies_ast(ast_el):
     spl_name, local_ast, combined_ast = ast_el
     visitor = GenerateDependenciesAST()
     dependencies = visitor.visitDepend(combined_ast)
-    return (spl_name, set(dependencies))
+    return (spl_name, list(set(dependencies)))
 
 def generate_dependencies(pool):
     global asts
