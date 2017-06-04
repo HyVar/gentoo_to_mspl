@@ -59,27 +59,9 @@ def double_test():
 	gentoo_rec.generate_all_information("tmp/")
 	print(json.dumps(gentoo_rec.mspl, sort_keys=True, indent=4, separators=(',', ': ')))
 
-lock = multiprocessing.Lock()
-def find_direct_reference():
-	global pool
-	print("loading repository")
-	gentoo_rec.load_repository_egencache(path_to_data)
-	print("parsing the asts")
-	gentoo_rec.parse_mspl()
-	print("generating the dependencies")
-	gentoo_rec.generate_dependencies(pool)
-	print("analysing links")
-	pool.map(__tmp, gentoo_rec.dependencies.iteritems())
-
-def __tmp(k,v):
-	global lock
-	for dep in v:
-		if dep in gentoo_rec.dependencies:
-			with lock:
-				print(k + " -> " + dep)
 
 if __name__ == "__main__":
 	multiprocessing.freeze_support()
 	pool = multiprocessing.Pool(5)
 	gentoo_rec.available_cores = 5
-	find_direct_reference()
+	double_test()
