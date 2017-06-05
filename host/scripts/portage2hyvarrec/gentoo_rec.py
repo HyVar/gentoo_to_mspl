@@ -509,7 +509,6 @@ def generate_name_mappings(pool):
 def __gnm_combine_util(map_el, local_map_el):
     utils.inline_combine_dicts(map_el, local_map_el, utils.inline_combine_drop)
 
-#flag -> package -> name -> id
 
 # extracting dependencies from the ast
 class GenerateDependenciesAST(ASTVisitor):
@@ -555,7 +554,9 @@ def generate_all_information(target_dir):
     """
     Fill the name mapping file with information from one spl
     """
+    global mspl
     pool = multiprocessing.Pool(available_cores)
+    mspl_map = { spl['name']: spl for spl in mspl }
     # 1. generate the name mappings
     global map_name_id
     global map_id_name
@@ -564,15 +565,15 @@ def generate_all_information(target_dir):
     with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
         json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
     # 2. generate the dependencies
-    global mspl
     global dependencies
     generate_dependencies(pool)
     for spl_name, deps in dependencies:
-        mspl[spl_name]['dependencies'] = deps
+        mspl_map[spl_name]['dependencies'] = deps
     # 3. generate the package groups
     global package_groups
     generate_package_groups(pool)
-    mspl.update(package_groups)
+    mspl_map.update(package_groups)
+    mspl = mspl_map
 
 
 ######################################################################

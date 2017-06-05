@@ -16,9 +16,9 @@ def constraint_test():
 	print(json.dumps(ast_local, sort_keys=True, indent=4, separators=(',', ': ')))
 
 # Single test
-test_filename1 = "dev-games/ogre-1.9.0-r1"
+test_filename1 = "sys-fs/udev-232-r2"
 test_file1_path = os.path.join(path_to_data, test_filename1)
-test_filename2 = "media-libs/mesa-9.0.0"
+test_filename2 = "sys-devel/automake-1.15"
 test_file2_path = os.path.join(path_to_data, test_filename2)
 pool = None
 
@@ -56,8 +56,10 @@ def simple_test():
 def double_test():
 	global pool
 	gentoo_rec.mspl = pool.map(gentoo_rec.load_file_egencache, [test_file1_path, test_file2_path])
-	gentoo_rec.generate_all_information("tmp/")
-	print(json.dumps(gentoo_rec.mspl, sort_keys=True, indent=4, separators=(',', ': ')))
+	gentoo_rec.parse_mspl()
+	gentoo_rec.generate_all_information(".")
+	res = { 'mspl': gentoo_rec.mspl, 'asts': gentoo_rec.asts }
+	print(json.dumps(, sort_keys=True, indent=4, separators=(',', ': ')))
 
 
 if __name__ == "__main__":
