@@ -3,7 +3,7 @@
 ######################################################################
 
 import utils
-import ast_visitor
+import constraint_ast_visitor
 
 trust_feature_declaration = False
 
@@ -44,9 +44,9 @@ def generate_name_mappings_spl(spl):
 
 
 # extracting use mappings from the ast
-class GenerateUseMappingsAST(ast_visitor.ASTVisitor):
+class GenerateUseMappingsAST(constraint_ast_visitor.ASTVisitor):
     def __init__(self):
-        super(ast_visitor.ASTVisitor, self).__init__()
+        super(constraint_ast_visitor.ASTVisitor, self).__init__()
     def DefaultValue(self):
         return {}
     def CombineValue(self, value1, value2):
@@ -59,7 +59,7 @@ class GenerateUseMappingsAST(ast_visitor.ASTVisitor):
         return { self.spl_name: [ ctx['use'] ] }
     def visitAtom(self, ctx):
         self.local_package_name = ctx['package']
-        return ast_visitor.ASTVisitor.visitAtom(self, ctx)
+        return constraint_ast_visitor.ASTVisitor.visitAtom(self, ctx)
     def visitSelection(self,ctx):
         res = { self.local_package_name: [ ctx['use'] ] }
         if 'suffix' in ctx: res[self.spl_name] = [ ctx['use'] ]
@@ -79,10 +79,10 @@ def generate_use_mappings_ast(ast_el):
             update_mappings(mappings, 'flag', spl_name, use)
     return mappings
 
-def generate_name_mappings(pool,mspl,asts):
-    mappings_list = pool.map(generate_name_mappings_spl,mspl)
+def generate_name_mappings(concurrent_map,mspl,asts):
+    mappings_list = concurrent_map(generate_name_mappings_spl,mspl)
     if not trust_feature_declaration:
-        mappings_list = mappings_list + pool.map(generate_use_mappings_ast,asts)
+        mappings_list = mappings_list + concurrent_map(generate_use_mappings_ast,asts)
     map_id_name, map_name_id = create_empty_name_mappings()
     for local_map_id_name, local_map_name_id in mappings_list:
         map_id_name.update(local_map_id_name)

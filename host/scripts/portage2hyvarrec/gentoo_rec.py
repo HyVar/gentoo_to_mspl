@@ -15,9 +15,8 @@ import multiprocessing
 import click
 import time
 
-import md5_cache_utils
-import parser
-import ast_visitor
+import egencache_utils
+import constraint_parser
 import extract_id_maps
 import extract_dependencies
 
@@ -28,9 +27,9 @@ def usage():
 
 
 # extracting package groups
-def generate_package_groups(pool,mspl):
+def generate_package_groups(concurrent_map,mspl):
     global package_groups
-    information_list = pool.map(__gpg_util, mspl)
+    information_list = concurrent_map(__gpg_util, mspl)
     package_groups = {}
     for group_name, version, spl_name in information_list:
         if group_name in package_groups:
@@ -61,64 +60,66 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     """
     Tool that converts the gentoo files
 
-    INPUT_DIR directory containing the mspl and spl directories.
+    INPUT_DIR directory containing the engencache portage files (see https://wiki.gentoo.org/wiki/Egencache).
     Usually it is ../../../host/portage/gen/md5-cache
 
-    TARGET_DIR output directory
+    TARGET_DIR directory where all the files resulting of the translation will be put
+    Usually it is ../../../host/portage/json
 
-    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" /home/jacopo/Desktop/other/software/gentoo_rec/host/portage/usr/portage/metadata/md5-cache /dev/null
+    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/gen/md5-cache /dev/null
     """
 
     # todo handle trust feature declaration in portage file
     # trust_feature_declaration = True
 
+    # OPTION: 1. manage number of parallel threads
     if par > 1:
         available_cores = max(par, multiprocessing.cpu_count())
     else:
         available_cores = max(1, multiprocessing.cpu_count() - 1)
+    # OPTION: 2. manage verbosity
     if verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
         logging.info("Verbose output.")
 
+    # 1. setup the output directory
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
-
+    # 2. starts the translation
     logging.info("Load the md5_cache files.")
-    if translate_only:
-        # process just one package
+    if translate_only: # process just one package
         files = [os.path.join(input_dir,translate_only)]
     else:
-        files = md5_cache_utils.get_egencache_files(input_dir)
-    logging.debug("Considering " + unicode(len(files)) + " files")
-    t = time.time()
+        files = egencache_utils.get_egencache_files(input_dir)
+
+    # 3. manage concurrency
     if available_cores > 1 and len(files) > 1:
         pool = multiprocessing.Pool(available_cores)
-        mspl = pool.map(md5_cache_utils.load_file_egencache, files)
+        concurrent_map = pool.map
     else:
-        mspl = map(md5_cache_utils.load_file_egencache, files)
+        concurrent_map = map
+
+    # 4. continues the translation, following the different steps 
+    logging.debug("Considering " + unicode(len(files)) + " files")
+    t = time.time()
+    mspl = concurrent_map(egencache_utils.load_file_egencache, files)
     t = time.time() - t
-    logging.info("Loading completed in " + unicode(t))
+    logging.info("Loading completed in " + unicode(t) + " seconds")
     assert mspl
 
     logging.info("Converting the gentoo dependencies into internal AST representation.")
     t = time.time()
-    if available_cores > 1 and len(files) > 1:
-        pool = multiprocessing.Pool(available_cores)
-        asts = pool.map(parser.parse_spl, mspl)
-    else:
-        asts = map(parser.parse_spl, mspl)
+    asts = concurrent_map(constraint_parser.parse_spl, mspl)
     t = time.time() - t
-    logging.info("Conversion completed in " + unicode(t))
+    logging.info("Conversion completed in " + unicode(t) + " seconds")
     assert asts
-
 
     logging.info("Extracting ids information from ASTs.")
     t = time.time()
-    pool = multiprocessing.Pool(available_cores)
-    map_name_id, map_id_name = extract_id_maps.generate_name_mappings(pool,mspl,asts)
+    map_name_id, map_id_name = extract_id_maps.generate_name_mappings(concurrent_map,mspl,asts)
     t = time.time() - t
-    logging.info("Extraction completed in " + unicode(t))
+    logging.info("Extraction completed in " + unicode(t) + " seconds")
 
     #logging.info("Write map of names in " + utils.NAME_MAP_FILE)
     # with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
@@ -127,13 +128,9 @@ def main(input_dir,target_dir,verbose,par,translate_only):
 
     logging.info("Extract dependecies information from ASTs.")
     t = time.time()
-    if available_cores > 1 and len(files) > 1:
-        pool = multiprocessing.Pool(available_cores)
-        dependencies = pool.map(extract_dependencies.generate_dependencies_ast,asts)
-    else:
-        dependencies = map(extract_dependencies.generate_dependencies_ast, asts)
+    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
     t = time.time() - t
-    logging.info("Extraction completed in " + unicode(t))
+    logging.info("Extraction completed in " + unicode(t) + " seconds")
 
 
     logging.info("Start to create the data dictionary.")
@@ -146,8 +143,7 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     for spl_name, local_ast, combined_ast in asts:
         data[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
     # generate the package groups
-    pool = multiprocessing.Pool(available_cores)
-    package_groups = generate_package_groups(pool,mspl)
+    package_groups = generate_package_groups(concurrent_map,mspl)
     data.update(package_groups)
 
     if translate_only: # print info into debugging mode
