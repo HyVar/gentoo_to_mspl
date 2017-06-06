@@ -16,7 +16,7 @@ FILES=$FILES' host/portage/portage.tar.bz2'
 DIRS=$DIRS' host/portage/json/catalog'
 DIRS=$DIRS' host/portage/json/hyvarrec'
 DIRS=$DIRS' host/portage/json/mspl'
-DIRS=$DIRS' host/portage/usr'
+DIRS=$DIRS' host/portage/gen'
 
 for i in $FILES
 do
