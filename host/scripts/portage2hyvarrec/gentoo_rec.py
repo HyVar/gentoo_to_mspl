@@ -294,7 +294,8 @@ def parse_spl(spl):
     # simplify the constraint
     local_ast = utils.compact_list(local_ast)
     #combined_ast = list(set(external_ast + runtime_ast))
-    combined_ast = external_ast + runtime_ast
+    combined_ast = utils.compact_list(external_ast + runtime_ast)
+    del spl['fm'] # try to save memory
     return (spl['name'], local_ast, combined_ast)
 
 def parse_mspl():
@@ -525,7 +526,10 @@ class GenerateDependenciesAST(ASTVisitor):
 def generate_dependencies_ast(ast_el):
     spl_name, local_ast, combined_ast = ast_el
     visitor = GenerateDependenciesAST()
-    dependencies = visitor.visitDepend(combined_ast)
+    try:
+        dependencies = visitor.visitDepend(combined_ast)
+    except TypeError:
+        print("Error: " + spl_name + "\n\tconstraints: " + json.dumps(combined_ast , sort_keys=True, indent=4, separators=(',', ': ')))
     return (spl_name, list(set(dependencies)))
 
 def generate_dependencies(pool):
@@ -569,7 +573,10 @@ def generate_all_information(target_dir):
     generate_dependencies(pool)
     for spl_name, deps in dependencies:
         mspl_map[spl_name]['dependencies'] = deps
-    # 3. generate the package groups
+    # 3. put the asts in the mspl map
+    for spl_name, local_ast, combined_ast in asts:
+        mspl_map[spl_name]['fm'] = { 'local': local_ast, 'combined': combined_ast }
+    # 4. generate the package groups
     global package_groups
     generate_package_groups(pool)
     mspl_map.update(package_groups)

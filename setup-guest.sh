@@ -10,7 +10,7 @@ else
  PSWD_USER=osboxes.org
 
  sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S -- sh -c 'echo ACCEPT_KEYWORDS=\\\"~amd64\\\" >> /etc/portage/make.conf'"
- sshpass -p$PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  -r guest/*  ${HOST}:
- sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S -- mv ~hyvar/repos.conf /etc/portage/"
+ sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  -r guest/*  ${HOST}:
+ sshpass -p $PSWD_USER ssh -o PubkeyAuthentication=no -p ${PORT} ${HOST} "echo ${PSWD} | sudo -S -- mv ~/hyvar/repos.conf /etc/portage/"
 
 fi

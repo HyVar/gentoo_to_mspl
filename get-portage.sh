@@ -17,6 +17,6 @@ else
  sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/portage.tar.bz2 host/portage
  cd host
  sh uncompress-portage.sh
- sh portage2hyvarrec.sh -v
+ #sh portage2hyvarrec.sh -v
 fi
 

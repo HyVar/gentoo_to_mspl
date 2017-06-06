@@ -4,8 +4,9 @@ import gentoo_rec
 import os.path
 import json
 import multiprocessing
+import time
 
-path_to_data = os.path.realpath("../../../host/portage/usr/portage/metadata/md5-cache")
+path_to_data = os.path.realpath("../../../host/portage/gen/md5-cache")
 
 # Grammar test
 constraint = "media-libs/freetype:2 virtual/opengl"
@@ -59,11 +60,25 @@ def double_test():
 	gentoo_rec.parse_mspl()
 	gentoo_rec.generate_all_information(".")
 	res = { 'mspl': gentoo_rec.mspl, 'asts': gentoo_rec.asts }
-	print(json.dumps(, sort_keys=True, indent=4, separators=(',', ': ')))
+	print(json.dumps(res , sort_keys=True, indent=4, separators=(',', ': ')))
+
+def load_test():
+	gentoo_rec.available_cores = 5
+	print "loading files ... ",
+	t = time.time()
+	gentoo_rec.load_repository_egencache(path_to_data) # loads the mspl
+	print(str(time.time() - t) + "s")
+	print "parsing the ast ... ",
+	t = time.time()
+	gentoo_rec.parse_mspl() # loads the asts
+	print(str(time.time() - t) + "s")
+	print "generating the information ... ",
+	t = time.time()
+	gentoo_rec.generate_all_information(".") # loads the information and write the mapping in files
+	print(str(time.time() - t) + "s")
+
+
 
 
 if __name__ == "__main__":
-	multiprocessing.freeze_support()
-	pool = multiprocessing.Pool(5)
-	gentoo_rec.available_cores = 5
-	double_test()
+	load_test()
