@@ -220,7 +220,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitDependCHOICE(self, ctx):
         return { 'type': "dchoice", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
     def visitDependINNER(self, ctx):
-        return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
+        return { 'type': "dinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
 
     def visitChoice(self, ctx):
         if ctx.OR(): return { 'type': "or" }
@@ -355,7 +355,7 @@ class ASTVisitor(object):
     def visitDependCHOICE(self, ctx):
         return reduce(self.__mapvisitDependEL, ctx['els'], self.DefaultValue())
     def visitDependINNER(self, ctx):
-        return reduce(self.__mapvisitDependEL, ctx, self.DefaultValue())
+        return reduce(self.__mapvisitDependEL, ctx['els'], self.DefaultValue())
 
     def visitChoice(self, ctx):
         return self.DefaultValue()
@@ -472,7 +472,7 @@ class GenerateUseMappingsAST(ASTVisitor):
         self.local_package_name = ctx['package']
         return ASTVisitor.visitAtom(self, ctx)
     def visitSelection(self,ctx):
-        res = {self.local_package_name: [ ctx['use'] ] }
+        res = { self.local_package_name: [ ctx['use'] ] }
         if 'suffix' in ctx: res[self.spl_name] = [ ctx['use'] ]
         return  res
 
@@ -526,10 +526,7 @@ class GenerateDependenciesAST(ASTVisitor):
 def generate_dependencies_ast(ast_el):
     spl_name, local_ast, combined_ast = ast_el
     visitor = GenerateDependenciesAST()
-    try:
-        dependencies = visitor.visitDepend(combined_ast)
-    except TypeError:
-        print("Error: " + spl_name + "\n\tconstraints: " + json.dumps(combined_ast , sort_keys=True, indent=4, separators=(',', ': ')))
+    dependencies = visitor.visitDepend(combined_ast)
     return (spl_name, list(set(dependencies)))
 
 def generate_dependencies(pool):
@@ -546,7 +543,7 @@ def generate_package_groups(pool):
     for group_name, version, spl_name in information_list:
         if group_name in package_groups:
             package_groups[group_name]['implementations'][version] = spl_name
-            package_groups[group_name]['dependencies'].add(spl_name)
+            package_groups[group_name]['dependencies'].extend(spl_name)
         else:
             package_groups[group_name] = {'implementations': {version: spl_name}, 'dependencies': [spl_name]}
 def __gpg_util(spl):
