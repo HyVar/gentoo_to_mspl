@@ -56,7 +56,7 @@ def __gpg_util(spl):
 @click.option('--par', '-p', type=click.INT, default=-1,
               help='Number of process to use for translating the dependencies. Default all processors available - 1.')
 @click.option('--translate-only', default="", help='Package to convert - Do not convert all the other ones.')
-def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
+def main(input_dir,target_dir,verbose,par,translate_only):
     """
     Tool that converts the gentoo files
 
@@ -65,7 +65,7 @@ def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
 
     TARGET_DIR output directory
 
-    Example: python gentoo_rec.py --translate-only "sys-fs/udev-232-r2" "../../../host/portage/gen/md5-cache" /dev/null
+    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" /home/jacopo/Desktop/other/software/gentoo_rec/host/portage/usr/portage/metadata/md5-cache /dev/null
     """
 
     # todo handle trust feature declaration in portage file
