@@ -19,7 +19,7 @@ import re
 #import z3
 #import SpecificationGrammar.SpecTranslator as SpecTranslator
 import multiprocessing
-#import click
+import click
 
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
@@ -55,7 +55,7 @@ to_smt = True
 # trust feature declaration in portage file
 trust_feature_declaration = True
 # number of core to use
-available_cores = 3
+available_cores = max(1, multiprocessing.cpu_count() - 1)
 
 ######################################################################
 ### FUNCTIONS UTILS
@@ -550,11 +550,35 @@ def __gpg_util(spl):
     return ( spl['group_name'], spl['versions']['full'], spl['name'])
 
 
-# Main Generation function
-def generate_all_information(target_dir):
+@click.command()
+@click.argument(
+    'input_dir',
+    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
+@click.argument(
+    'target_dir',
+    type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
+@click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
+@click.option('--par', '-p', type=click.INT, default=-1,
+              help='Number of process to use for translating the dependencies. Default all processors available - 1.')
+@click.option('--translate-only', '-p', default="", help='Package to convert - Do not convert all the other ones.')
+def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
     """
-    Fill the name mapping file with information from one spl
+    Tool that converts the gentoo files
+
+    INPUT_DIR directory containing the mspl and spl directories
+
+    TARGET_DIR output directory
     """
+    if par > 1:
+        global available_cores
+        available_cores = max(par, multiprocessing.cpu_count())
+    if verbose:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+        logging.info("Verbose output.")
+
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
     global mspl
     pool = multiprocessing.Pool(available_cores)
     mspl_map = { spl['name']: spl for spl in mspl }
@@ -754,40 +778,6 @@ def worker(pair):
     convert(pkg,target_dir)
     return True
 
-@click.command()
-@click.argument(
-    'input_dir',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
-@click.argument(
-    'target_dir',
-    type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
-@click.option('--no-opt', is_flag=True, help="Do not convert dependencies into SMT formulas.")
-@click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
-@click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for translating the dependencies.')
-@click.option('--translate-only', '-p', default="", help='Package to convert - Do not convert all the other ones.')
-def main(input_dir,target_dir,no_opt,verbose,par,translate_only):
-    " ""
-    Tool that converts the gentoo files
-
-    INPUT_DIR directory containing the mspl and spl directories
-
-    TARGET_DIR output directory
-    " ""
-    global map_name_id
-    global map_id_name
-    global mspl
-    global to_smt
-
-    if par > 1:
-        available_cores = max(par, multiprocessing.cpu_count())
-    else:
-        available_cores = max(1, multiprocessing.cpu_count() - 1)
-    if verbose:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-        logging.info("Verbose output.")
-
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
 
     logging.info("Load the MSPL. This may take a while")
     load_mspl(os.path.join(input_dir,'mspl'))

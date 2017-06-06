@@ -18,12 +18,14 @@ import z3
 
 
 class MyVisitor(SpecificationGrammarVisitor):
-    def __init__(self, json_data):
+    def __init__(self, json_data, feature_as_boolean=False, parse_preference=False):
         """the input parameter for the visitor is the json data"""
         self.json_data = json_data
         self.features = set()
         self.attributes = set()
         self.contexts = set()
+        self.feature_as_boolean = feature_as_boolean
+        self.parse_preference = parse_preference
 
     def defaultResult(self):
         return ""
@@ -132,6 +134,11 @@ class MyVisitor(SpecificationGrammarVisitor):
     def visitTermFeature(self, ctx):
         id = ctx.getChild(1).accept(self)
         self.features.add(id)
+        if self.feature_as_boolean:
+            if self.parse_preference:
+                return z3.If(z3.Bool(id),1,0)
+            else:
+                z3.Bool(id)
         return z3.Int(id)
 
     def visitTermAttribute(self, ctx):
@@ -149,12 +156,12 @@ class MyVisitor(SpecificationGrammarVisitor):
         return z3.simplify(z3.BoolVal(False))
 
 
-def translate_constraint(in_string, data):
+def translate_constraint(in_string, data,feature_as_boolean=False):
     lexer = SpecificationGrammarLexer(InputStream(in_string))
     stream = CommonTokenStream(lexer)
     parser = SpecificationGrammarParser(stream)
     tree = parser.constraint()
-    visitor = MyVisitor(data)
+    visitor = MyVisitor(data,feature_as_boolean)
     formula = visitor.visit(tree)
     return {
         "formula": formula,
@@ -163,20 +170,13 @@ def translate_constraint(in_string, data):
         "attributes": visitor.attributes}
 
 
-def translate_preference(in_string, data):
-    print "h1"
+def translate_preference(in_string, data, feature_as_boolean=False):
     lexer = SpecificationGrammarLexer(InputStream(in_string))
-    print "h2"
     stream = CommonTokenStream(lexer)
-    print "h3"
     parser = SpecificationGrammarParser(stream)
-    print "h4"
     tree = parser.preference()
-    print "h5"
-    visitor = MyVisitor(data)
-    print "h6"
+    visitor = MyVisitor(data,feature_as_boolean,True)
     formula = visitor.visit(tree)
-    print "h7"
     return {
         "formula": formula,
         "contexts": visitor.contexts,
