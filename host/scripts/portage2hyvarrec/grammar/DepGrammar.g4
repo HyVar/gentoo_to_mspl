@@ -1,5 +1,6 @@
 grammar DepGrammar;
 
+// To generate files run: antlr4 -Dlanguage=Python2 -visitor -no-listener DepGrammar.g4
 
 options { tokenVocab=DepGrammarLexer; }
 

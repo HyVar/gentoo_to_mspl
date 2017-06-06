@@ -1,5 +1,6 @@
 lexer grammar DepGrammarLexer;
 
+// To generate files run: antlr4 -Dlanguage=Python2 -no-listener DepGrammarLexer.g4
 
 fragment SPACE: [ \t\r\n]+ ;
 WS: SPACE -> skip ;
@@ -46,7 +47,15 @@ COLON : ':' ;
 COMMA : ',' ;
 
 // simplified identifiers
-ID    : [a-zA-Z0-9._@][a-zA-Z0-9._\-+@]*;
+//ID    : [a-zA-Z0-9._@][a-zA-Z0-9._\-+@]*;
+
+fragment LETTER : ('a' .. 'z') | ('A' .. 'Z') ;
+fragment NUMBER : ('0' .. '9') ;
+fragment SPECIAL : '.' | '_' | '@' ;
+fragment FIRST_CHAR : LETTER | NUMBER | SPECIAL;
+
+
+ID    : FIRST_CHAR ( FIRST_CHAR | PLUS | MINUS | '\\' )*;
 
 
 // identifiers

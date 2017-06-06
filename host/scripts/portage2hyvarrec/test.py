@@ -44,7 +44,7 @@ def simple_test():
 	print(json.dumps({'name': spl_name, 'local': local_ast, 'combined': combined_ast}, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
 	print("Name Mapping:")
-	mappings_list = [ gentoo_rec.generate_name_mappings_spl(spl) ]
+	mappings_list = [ gentoo_rec.generate_name_mappings_spl(spl,mspl,asts,map_name_id,map_id_name) ]
 	mappings_list_annex = [ gentoo_rec.generate_use_mappings_ast(ast) ]
 	mappings_list.extend(mappings_list_annex)
 	map_id_name, map_name_id = gentoo_rec.create_empty_name_mappings()
@@ -82,11 +82,11 @@ def load_test():
 	gentoo_rec.available_cores = 3
 	print "loading files ... ",
 	t = time.time()
-	gentoo_rec.load_repository_egencache(path_to_data) # loads the mspl
+	mspl = gentoo_rec.load_repository_egencache(path_to_data,cores) # loads the mspl
 	print(str(time.time() - t) + "s, " + ("ok" if gentoo_rec.mspl else "ERROR"))
 	print "parsing the ast ... ",
 	t = time.time()
-	gentoo_rec.parse_mspl() # loads the asts
+	asts = gentoo_rec.parse_mspl(mspl,cores)  # loads the asts
 	print(str(time.time() - t) + "s, " + ("ok" if gentoo_rec.asts else "ERROR"))
 	print "generating the information ... ",
 	t = time.time()

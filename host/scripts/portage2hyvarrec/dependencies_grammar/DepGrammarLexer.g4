@@ -1,6 +1,6 @@
 lexer grammar DepGrammarLexer;
 
-// To generate files run antlr4 -Dlanguage=Python2 -no-listener
+// To generate files run: antlr4 -Dlanguage=Python2 -no-listener DepGrammarLexer.g4
 
 fragment SPECIAL_CHAR: ('-'|'_'|'+'|'.');
 fragment NUM: [0-9];
