@@ -19,6 +19,7 @@ import md5_cache_utils
 import parser
 import ast_visitor
 import extract_id_maps
+import extract_dependencies
 
 
 def usage():
@@ -89,12 +90,13 @@ def main(input_dir,target_dir,verbose,par,translate_only):
         files = [os.path.join(input_dir,translate_only)]
     else:
         files = md5_cache_utils.get_egencache_files(input_dir)
+    logging.debug("Considering " + unicode(len(files)) + " files")
     t = time.time()
     if available_cores > 1 and len(files) > 1:
         pool = multiprocessing.Pool(available_cores)
-        mspl = pool.map(md5_cache_utils.load_file_egencache, )
+        mspl = pool.map(md5_cache_utils.load_file_egencache, files)
     else:
-        mspl = map(md5_cache_utils.load_file_egencache, md5_cache_utils.get_egencache_files(input_dir))
+        mspl = map(md5_cache_utils.load_file_egencache, files)
     t = time.time() - t
     logging.info("Loading completed in " + unicode(t))
     assert mspl
@@ -113,7 +115,7 @@ def main(input_dir,target_dir,verbose,par,translate_only):
 
     logging.info("Extracting ids information from ASTs.")
     t = time.time()
-    pool = multiprocessing.dummy.Pool(available_cores)
+    pool = multiprocessing.Pool(available_cores)
     map_name_id, map_id_name = extract_id_maps.generate_name_mappings(pool,mspl,asts)
     t = time.time() - t
     logging.info("Extraction completed in " + unicode(t))
@@ -126,10 +128,10 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     logging.info("Extract dependecies information from ASTs.")
     t = time.time()
     if available_cores > 1 and len(files) > 1:
-        pool = multiprocessing.dummy.Pool(available_cores)
-        dependencies = pool.map(extract_id_maps.generate_dependencies_ast,asts)
+        pool = multiprocessing.Pool(available_cores)
+        dependencies = pool.map(extract_dependencies.generate_dependencies_ast,asts)
     else:
-        dependencies = map(extract_id_maps.generate_dependencies_ast, asts)
+        dependencies = map(extract_dependencies.generate_dependencies_ast, asts)
     t = time.time() - t
     logging.info("Extraction completed in " + unicode(t))
 
@@ -144,9 +146,13 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     for spl_name, local_ast, combined_ast in asts:
         data[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
     # generate the package groups
-    pool = multiprocessing.dummy.Pool(available_cores)
+    pool = multiprocessing.Pool(available_cores)
     package_groups = generate_package_groups(pool,mspl)
     data.update(package_groups)
+
+    if translate_only: # print info into debugging mode
+        logging.debug("Data: " + json.dumps(data))
+
 
     # todo conversion into smt
     # todo save into file (compressed if possible and option using marshal)

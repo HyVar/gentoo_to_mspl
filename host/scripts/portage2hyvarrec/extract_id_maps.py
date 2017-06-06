@@ -5,6 +5,8 @@
 import utils
 import ast_visitor
 
+trust_feature_declaration = False
+
 def create_empty_name_mappings():
     return ( { } , {'package': {}, 'flag': {}, 'slot': {}, 'subslot': {}, 'context': {}} )
 def create_name_mappings(spl_name):
