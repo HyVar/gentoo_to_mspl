@@ -55,7 +55,7 @@ fragment SPECIAL : '.' | '_' | '@' ;
 fragment FIRST_CHAR : LETTER | NUMBER | SPECIAL;
 
 
-ID    : FIRST_CHAR ( FIRST_CHAR | PLUS | MINUS | '\\' )*;
+ID    : FIRST_CHAR ( FIRST_CHAR | PLUS | MINUS )*;
 
 
 // identifiers
