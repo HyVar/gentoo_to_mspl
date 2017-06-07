@@ -87,7 +87,7 @@ def main(input_dir,target_dir,verbose,par,translate_only):
         os.makedirs(target_dir)
 
     # 2. starts the translation
-    logging.info("Load the md5_cache files.")
+    logging.info("Load the egencache files.")
     if translate_only: # process just one package
         files = [os.path.join(input_dir,translate_only)]
     else:
@@ -126,7 +126,7 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     #     json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
     # 2. generate the dependencies
 
-    logging.info("Extract dependecies information from ASTs.")
+    logging.info("Extract dependencies information from ASTs.")
     t = time.time()
     dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
     t = time.time() - t
