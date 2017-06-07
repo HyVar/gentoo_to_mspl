@@ -66,7 +66,8 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     TARGET_DIR directory where all the files resulting of the translation will be put
     Usually it is ../../../host/portage/json
 
-    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/gen/md5-cache /dev/null
+    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+    Example: python gentoo_rec.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
     """
 
     # todo handle trust feature declaration in portage file
@@ -149,6 +150,8 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     if translate_only: # print info into debugging mode
         logging.debug("Data: " + json.dumps(data))
 
+    with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
+        json.dump(data, f)
 
     # todo conversion into smt
     # todo save into file (compressed if possible and option using marshal)
