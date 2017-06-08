@@ -104,7 +104,41 @@ class ProfileData(object):
 ### ANALYSING PROFILE FILES
 ######################################################################
 
+"""
+This function needs to be extended (from https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html):
+The profile default settings for Portage. The general format is described in make.conf(5). The make.defaults for your profile defines a few specific variables too:
 
+    ARCH
+        Architecture type (x86/ppc/hppa/etc...). 
+    IUSE_IMPLICIT = [space delimited list of USE flags]
+        Defines implicit IUSE for ebuilds using EAPI 5 or later. Flags that come from USE_EXPAND or USE_EXPAND_UNPREFIXED variables do not belong in IUSE_IMPLICIT, since USE_EXPAND_VALUES_* variables are used to define implicit IUSE for those flags. See ebuild(5) for more information about IUSE. 
+    USERLAND = GNU
+        Support BSD/cygwin/etc... 
+    USE_EXPAND = [space delimited list of variable names]
+        Any variable listed here will be used to augment USE by inserting a new flag for every value in that variable, so USE_EXPAND="FOO" and FOO="bar bla" results in USE="foo_bar foo_bla". 
+    USE_EXPAND_HIDDEN = [space delimited list of variable names]
+        Names of USE_EXPAND variables that should not be shown in the verbose merge list output of the emerge(1) command. 
+    USE_EXPAND_IMPLICIT = [space delimited list of variable names]
+        Defines USE_EXPAND and USE_EXPAND_UNPREFIXED variables for which the corresponding USE flags may have implicit IUSE for ebuilds using EAPI 5 or later. 
+    USE_EXPAND_UNPREFIXED = [space delimited list of variable names]
+        Any variable listed here will be used to augment USE by inserting a new flag for every value in that variable, so USE_EXPAND_UNPREFIXED="FOO" and FOO="bar bla" results in USE="bar bla". 
+    USE_EXPAND_VALUES_ARCH = [space delimited list of ARCH values]
+        Defines ARCH values used to generate implicit IUSE for ebuilds using EAPI 5 or later. 
+    USE_EXPAND_VALUES_ELIBC = [space delimited list of ELIBC values]
+        Defines ELIBC values used to generate implicit IUSE for ebuilds using EAPI 5 or later. 
+    USE_EXPAND_VALUES_KERNEL = [space delimited list of KERNEL values]
+        Defines KERNEL values used to generate implicit IUSE for ebuilds using EAPI 5 or later. 
+    USE_EXPAND_VALUES_USERLAND = [space delimited list of USERLAND values]
+        Defines USERLAND values used to generate implicit IUSE for ebuilds using EAPI 5 or later. 
+    ELIBC = glibc
+        Support uClibc/BSD libc/etc... 
+    PROFILE_ONLY_VARIABLES = ARCH
+        Prevent critical variables from being changed by the user in make.conf or the env. 
+    PROFILE_ARCH
+        Distinguish machines classes that have the same ARCH. All sparc machines have ARCH=sparc but set this to either 'sparc32' or 'sparc64'. 
+    BOOTSTRAP_USE
+        Special USE flags which may be needed when bootstrapping from stage1 to stage2.
+"""
 def analyse_make_defaults(filename, data):
 	process = subprocess.Popen(["bash", "-c", "source " + filename + "; echo $USE"], stdout=subprocess.PIPE)
 	out, err = process.communicate()
