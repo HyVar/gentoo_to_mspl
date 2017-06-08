@@ -13,6 +13,9 @@ import re
 
 
 # use and use_map
+def use_create_map():
+	return { 'positive': set([]), 'negative': set([]) }
+
 def use_update_map_simple(uses, use):
 	if use[0] == '-':
 		uses['negative'].add(use[1:])
@@ -25,9 +28,15 @@ def use_invert(use):
 	else:
 		return "-" + use
 
+def iuse_update_map_simple(uses, iuse):
+	if iuse[0] == '-':
+		uses['negative'].add(iuse[1:])
+	elif iuse[0] == '+':
+		uses['positive'].add(iuse[1:])
+
 
 def use_process_list(uselist):
-	res = { 'positive': set([]), 'negative': set([]) }
+	res = use_create_map()
 	for use in uselist:
 		use_update_map_simple(res, use)
 	return res
@@ -45,7 +54,7 @@ def use_update_map_map(uses1, uses2):
 # data
 class ProfileData(object):
 	def __init__(self):
-		self.uses = { 'positive': set([]), 'negative': set([]) }
+		self.uses = use_create_map()
 		self.packages = { 'system': set([]), 'profile': set([]), 'mask': set([]) }
 		self.package_uses = {}
 
@@ -146,6 +155,36 @@ def analyse_use_mask(f, data):
 	process_file(f, data, ProfileData.update_use_simple_mask)
 
 
+
+
+######################################################################
+### ANALYSING EGENCACHE FILES FOR PARTIAL CONFIGURATION
+######################################################################
+
+egencache_path = "/usr/portage/metadata/md5-cache"
+
+def analyse_egencache(data):
+	for root, dirnames, filenames in os.walk(egencache_path):
+		for filename in filenames:
+			data_tmp = {}
+			with open(os.path.join(root, filename), 'r') as f:
+				for line in f:
+					line = line[:-1]  # remove the \n at the end of the line
+					tmp = string.split(line, "=", 1)
+					data_tmp[array[0]] = tmp[1]
+			if 'IUSE' in data_tmp:
+				package = "=" + filename
+				if not package in data.package_uses:
+					package_uses = use_create_map()
+				else:
+					package_uses = data.package_uses[package]
+				for iuse in re.findall("[a-zA-Z0-9._\-+@]+", data_tmp['IUSE']):
+					iuse_update_map_simple(package_uses, iuse)
+				if (len(package_uses['positive']) + len(package_uses['negative']) > 0): # avoids filling the data with empty information
+					data.package_uses[package] = package_uses
+
+
+
 ######################################################################
 ### GLOBAL FUNCTIONS
 ######################################################################
@@ -158,6 +197,7 @@ def get_profile_folders(profile_path, acc=None):
 	parent_file_name = os.path.join(profile_path, "parent")
 	if os.path.isfile(parent_file_name):
 		with open(parent_file_name, 'r') as f:
+			data_tmp = {}
 			for parent in f:
 				parent = os.path.realpath(os.path.join(profile_path, parent[:-1]))
 				if not parent in acc:
@@ -171,15 +211,15 @@ __analyse_mapping = {
 	"package.mask":			  analyse_package_mask,
 	#
 	"package.use":			   analyse_package_use,
-	"package.use.force":        analyse_package_use,
+	"package.use.force":		analyse_package_use,
 	"package.use.stable.force": analyse_package_use,
-	"package.use.mask":	        analyse_package_use_mask,
+	"package.use.mask":			analyse_package_use_mask,
 	"package.use.stable.mask":  analyse_package_use_mask,
 	#
 	"use.force":				analyse_use,
-	"use.stable.force":		    analyse_use,
-	"use.mask":				    analyse_use_mask,
-	"use.stable.mask":		    analyse_use_mask
+	"use.stable.force":			analyse_use,
+	"use.mask":					analyse_use_mask,
+	"use.stable.mask":			analyse_use_mask
 }
 
 def analyse_profile_folder(folder, data):
@@ -204,8 +244,12 @@ def main():
 
 
 # TODO: deal with package configuration set in the .ebuild itself...
+#	iterate over all egencache files, extract the IUSE, and the ones with + and - give a partial configuration
 # TODO: deal with /etc/portage/package.use ...
+#	not different from what I already did with the other package.use
 # TODO: deal with /etc/portage/make.conf
+#	not different from what I will do with the other make.defaults
+# TODO: make things concurrent, as we have a lot of data to manage, like usually...
 
 if __name__ == "__main__":
 	#profile_list = get_profile_folders(os.path.realpath("/etc/portage/make.profile"))
