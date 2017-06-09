@@ -66,9 +66,9 @@ def construct_spl(names, versions, environment, slots, features, fm_local, fm_ex
     fm_external = fm_external if fm_external else ""
     fm_runtime = fm_runtime if fm_runtime else ""
     data = {'name': name, 'group_name': group_name, 'features': features, 'environment': environment,
-            'fm': {'local': fm_local, 'external': fm_external, 'runtime': fm_runtime},
+            "fm": {'local': fm_local, 'external': fm_external, 'runtime': fm_runtime},
             'versions': {'full': str(version_all), 'base': str(version), 'revision': str(revision)},
-            'slots': {'slot': slot, 'subslot': subslot}}
+            'slot': slot, 'subslot': subslot}
     return data
 
 
