@@ -11,8 +11,7 @@ else
  PSWD_USER=osboxes.org
 
  sshpass -p $PSWD_USER ssh -p ${PORT} -o PubkeyAuthentication=no ${HOST} "echo ${PSWD} | sudo -S sh ~/hyvar/compress-configuration.sh"
- sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/world.gz host/configuration
- sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/configuration.gz host/configuration
+ sshpass -p $PSWD_USER scp -o PubkeyAuthentication=no -P ${PORT}  ${HOST}:/home/osboxes/hyvar/gen/configuration.tar.bz2 host/configuration
  cd host
  sh uncompress-configuration.sh
 fi

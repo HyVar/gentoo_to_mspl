@@ -7,9 +7,7 @@ sed -i '/ACCEPT_KEYWORDS=.*$/d' /etc/portage/make.conf
 
 # 2. clean ~/hyvar
 
-pathx="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd && echo x)"
-path="${DIR%x}"
-dir=basename($path)
+path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd && echo x)"
+path="${path%x}"
 
-cd $path/..
-rm -rf $dir
+rm -rf $path

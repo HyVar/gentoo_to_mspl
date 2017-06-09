@@ -10,14 +10,20 @@ cd ${DIR}
 
 # LOAD DIRECT INFORMATION
 
-# world
-gzip -c /var/lib/portage/world > gen/world.gz
+cp /var/lib/portage/world gen/world
 
-# configuration
-./list-gentoo-packages.sh &> /tmp/configuration
-gzip -c /tmp/configuration > gen/configuration.gz
+./list-gentoo-packages.sh &> gen/configuration
 
 
 # LOAD PORTAGE CONFIGURATION: USE AND PROFILE
 
+# need python2.7
+eselect python set python2.7
 python ./load_profile.py
+
+# COMPRESS EVERYTHING
+
+cd gen
+
+tar cvfj configuration.tar.bz2 world configuration profile.json
+

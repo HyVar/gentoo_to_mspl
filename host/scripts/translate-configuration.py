@@ -2,12 +2,11 @@
 
 import os
 import sys
-import gzip
 import json
 
 def load_configuration(path):
 	data = {}
-	with gzip.open(path) as f:
+	with open(path) as f:
 		output = f.read()
 	packages=output.split("\n")
 	packages = packages[:-1] # remove last line
@@ -25,7 +24,7 @@ def save_configuration(filename, configuration):
 
 
 def load_world(path):
-	with gzip.open(path) as f:
+	with open(path) as f:
 		output = f.read()
 	return { p : {} for p in output.split() }
 
@@ -41,8 +40,8 @@ if __name__ == "__main__":
 		sys.exit(-1)
 	path = sys.argv[1]
 	outfile = os.path.join(path,"json/configuration.json")
-	data = load_configuration(os.path.join(path, "configuration.gz"))
+	data = load_configuration(os.path.join(path, "configuration"))
 	save_configuration(outfile, data)
 	outfile = os.path.join(path,"json/world.json")
-	data = load_world(os.path.join(path, "world.gz"))
+	data = load_world(os.path.join(path, "world"))
 	save_world(outfile, data)
