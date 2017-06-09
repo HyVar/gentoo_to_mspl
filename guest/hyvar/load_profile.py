@@ -284,7 +284,8 @@ def analyse_egencache_file(filename):
 			array = line.split("=", 1)
 			data_tmp[array[0]] = array[1]
 	if 'IUSE' in data_tmp:
-		package = "=" + filename
+		tmp = filename.split("/")
+		package = "=" + tmp[-2] + "/" + tmp[-1]
 		package_uses = use_create_map()
 		for iuse in re.findall("[a-zA-Z0-9._\-+@]+", data_tmp['IUSE']):
 			iuse_update_map_simple(package_uses, iuse)
