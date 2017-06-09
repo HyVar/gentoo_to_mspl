@@ -105,17 +105,15 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         self.map_name_id = map_name_id
         self.package = package
 
-
     def DefaultValue(self):
         return []
 
     def CombineValue(self, value1, value2):
-        utils.inline_combine_dicts(value1, value2, utils.inline_combine_lists)
         return value1
 
-
     def visitRequired(self, ctx):
-        return reduce(self.__mapvisitRequiredEL, ctx, self.DefaultValue())
+        return smt.And([map(self.mapvisitRequiredEL, ctx['els'])])
+
     def visitRequiredEL(self, ctx):
         if ctx['type'] == "rsimple":
             return self.visitRequiredSIMPLE(ctx)
@@ -158,7 +156,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.FALSE() # no formula to be satisified
 
     def visitRequiredINNER(self, ctx):
-        return smt.And([ map(self.mapvisitRequiredEL, ctx['els']) ])
+        return smt.And([map(self.mapvisitRequiredEL, ctx['els'])])
 
     def visitDepend(self, ctx):
         return reduce(self.__mapvisitDependEL, ctx, self.DefaultValue())

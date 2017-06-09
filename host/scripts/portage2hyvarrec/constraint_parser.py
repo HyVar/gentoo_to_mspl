@@ -52,7 +52,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitRequiredCHOICE(self, ctx):
         return {'type': "rchoice",
                 'els': [child.accept(self) for child in ctx.requiredEL()],
-                'choice': ctx.choice.accept(self)
+                'choice': ctx.choice().accept(self)
                 }
     def visitRequiredINNER(self, ctx):
         return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
@@ -69,7 +69,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitDependCHOICE(self, ctx):
         return {'type': "dchoice",
                 'els': [child.accept(self) for child in ctx.dependEL()],
-                'choice': ctx.choice.accept(self)
+                'choice': ctx.choice().accept(self)
                 }
     def visitDependINNER(self, ctx):
         return { 'type': "dinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
