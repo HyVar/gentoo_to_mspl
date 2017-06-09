@@ -41,6 +41,7 @@ version_op: LEQ | LT | GT | GEQ | EQ | REV ;
 slot_spec:
     slot=ID                                   #slotSIMPLE
   | slot=ID DIV subslot=ID                    #slotFULL
+  // why is there a ? for the id?
   | slot=ID? EQ                               #slotEQ
   | TIMES                                     #slotSTAR
   ;

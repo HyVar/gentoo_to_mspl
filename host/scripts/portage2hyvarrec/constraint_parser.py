@@ -92,12 +92,12 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return res
 
     def visitVersion_op(self, ctx):
-        if ctx.LEQ(): return { 'type': "leq" }
-        if ctx.LT(): return { 'type': "lt" }
-        if ctx.GT(): return { 'type': "gt" }
-        if ctx.GEQ(): return { 'type': "geq" }
-        if ctx.EQ(): return { 'type': "eq" }
-        return {'type': "rev"}
+        if ctx.LEQ(): return "<="
+        if ctx.LT(): return "<"
+        if ctx.GT(): return ">"
+        if ctx.GEQ(): return ">-"
+        if ctx.EQ(): return "="
+        return {'type': "~"}
 
     def visitSlotSIMPLE(self, ctx):
         return { 'type': "ssimple", 'slot': ctx.ID().getText() }
@@ -117,21 +117,16 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         if ctx.suffix(): res['suffix'] = ctx.suffix().accept(self)
         return res
     def visitPrefix(self, ctx):
-        res = { 'type': "prefix" }
-        if ctx.NOT(): res['not'] = ctx.NOT().getText()
-        if ctx.MINUS(): res['minus'] = ctx.MINUS().getText()
-        if ctx.PLUS(): res['plus'] = ctx.PLUS().getText()
-        return res
+        if ctx.NOT(): return '!'
+        if ctx.MINUS(): return '-'
+        if ctx.PLUS(): return '+'
+        return ""
     def visitPreference(self, ctx):
-        res = { 'type': "preference" }
-        if ctx.MINUS(): res['minus'] = ctx.MINUS().getText()
-        if ctx.PLUS(): res['plus'] = ctx.PLUS().getText()
-        return res
+        if ctx.MINUS(): return '-'
+        if ctx.PLUS(): return '+'
     def visitSuffix(self, ctx):
-        res = { 'type': "suffix" }
-        if ctx.IMPLIES(): res['implies'] = ctx.IMPLIES().getText()
-        if ctx.EQ(): res['eq'] = ctx.EQ().getText()
-        return res
+        if ctx.IMPLIES(): return '?'
+        if ctx.EQ(): return '='
 
 ast_translator = SPLParserTranslateConstraints()
 

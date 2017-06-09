@@ -15,9 +15,9 @@ def match_version(template, operator, p_name):
     Check if a version package s (a string) matches a template
     Note that s and template need to have the same base package
     """
-    if operator == "rev":
-        return match_version(template + "-r*", "eq", p_name) or match_version(template, "eq", p_name)
-    if operator == "eq":
+    if operator == "~":
+        return match_version(template + "-r*", "=", p_name) or match_version(template, "=", p_name)
+    if operator == "=":
         # update re special chars in the template
         template = re.sub('\.', '\\\.', template)
         template = re.sub('\*', '.*', template) + "$"
@@ -33,13 +33,13 @@ def match_version(template, operator, p_name):
     s_match = p.search(p_name)
     s_nums = map(lambda x: int(x), s_match.group("nums").split("."))
 
-    if operator == 'leq':
+    if operator == '<=':
         return s_nums <= t_nums
-    elif operator == 'geq':
+    elif operator == '>=':
         return s_nums >= t_nums
-    elif operator == 'gt':
+    elif operator == '>':
         return s_nums < t_nums
-    elif operator == 'lt':
+    elif operator == '<':
         return s_nums > t_nums
     else:
         raise Exception("Operator " + operator + " not supported for package version comparison")
@@ -95,9 +95,70 @@ def get_smt_context(map_name_id,c_name):
 def get_no_two_true_expressions(fs):
     return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(fs) for j in range(fs) if i < j])
 
-def decompact_atom(mspl,ctx):
-    ls = []
-    if
+
+def process_simple_atom(mspl,ctx)
+
+def decompact_atom(ctx):
+
+    def get_use(ctx):
+        use = {"use": ctx["use"]}
+        if "preference" in ctx:
+            use["preference"] = ctx["preference"]
+        return use
+
+    # decompact the comapct atoms
+    assert "selection" in ctx
+    condELs = []
+    normal_sels = []
+    for i in ctx["selection"]:
+        if "prefix" in i and i["prefix"] == "!":
+            if "suffix" in i:
+                if i["suffix"] == "?":
+                    # app - misc / foo[!bar?]    bar? (app - misc / foo) !bar? (app - misc / foo[-bar])
+                    first = {
+                        "condition": {'use': i["use"]},
+                        "els" : [ { x:y for x,y in ctx if x != "selection" and x != "type" }]}
+                    second = first.deepcopy()
+                    second["condition"]["not"] = ""
+                    second["els"][0]["selection"] = [get_use(i) + {"prefix": "-" }]
+                    condELs.extend([first,second])
+                elif i["suffix"] == "=":
+                    # app - misc / foo[!bar =]    bar? (app - misc / foo[-bar]) !bar? (app - misc / foo[bar])
+                    first = {
+                        "condition": {'use': i["use"]},
+                        "els" : [ { x:y for x,y in ctx if x != "selection" and x != "type" }]}
+                    second = first.deepcopy()
+                    first["els"][0]["selection"] = [get_use(i) + {"prefix": "-"}]
+                    second["els"][0]["selection"] = [get_use(i)]
+                    second["condition"]["not"] = ""
+                    condELs.extend([first,second])
+            else:
+                raise Exception("Find prefix ! but not suffix ? or = for use " + i["use"])
+        elif "suffix" in i:
+            if i["suffix"] == "?":
+                # app - misc / foo[bar?]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo)
+                first = {
+                    "condition": {'use': i["use"]},
+                    "els": [{x: y for x, y in ctx if x != "selection" and x != "type"}]}
+                second = first.deepcopy()
+                first["els"][0]["selection"] = [get_use(i)]
+                second["condition"]["not"] = ""
+                condELs.extend([first, second])
+            elif i["suffix"] == "=":
+                # app - misc / foo[bar =]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo[-bar])
+                first = {
+                    "condition": {'use': i["use"]},
+                    "els": [{x: y for x, y in ctx if x != "selection" and x != "type"}]}
+                second = first.deepcopy()
+                first["els"][0]["selection"] = [get_use(i)]
+                second["els"][0]["selection"] = [get_use(i) + {"prefix": "-"}]
+                second["condition"]["not"] = ""
+                condELs.extend([first, second])
+        else:
+            normal_sels.append(i)
+    return condELs,normal_sels
+
+
 ##############################################
 # visitor to convert the AST into SMT formulas
 ##############################################
@@ -186,32 +247,59 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         return smt.And([map(self.mapvisitDependEL, ctx['els'])])
 
     def visitAtom(self, ctx):
-        res = self.DefaultValue()
-        if 'version_op' in ctx:
-            res = self.CombineValue(res, self.visitVersion_op(ctx['version_op']))
-        if 'slots' in ctx:
-            res = self.CombineValue(res, self.visitSlot(ctx['slots']))
-        if 'selection' in ctx:
-            res = reduce(self.__mapvisitSelection, ctx['selection'], res)
-        return res
 
-    def visitVersion_op(self, ctx):
-        return self.DefaultValue()
-    def visitSlot(self, ctx):
-        if ctx['type'] == "ssimple":
-            return self.visitSlotSIMPLE(ctx)
-        elif ctx['type'] == "sfull":
-            return self.visitSlotFULL(ctx)
-        elif ctx['type'] == "seq":
-            return self.visitSlotEQ(ctx)
-        elif ctx['type'] == "sstar":
-            return self.visitSlotSTAR(ctx)
-    def visitSlotSIMPLE(self, ctx):
-        return self.DefaultValue()
-    def visitSlotFULL(self, ctx):
-        return self.DefaultValue()
-    def visitSlotEQ(self, ctx):
-        return self.DefaultValue()
+        def aux_visit_select(pkgs,sel):
+            if sel["use"] in self.mspl[self.package]["declared_uses"]:
+                # the package declared the use
+                if "prefix" in sel and sel["prefix"]  == "-":
+                    if "preference" in sel:
+                        if sel["preference"] == "+":
+                            return smt.False()
+                    else: # preference - or absent
+                        return smt.Or(map(lambda x: get_smt_package(self.mspl,x),pkgs))
+                else: # prefix + or absent
+                    if "preference" in sel:
+                        if sel["preference"] == "+":
+                            return smt.Or(map(lambda x: get_smt_package(self.mspl,x),pkgs))
+                    else: # preference - or absent
+                        return smt.False()
+            else: # package declared the use
+                if "prefix" in sel and sel["prefix"] == "-":
+                    return smt.Or(map(lambda x: smt.And(
+                        get_smt_package(self.mspl, x),
+                        smt.Not(get_smt_use(self.mspl,x,sel["use"]))),pkgs))
+                else: # prefix + or absent
+                    return smt.Or(map(lambda x: smt.And(
+                        get_smt_package(self.mspl, x),
+                        get_smt_use(self.mspl, x, sel["use"])), pkgs))
+
+        # todo this function can be made more efficient avoiding to redo previous work for compact atoms
+        operator = "="
+        if 'version_op' in ctx:
+            operator = ctx['version_op']
+        slot = ""
+        subslot = ""
+        if "slots" in ctx:
+            if "slot" in ctx["slots"]:
+                slot = ctx["slots"]["slot"]
+            if "subslot" in ctx["slots"]:
+                subslot = ctx["slots"]["subslot"]
+
+        pkgs = get_packages(self.mspl,ctx["package"], operator, slot, subslot)
+
+        # decompact compact forms
+        if "selection" in ctx:
+            if "type" in ctx: # decompact procedure has not been run yet
+                condELs, normal_sels = decompact_atom(ctx)
+            else:
+                normal_sels = ctx["selection"]
+                condELs = []
+            formulas = map(self.visitDependCONDITION,condELs)
+            formulas.extend(map(lambda x: aux_visit_select(pkgs,x), normal_sels))
+            return smt.And(formulas)
+        else:
+            return smt.Or(map(lambda x: get_smt_package(self.mspl, x), pkgs))
+
     def visitSlotSTAR(self, ctx):
         return self.DefaultValue()
 
