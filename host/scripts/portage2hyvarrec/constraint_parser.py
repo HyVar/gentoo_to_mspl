@@ -42,7 +42,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def __init__(self):
         super(DepGrammarVisitor, self).__init__()
     def visitRequired(self, ctx):
-        return [ child.accept(self) for child in ctx.requiredEL() ]
+        return [child.accept(self) for child in ctx.requiredEL()]
     def visitRequiredSIMPLE(self, ctx):
         res = { 'type': "rsimple", 'use': ctx.ID().getText() }
         if ctx.NOT(): res['not'] = ctx.NOT().getText()
@@ -61,8 +61,8 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return [ child.accept(self) for child in ctx.dependEL() ]
     def visitDependSIMPLE(self, ctx):
         res = { 'type': "dsimple", 'atom': ctx.atom().accept(self) }
-        if ctx.NOT(): res['not'] = ctx.NOT().getText()
-        if ctx.BLOCK(): res['block'] = ctx.BLOCK().getText()
+        if ctx.NOT(): res['not'] = ctx.NOT()[0].getText()
+        # hardblockers !! are treated as a single block !
         return res
     def visitDependCONDITION(self, ctx):
         return { 'type': "dcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.dependEL() ] }
@@ -84,7 +84,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return  res
 
     def visitAtom(self, ctx):
-        res = { 'type': "atom", 'package': ctx.ID(0).getText() + "/" + ctx.ID(1).getText() }
+        res = {'type': "atom", 'package': ctx.ID(0).getText() + "/" + ctx.ID(1).getText() }
         if ctx.version_op(): res['version_op'] = ctx.version_op().accept(self)
         if ctx.TIMES(): res['times'] = ctx.TIMES().getText()
         if ctx.slot_spec(): res['slots'] = ctx.slot_spec().accept(self)
@@ -97,8 +97,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         if ctx.GT(): return { 'type': "gt" }
         if ctx.GEQ(): return { 'type': "geq" }
         if ctx.EQ(): return { 'type': "eq" }
-        if ctx.NEQ(): return { 'type': "neq" }
-        return { 'type': "rev"}
+        return {'type': "rev"}
 
     def visitSlotSIMPLE(self, ctx):
         return { 'type': "ssimple", 'slot': ctx.ID().getText() }

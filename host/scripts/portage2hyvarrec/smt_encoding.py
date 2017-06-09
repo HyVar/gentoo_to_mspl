@@ -15,9 +15,9 @@ def match_version(template, operator, p_name):
     Check if a version package s (a string) matches a template
     Note that s and template need to have the same base package
     """
-    if operator == "~":
-        return match_version(template + "-r*", "=", p_name) or match_version(template, "=", p_name)
-    if operator == "=":
+    if operator == "rev":
+        return match_version(template + "-r*", "eq", p_name) or match_version(template, "eq", p_name)
+    if operator == "eq":
         # update re special chars in the template
         template = re.sub('\.', '\\\.', template)
         template = re.sub('\*', '.*', template) + "$"
@@ -33,13 +33,13 @@ def match_version(template, operator, p_name):
     s_match = p.search(p_name)
     s_nums = map(lambda x: int(x), s_match.group("nums").split("."))
 
-    if operator == '<=':
+    if operator == 'leq':
         return s_nums <= t_nums
-    elif operator == '>=':
+    elif operator == 'geq':
         return s_nums >= t_nums
-    elif operator == '<':
+    elif operator == 'gt':
         return s_nums < t_nums
-    elif operator == '>':
+    elif operator == 'lt':
         return s_nums > t_nums
     else:
         raise Exception("Operator " + operator + " not supported for package version comparison")
@@ -95,34 +95,25 @@ def get_smt_context(map_name_id,c_name):
 def get_no_two_true_expressions(fs):
     return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(fs) for j in range(fs) if i < j])
 
+def decompact_atom(mspl,ctx):
+    ls = []
+    if
 ##############################################
 # visitor to convert the AST into SMT formulas
 ##############################################
 class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
 
-    def __init__(self,map_name_id,package):
+    def __init__(self,mspl,map_name_id,package):
         super(constraint_ast_visitor.ASTVisitor, self).__init__()
         self.map_name_id = map_name_id
         self.package = package
+        self.mspl = mspl
 
-    def DefaultValue(self):
-        return []
-
-    def CombineValue(self, value1, value2):
-        return value1
+    # def CombineValue(self, value1, value2):
+    #     return value1
 
     def visitRequired(self, ctx):
-        return smt.And([map(self.mapvisitRequiredEL, ctx['els'])])
-
-    def visitRequiredEL(self, ctx):
-        if ctx['type'] == "rsimple":
-            return self.visitRequiredSIMPLE(ctx)
-        elif ctx['type'] == "rcondition":
-            return self.visitRequiredCONDITION(ctx)
-        elif ctx['type'] == "rchoice":
-            return self.visitRequiredCHOICE(ctx)
-        elif ctx['type'] == "rinner":
-            return self.visitRequiredINNER(ctx)
+        return smt.And(map(self.mapvisitRequiredEL, ctx))
 
     def visitRequiredSIMPLE(self, ctx):
         assert(self.map_name_id[self.package][ctx["use"]]) # flag must exists
@@ -159,29 +150,40 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         return smt.And([map(self.mapvisitRequiredEL, ctx['els'])])
 
     def visitDepend(self, ctx):
-        return reduce(self.__mapvisitDependEL, ctx, self.DefaultValue())
-    def visitDependEL(self, ctx):
-        if ctx['type'] == "dsimple":
-            return self.visitDependSIMPLE(ctx)
-        elif ctx['type'] == "dcondition":
-            return self.visitDependCONDITION(ctx)
-        elif ctx['type'] == "dchoice":
-            return self.visitDependCHOICE(ctx)
-        elif ctx['type'] == "dinner":
-            return self.visitDependINNER(ctx)
-    def visitDependSIMPLE(self, ctx):
-        return self.visitAtom(ctx['atom'])
-    def visitDependCONDITION(self, ctx):
-        return reduce(self.__mapvisitDependEL, ctx['els'], self.visitCondition(ctx['condition']))
-    def visitDependCHOICE(self, ctx):
-        return reduce(self.__mapvisitDependEL, ctx['els'], self.DefaultValue())
-    def visitDependINNER(self, ctx):
-        return reduce(self.__mapvisitDependEL, ctx['els'], self.DefaultValue())
+        return smt.And(map(self.visitDependEL, ctx))
 
-    def visitChoice(self, ctx):
-        return self.DefaultValue()
-    def visitCondition(self, ctx):
-        return self.DefaultValue()
+    def visitDependSIMPLE(self, ctx):
+        formula = self.visitAtom(ctx['atom'])
+        if "not" in ctx:
+            return smt.Not(formula)
+        return formula
+
+    def visitDependCONDITION(self, ctx):
+        formulas = map(self.visitDependEL, ctx['els'])
+        assert (self.map_name_id[self.package][ctx['condition']['use']])  # flag must exists
+        use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
+        if 'not' in ctx['condition']:
+            return smt.If(smt.Not(use),smt.And(formulas))
+        return smt.If(use,smt.And(formulas))
+
+    def visitDependCHOICE(self, ctx):
+        formulas = map(self.visitDependEL, ctx['els'])
+        if ctx["choice"]["type"] == "or":
+            return smt.Or(formulas)
+        elif ctx["choice"]["type"] == "one-max":
+            if len(formulas) > 2:
+                return get_no_two_true_expressions(formulas)
+            else:
+                return smt.TRUE()
+        elif ctx["choice"]["type"] == "xor":
+            if len(formulas) > 1:
+                return smt.And(smt.Or(formulas),get_no_two_true_expressions(formulas))
+            elif len(formulas) == 1:
+                return formulas[0]
+            return smt.FALSE() # no formula to be satisified
+
+    def visitDependINNER(self, ctx):
+        return smt.And([map(self.mapvisitDependEL, ctx['els'])])
 
     def visitAtom(self, ctx):
         res = self.DefaultValue()

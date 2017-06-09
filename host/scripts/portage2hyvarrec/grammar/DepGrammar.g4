@@ -20,7 +20,7 @@ requiredEL:
 depend: dependEL* ;
 
 dependEL:
-    (NOT | BLOCK)? atom                               #dependSIMPLE
+    (NOT NOT?)? atom                               #dependSIMPLE
   | condition LPAREN dependEL* RPAREN                 #dependCONDITION
   | choice LPAREN dependEL* RPAREN                    #dependCHOICE
   | LPAREN dependEL* RPAREN                           #dependINNER
@@ -33,7 +33,10 @@ atom:
   version_op? category=ID DIV package=ID TIMES? (COLON slot_spec)? (LBRACKET selection (COMMA selection)* RBRACKET)?
   ;
 
-version_op: LEQ | LT | GT | GEQ | EQ | NEQ | REV ;
+// != is not needed since the ! is matched in dependSIMPLE
+version_op: LEQ | LT | GT | GEQ | EQ | REV ;
+
+
 
 slot_spec:
     slot=ID                                   #slotSIMPLE

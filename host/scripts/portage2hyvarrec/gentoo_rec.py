@@ -74,7 +74,7 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     # trust_feature_declaration = True
 
     # OPTION: 1. manage number of parallel threads
-    if par > 1:
+    if par != -1:
         available_cores = min(par, multiprocessing.cpu_count())
     else:
         available_cores = max(1, multiprocessing.cpu_count() - 1)
