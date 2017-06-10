@@ -14,17 +14,33 @@ import logging
 import multiprocessing
 import click
 import time
+import sys
 
 import egencache_utils
 import constraint_parser
 import extract_id_maps
 import extract_dependencies
+import smt_encoding
 
 
 def usage():
     """Print usage"""
     print(__doc__)
 
+
+def read_load_data_file(file_name):
+    with open(file_name, "r") as f:
+        data = json.load(f)
+    return data["mspl"],data["map_name_id"],data["map_id_name"]
+
+
+def store_data_file(file_name,mspl,map_name_id,map_id_name):
+    final_data = {
+        "mspl": mspl,
+        "map_name_id": map_name_id,
+        "map_id_name": map_id_name }
+    with open(file_name, 'w') as f:
+        json.dump(final_data, f)
 
 # extracting package groups
 def generate_package_groups(concurrent_map,mspl):
@@ -55,8 +71,24 @@ def __gpg_util(spl):
 @click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
 @click.option('--par', '-p', type=click.INT, default=-1,
               help='Number of process to use for translating the dependencies. Default all processors available - 1.')
-@click.option('--translate-only', default="", help='Package to convert - Do not convert all the other ones.')
-def main(input_dir,target_dir,verbose,par,translate_only):
+@click.option('--translate-only-package', default="", help='Package to convert - Do not convert all the other ones.')
+@click.option('--simplify-mode', default="default", type=click.Choice(["default","individual"]),
+              help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')
+@click.option('--use-existing-data', default="",
+              help='File path of existing file to load.')
+@click.option('--translate-only', is_flag=True, help="Performs only the translation into SMT formulas." + 
+              " Requires the flag --use-existing-data.")
+@click.option('--output-file-name', '-o', default="hyvar_mspl.json",
+              help='Name (not path!) of the output file.')
+def main(input_dir,
+         target_dir,
+         verbose,
+         par,
+         translate_only_package,
+         simplify_mode,
+         use_existing_data,
+         translate_only,
+         output_file_name):
     """
     Tool that converts the gentoo files
 
@@ -73,94 +105,102 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     # todo handle trust feature declaration in portage file
     # trust_feature_declaration = True
 
-    # OPTION: 1. manage number of parallel threads
+    # OPTION: manage number of parallel threads
     if par != -1:
         available_cores = min(par, multiprocessing.cpu_count())
     else:
         available_cores = max(1, multiprocessing.cpu_count() - 1)
-    # OPTION: 2. manage verbosity
+    # OPTION: manage verbosity
     if verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
         logging.info("Verbose output.")
 
-    # 1. setup the output directory
+    # OPTION: load data file if available
+    if use_existing_data:
+        if os.path.isfile(use_existing_data):
+            mspl,map_name_id, map_id_name = read_load_data_file(use_existing_data)
+        else:
+            logging.critical("The file " + use_existing_data + " can not be found.")
+            sys.exit(1)
+
+    # OPTION: check if the flag --translate-only is properly used
+    if translate_only:
+        if not use_existing_data:
+            logging.critical("The option --translate-only requires the option --use-existing-data.")
+            sys.exit(1)
+
+    # setup the output directory
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
-    # 2. starts the translation
-    logging.info("Load the egencache files.")
-    if translate_only: # process just one package
-        files = [os.path.join(input_dir,translate_only)]
-    else:
-        files = egencache_utils.get_egencache_files(input_dir)
+    if not translate_only:
+        # starts the extraction
+        logging.info("Load the egencache files.")
+        if translate_only_package: # process just one package
+            t = time.time()
+            files = [os.path.join(input_dir,translate_only_package)]
+            logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+        else:
+            files = egencache_utils.get_egencache_files(input_dir)
+    
+        # manage concurrency
+        if available_cores > 1 and len(files) > 1:
+            pool = multiprocessing.Pool(available_cores)
+            concurrent_map = pool.map
+        else:
+            concurrent_map = map
+    
+        # continues the translation, following the different steps
+        logging.debug("Considering " + unicode(len(files)) + " files")
+        t = time.time()
+        raw_mspl = concurrent_map(egencache_utils.load_file_egencache, files)
+        logging.info("Load ing completed in " + unicode(time.time() - t) + " seconds.")
+        assert raw_mspl
+    
+        logging.info("Converting the gentoo dependencies into internal AST representation.")
+        t = time.time()
+        asts = concurrent_map(constraint_parser.parse_spl, raw_mspl)
+        logging.info("Conversion completed in " + unicode(time.time() - t) + " seconds.")
+        assert asts
+    
+        logging.info("Extracting ids information from ASTs.")
+        t = time.time()
+        map_name_id, map_id_name = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
+        logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
 
-    # 3. manage concurrency
-    if available_cores > 1 and len(files) > 1:
-        pool = multiprocessing.Pool(available_cores)
-        concurrent_map = pool.map
-    else:
-        concurrent_map = map
+        logging.info("Extract dependencies information from ASTs.")
+        t = time.time()
+        dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
+        t = time.time() - t
+        logging.info("Extraction completed in " + unicode(t) + " seconds.")
+    
+    
+        logging.info("Start to create the mspl dictionary.")
+        # add name : spl
+        mspl = {spl['name']: spl for spl in raw_mspl}
+        # add dependencies
+        for spl_name,deps in dependencies:
+            mspl[spl_name]['dependencies'] = deps
+        # add asts
+        for spl_name, local_ast, combined_ast in asts:
+            mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
+        # generate the package groups
+        package_groups = generate_package_groups(concurrent_map,raw_mspl)
+        mspl.update(package_groups)
 
-    # 4. continues the translation, following the different steps 
-    logging.debug("Considering " + unicode(len(files)) + " files")
-    t = time.time()
-    mspl = concurrent_map(egencache_utils.load_file_egencache, files)
-    t = time.time() - t
-    logging.info("Loading completed in " + unicode(t) + " seconds")
-    assert mspl
+    # logging.info("Generation of SMT formulas.")
+    # t = time.time()
+    # formulas = smt_encoding.generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode)
+    # logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
+    # # add formulas in mspl
+    # for spl_name, formula_list in formulas:
+    #     mspl[spl_name]["smt_constraints"] = {"formulas": formula_list, "features": []}
 
-    logging.info("Converting the gentoo dependencies into internal AST representation.")
-    t = time.time()
-    asts = concurrent_map(constraint_parser.parse_spl, mspl)
-    t = time.time() - t
-    logging.info("Conversion completed in " + unicode(t) + " seconds")
-    assert asts
-
-    logging.info("Extracting ids information from ASTs.")
-    t = time.time()
-    map_name_id, map_id_name = extract_id_maps.generate_name_mappings(concurrent_map,mspl,asts)
-    t = time.time() - t
-    logging.info("Extraction completed in " + unicode(t) + " seconds")
-
-    #logging.info("Write map of names in " + utils.NAME_MAP_FILE)
-    # with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
-    #     json.dump({"name_to_id": map_name_id, "id_to_name": map_id_name}, f)
-    # 2. generate the dependencies
-
-    logging.info("Extract dependencies information from ASTs.")
-    t = time.time()
-    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
-    t = time.time() - t
-    logging.info("Extraction completed in " + unicode(t) + " seconds")
-
-
-    logging.info("Start to create the data dictionary.")
-    # add name : spl
-    data = {spl['name']: spl for spl in mspl}
-    # add dependencies
-    for spl_name,deps in dependencies:
-        data[spl_name]['dependencies'] = deps
-    # add asts
-    for spl_name, local_ast, combined_ast in asts:
-        data[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
-    # generate the package groups
-    package_groups = generate_package_groups(concurrent_map,mspl)
-    data.update(package_groups)
-
-    if translate_only: # print info into debugging mode
-        logging.debug("Data: " + json.dumps(data))
-
-    # todo conversion into smt
     # todo save into file (compressed if possible and option using marshal)
-
-    final_data = {}
-    final_data["mspl"] = data
-    final_data["map_name_id"] = map_name_id
-    final_data["map_id_name "] = map_id_name
-    with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
-        json.dump(final_data, f)
-
-
+    logging.info("Saving the file.")
+    t = time.time()
+    store_data_file(os.path.join(target_dir, output_file_name),mspl,map_name_id,map_id_name)
+    logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")
 
 if __name__ == "__main__":
     main()

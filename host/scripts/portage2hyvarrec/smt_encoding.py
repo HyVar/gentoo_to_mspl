@@ -100,8 +100,6 @@ def get_no_two_true_expressions(fs):
     return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(fs) for j in range(fs) if i < j])
 
 
-def process_simple_atom(mspl,ctx)
-
 def decompact_atom(ctx):
 
     def get_use(ctx):
@@ -305,7 +303,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.Or(get_smt_packages(self.map_name_id,pkgs))
 
 
-def convert(mspl,map_name_id,package,simplify_mode):
+def convert(mspl,map_name_id,simplify_mode,package):
 
     logging.debug("Processing package " + package)
 
@@ -369,6 +367,10 @@ def convert(mspl,map_name_id,package,simplify_mode):
     constraints.append(validity_formula)
 
     if simplify_mode == "default":
-        return [pysmt.smtlib.printers.to_smtlib(smt.simplify(smt.And(constraints)))]
+        return (package,[pysmt.smtlib.printers.to_smtlib(smt.simplify(smt.And(constraints)))])
     elif simplify_mode == "individual":
-        return map(lambda x: pysmt.smtlib.printers.to_smtlib(smt.simplify(x)),constraints)
+        return (package,map(lambda x: pysmt.smtlib.printers.to_smtlib(smt.simplify(x)),constraints))
+
+
+def generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode):
+    return concurrent_map(lambda x: convert(mspl,map_name_id,simplify_mode,x),mspl.keys())
