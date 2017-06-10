@@ -42,8 +42,8 @@ def store_data_file(file_name,mspl,map_name_id,map_id_name):
     with open(file_name, 'w') as f:
         json.dump(final_data, f)
 
-# extracting package groups
-def generate_package_groups(concurrent_map,mspl):
+# extracting package groups and adding their ids into the maps
+def generate_package_groups(concurrent_map,mspl,map_name_id,map_id_name):
     global package_groups
     information_list = concurrent_map(__gpg_util, mspl)
     package_groups = {}
@@ -53,6 +53,9 @@ def generate_package_groups(concurrent_map,mspl):
             package_groups[group_name]['dependencies'].extend(spl_name)
         else:
             package_groups[group_name] = {'implementations': {version: spl_name}, 'dependencies': [spl_name]}
+            new_id = utils.new_id()
+            map_name_id["package"][group_name] = new_id
+            map_id_name[new_id] = {'type': 'package', 'name': group_name}
     return package_groups
 def __gpg_util(spl):
     '''
@@ -100,6 +103,8 @@ def main(input_dir,
 
     Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
     Example: python gentoo_rec.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+    Example: python gentoo_rec.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.json --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+
     """
 
     # todo handle trust feature declaration in portage file
@@ -110,6 +115,14 @@ def main(input_dir,
         available_cores = min(par, multiprocessing.cpu_count())
     else:
         available_cores = max(1, multiprocessing.cpu_count() - 1)
+
+    # manage concurrency
+    if available_cores > 1 and not translate_only_package:
+        pool = multiprocessing.Pool(available_cores)
+        concurrent_map = pool.map
+    else:
+        concurrent_map = map
+
     # OPTION: manage verbosity
     if verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
@@ -118,7 +131,10 @@ def main(input_dir,
     # OPTION: load data file if available
     if use_existing_data:
         if os.path.isfile(use_existing_data):
+            logging.info("Loading the existing file.")
+            t = time.time()
             mspl,map_name_id, map_id_name = read_load_data_file(use_existing_data)
+            logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         else:
             logging.critical("The file " + use_existing_data + " can not be found.")
             sys.exit(1)
@@ -142,19 +158,12 @@ def main(input_dir,
             logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         else:
             files = egencache_utils.get_egencache_files(input_dir)
-    
-        # manage concurrency
-        if available_cores > 1 and len(files) > 1:
-            pool = multiprocessing.Pool(available_cores)
-            concurrent_map = pool.map
-        else:
-            concurrent_map = map
-    
+
         # continues the translation, following the different steps
         logging.debug("Considering " + unicode(len(files)) + " files")
         t = time.time()
         raw_mspl = concurrent_map(egencache_utils.load_file_egencache, files)
-        logging.info("Load ing completed in " + unicode(time.time() - t) + " seconds.")
+        logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         assert raw_mspl
     
         logging.info("Converting the gentoo dependencies into internal AST representation.")
@@ -185,7 +194,7 @@ def main(input_dir,
         for spl_name, local_ast, combined_ast in asts:
             mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
         # generate the package groups
-        package_groups = generate_package_groups(concurrent_map,raw_mspl)
+        package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
         mspl.update(package_groups)
 
     # logging.info("Generation of SMT formulas.")

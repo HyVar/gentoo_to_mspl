@@ -69,7 +69,7 @@ def get_packages(data,template,operator,slot="",subslot=""):
     :return: list of versioned packages that match with the given paramters
     """
 
-    base_pkg = utils.get_base_package(template)
+    base_pkg = utils.get_base_package(data,template)
     if base_pkg:
         ls = [x for x in data[base_pkg]["implementations"] if match_version(template,operator,x)]
         if slot:
@@ -251,7 +251,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
     def visitAtom(self, ctx):
 
         def aux_visit_select(pkgs,sel):
-            if sel["use"] in self.mspl[self.package]["declared_uses"]:
+            if sel["use"] in self.map_name_id["flag"][self.package]:
                 # the package declared the use
                 if "prefix" in sel and sel["prefix"]  == "-":
                     if "preference" in sel:
@@ -303,7 +303,8 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.Or(get_smt_packages(self.map_name_id,pkgs))
 
 
-def convert(mspl,map_name_id,simplify_mode,package):
+def convert(input_tuple):
+    mspl, map_name_id, simplify_mode, package = input_tuple
 
     logging.debug("Processing package " + package)
 
@@ -325,9 +326,9 @@ def convert(mspl,map_name_id,simplify_mode,package):
     else:
         # add local and combined constraints
         visitor = visitorASTtoSMT(mspl,map_name_id,package)
-        for i in map(visitor.visitRequiredEL,mspl["fm"]["local"]):
+        for i in map(visitor.visitRequiredEL,mspl[package]["fm"]["local"]):
             constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
-        for i in map(visitor.visitDependEL, mspl["fm"]["combined"]):
+        for i in map(visitor.visitDependEL, mspl[package]["fm"]["combined"]):
             constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
 
         # package with version needs its base package to be selected
@@ -373,4 +374,5 @@ def convert(mspl,map_name_id,simplify_mode,package):
 
 
 def generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode):
-    return concurrent_map(lambda x: convert(mspl,map_name_id,simplify_mode,x),mspl.keys())
+    ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl.keys()]
+    return concurrent_map(convert,ls)
