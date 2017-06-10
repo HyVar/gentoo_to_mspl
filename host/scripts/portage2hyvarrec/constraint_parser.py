@@ -75,9 +75,9 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return { 'type': "dinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
 
     def visitChoice(self, ctx):
-        if ctx.OR(): return { 'type': "or" }
-        if ctx.ONEMAX(): return { 'type': "one-max" }
-        return { 'type': "xor" }
+        if ctx.OR(): return "or"
+        if ctx.ONEMAX(): return "one-max"
+        return "xor"
     def visitCondition(self, ctx):
         res = { 'type': "condition", 'use': ctx.ID().getText() }
         if ctx.NOT(): res['not'] = ctx.NOT().getText()

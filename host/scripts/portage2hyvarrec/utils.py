@@ -95,12 +95,12 @@ def new_id():
 ### TRANSLATION SIMPLIFICATION FUNCTIONS
 ######################################################################
 
-def is_version(data,name):
+def is_base_package(mspl,name):
     """
-    given the data returns true if the name is a package with a version, false if it is a base package
+    given the data returns true if the name is a base package
     """
-    assert name in data
-    return "implementations" in data[name]
+    assert name in mspl
+    return "implementations" in mspl[name]
 
 
 def get_base_package(data,name):
