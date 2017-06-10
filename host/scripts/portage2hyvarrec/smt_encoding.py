@@ -8,6 +8,7 @@ import constraint_ast_visitor
 import utils
 import pysmt.shortcuts as smt
 import logging
+import pysmt.smtlib.printers
 
 def match_version(template, operator, p_name):
     """
@@ -304,7 +305,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.Or(get_smt_packages(self.map_name_id,pkgs))
 
 
-def convert(mspl,map_name_id,package):
+def convert(mspl,map_name_id,package,simplify_mode):
 
     logging.debug("Processing package " + package)
 
@@ -324,123 +325,50 @@ def convert(mspl,map_name_id,package):
         for i,j in possible_slot_matches:
             constraints.append(smt.Not(smt.And(get_smt_package(map_name_id,i),get_smt_package(map_name_id,j))))
     else:
+        # add local and combined constraints
         visitor = visitorASTtoSMT(mspl,map_name_id,package)
-        
-
-        assert "fm" in mspl[package]
-        assert "external" in mspl[package]["fm"]
-        assert "local" in mspl[package]["fm"]
-        visitor = dep_translator.DepVisitor(mspl, map_name_id, package)
-        if mspl[package]["fm"]["external"]:
-            parser = visitor.parser(mspl[package]["fm"]["external"])
-            tree = parser.depend()
-            visitor.visit(tree)
-        if mspl[package]["fm"]["runtime"] and mspl[package]["fm"]["runtime"] != mspl[package]["fm"]["external"]:
-            parser = visitor.parser(mspl[package]["fm"]["runtime"])
-            tree = parser.depend()
-            visitor.visit(tree)
-        if mspl[package]["fm"]["local"]:
-            parser = visitor.parser(mspl[package]["fm"]["local"])
-            tree = parser.localDEP()
-            visitor.visit(tree)
-        data["constraints"].extend(visitor.constraints)
+        for i in map(visitor.visitRequiredEL,mspl["fm"]["local"]):
+            constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
+        for i in map(visitor.visitDependEL, mspl["fm"]["combined"]):
+            constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
 
         # package with version needs its base package to be selected
-        data["constraints"].append(settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl 1 = " +
-                                settings.get_hyvar_package(map_name_id["package"][re.sub(settings.VERSION_RE,"",package)]))
+        constraints.append(smt.Implies(
+            get_smt_package(map_name_id, package),
+            get_smt_package(map_name_id,mspl[package]['group_name'])))
 
         # if package is not selected its flags are not selected either
-        data["constraints"].append(settings.get_hyvar_impl(
-            settings.get_hyvar_package(map_name_id["package"][package]) + " = 0",
-            settings.get_hyvar_and([settings.get_hyvar_flag(x) + " = 0" for x in map_name_id["flag"][package].values()])))
+        constraints.append(smt.Implies(
+            smt.Not(get_smt_package(map_name_id, package)),
+            smt.And(smt.Not(smt.get_smt_packages(map_name_id,map_name_id["flag"][package].keys())))))
 
         # if flag is selected then its package is selected too
-        for i in map_name_id["flag"][package].values():
-            data["constraints"].append(settings.get_hyvar_impl(
-                settings.get_hyvar_flag(i) + " = 1",
-                settings.get_hyvar_package(map_name_id["package"][package]) + " = 1"))
+        constraints.append(smt.Implies(
+            smt.Or(smt.get_smt_packages(map_name_id, map_name_id["flag"][package].keys())),
+            get_smt_package(map_name_id, package)))
+
+
 
     # add validity formulas. Context must be one of the possible env
-    envs = [settings.process_envirnoment_name(x) for x in mspl[package]["environment"]]
+
+    envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
     envs = [x for x in envs if not x.startswith("-")]
     if envs:
         if "*" not in envs:
-            data["constraints"].append(
-                settings.get_hyvar_package(map_name_id["package"][package]) + " = 1 impl (" +
-                settings.get_hyvar_or(
-                    [settings.get_hyvar_context() + " = " + unicode(map_name_id["context"][x]) for x in envs]) + ")")
+            validity_formula = smt.Implies(
+                get_smt_package(map_name_id, package),
+                smt.Or(map(lambda x:get_smt_context(map_name_id,x),envs)))
+        else:
+            validity_formula = smt.TRUE()
     else:
-        logging.warning("Environment empty for package " + package + ". This package will be treated as not installable.")
-        data["constraints"] = ["false"]
+        logging.warning("Environment empty for package " + package +
+                        ". This package will be treated as not installable.")
+        validity_formula = smt.FALSE()
 
-    # if activated, for performance reasons do the encoding directly into z3 smt formulas
-    if to_smt:
-        features = set()
-        ls = []
-        for i in data["constraints"]:
-            try:
-                # logging.debug("Processing " + i)
-                d = SpecTranslator.translate_constraint(i, {})
-                # other.update(d["contexts"])
-                # other.update(d["attributes"])
-                features.update(d["features"])
-                ls.append(d["formula"])
-            except Exception as e:
-                logging.error("Parsing failed while converting into SMT " + i + ": " + unicode(e))
-                logging.error("Exiting")
-                sys.exit(1)
-        formula = z3.simplify(z3.And(ls))
-        s = toSMT2(formula)
-        data["smt_constraints"] = {}
-        data["smt_constraints"]["formulas"] = [s]
-        data["smt_constraints"]["features"] = list(features)
-        # data["smt_constraints"]["other_int_symbols"] = list(other)
-        data["constraints"] = []
+    # validity formula added at the end of constraints
+    constraints.append(validity_formula)
 
-    logging.debug("Writing file " + os.path.join(target_dir, package + ".json"))
-    d = package.split(settings.PACKAGE_NAME_SEPARATOR)[0]
-    try:
-        if not os.path.exists(os.path.join(target_dir, d)):
-            os.makedirs(os.path.join(target_dir, d))
-    except OSError, e:
-        if e.errno != 17:
-            raise
-        # if e.errno == 17 another thread already created the directory (race condition)
-    with open(os.path.join(target_dir, package + ".json"), 'w') as f:
-        json.dump(data, f, indent=1)
-    return True
-
-# worker for a thread
-def worker(pair):
-    pkg,target_dir = pair
-    convert(pkg,target_dir)
-    return True
-
-
-    logging.info("Load the MSPL. This may take a while")
-    load_mspl(os.path.join(input_dir,'mspl'))
-    logging.info("Load the SPL. This may take a while")
-    load_spl(os.path.join(input_dir,os.path.join('catalog','spl')))
-
-    if os.path.isfile(os.path.join(target_dir,settings.NAME_MAP_FILE)):
-        logging.info("Use the exising " + settings.NAME_MAP_FILE + " file. No computation of new ids")
-        data = read_json(os.path.join(target_dir,settings.NAME_MAP_FILE))
-        map_name_id = data["name_to_id"]
-        map_id_name = data["id_to_name"]
-    else:
-        logging.info("Generate the name maps for packages and stores in a file")
-        generate_name_mapping_file(target_dir)
-
-    logging.info("Start converting files of the MSPL. Skipping existing ones")
-
-    if translate_only:
-        convert(translate_only, target_dir)
-    else:
-        to_convert = [x for x in spl.keys() if not os.path.isfile(os.path.join(target_dir,x+".json"))]
-        # if more than one thread is used python goes into segmentation fault
-        logging.info("Starting to convert packages using " + unicode(available_cores) + " processes.")
-        logging.info("Number of packages to convert: " + unicode(len(to_convert)))
-
-        pool = multiprocessing.Pool(available_cores)
-        pool.map(worker,[(x,target_dir) for x in to_convert])
-    logging.info("Execution terminated.")
+    if simplify_mode == "default":
+        return [pysmt.smtlib.printers.to_smtlib(smt.simplify(smt.And(constraints)))]
+    elif simplify_mode == "individual":
+        return map(lambda x: pysmt.smtlib.printers.to_smtlib(smt.simplify(x)),constraints)

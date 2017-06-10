@@ -56,9 +56,9 @@ def get_new_temp_file(extension):
     global __tmp_files_lock
     global __tmp_files
     name = '/tmp/' + uuid.uuid4().hex + '.' + extension
-    #__tmp_files_lock.acquire()
+    __tmp_files_lock.acquire()
     __tmp_files.append(name)
-    #__tmp_files_lock.release()
+    __tmp_files_lock.release()
     return name
 
 
