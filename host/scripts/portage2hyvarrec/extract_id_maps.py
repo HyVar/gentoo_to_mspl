@@ -34,8 +34,8 @@ def generate_name_mappings_spl(spl):
     if trust_feature_declaration:
         for use in spl['features']:
             update_mappings(mappings, 'flag', spl_name, use)
-    update_mappings(mappings, 'slot', spl_name, spl['slots']['slot'])
-    update_mappings(mappings, 'subslot', spl_name, spl['slots']['subslot'])
+    update_mappings(mappings, 'slot', spl_name, spl['slot'])
+    update_mappings(mappings, 'subslot', spl_name, spl['subslot'])
     for keyword in spl['environment']:
         keyword = utils.process_keyword(keyword)
         if not keyword.startswith("-"):

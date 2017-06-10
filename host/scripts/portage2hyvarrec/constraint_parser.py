@@ -42,7 +42,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def __init__(self):
         super(DepGrammarVisitor, self).__init__()
     def visitRequired(self, ctx):
-        return [ child.accept(self) for child in ctx.requiredEL() ]
+        return [child.accept(self) for child in ctx.requiredEL()]
     def visitRequiredSIMPLE(self, ctx):
         res = { 'type': "rsimple", 'use': ctx.ID().getText() }
         if ctx.NOT(): res['not'] = ctx.NOT().getText()
@@ -50,7 +50,10 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitRequiredCONDITION(self, ctx):
         return { 'type': "rcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
     def visitRequiredCHOICE(self, ctx):
-        return { 'type': "rchoice", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
+        return {'type': "rchoice",
+                'els': [child.accept(self) for child in ctx.requiredEL()],
+                'choice': ctx.choice().accept(self)
+                }
     def visitRequiredINNER(self, ctx):
         return { 'type': "rinner", 'els': [ child.accept(self) for child in ctx.requiredEL() ] }
 
@@ -58,13 +61,16 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return [ child.accept(self) for child in ctx.dependEL() ]
     def visitDependSIMPLE(self, ctx):
         res = { 'type': "dsimple", 'atom': ctx.atom().accept(self) }
-        if ctx.NOT(): res['not'] = ctx.NOT().getText()
-        if ctx.BLOCK(): res['block'] = ctx.BLOCK().getText()
+        if ctx.NOT(): res['not'] = ctx.NOT()[0].getText()
+        # hardblockers !! are treated as a single block !
         return res
     def visitDependCONDITION(self, ctx):
         return { 'type': "dcondition", 'condition': ctx.condition().accept(self), 'els': [ child.accept(self) for child in ctx.dependEL() ] }
     def visitDependCHOICE(self, ctx):
-        return { 'type': "dchoice", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
+        return {'type': "dchoice",
+                'els': [child.accept(self) for child in ctx.dependEL()],
+                'choice': ctx.choice().accept(self)
+                }
     def visitDependINNER(self, ctx):
         return { 'type': "dinner", 'els': [ child.accept(self) for child in ctx.dependEL() ] }
 
@@ -78,7 +84,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return  res
 
     def visitAtom(self, ctx):
-        res = { 'type': "atom", 'package': ctx.ID(0).getText() + "/" + ctx.ID(1).getText() }
+        res = {'type': "atom", 'package': ctx.ID(0).getText() + "/" + ctx.ID(1).getText() }
         if ctx.version_op(): res['version_op'] = ctx.version_op().accept(self)
         if ctx.TIMES(): res['times'] = ctx.TIMES().getText()
         if ctx.slot_spec(): res['slots'] = ctx.slot_spec().accept(self)
@@ -86,13 +92,12 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         return res
 
     def visitVersion_op(self, ctx):
-        if ctx.LEQ(): return { 'type': "leq" }
-        if ctx.LT(): return { 'type': "lt" }
-        if ctx.GT(): return { 'type': "gt" }
-        if ctx.GEQ(): return { 'type': "geq" }
-        if ctx.EQ(): return { 'type': "eq" }
-        if ctx.NEQ(): return { 'type': "neq" }
-        return { 'type': "rev"}
+        if ctx.LEQ(): return "<="
+        if ctx.LT(): return "<"
+        if ctx.GT(): return ">"
+        if ctx.GEQ(): return ">-"
+        if ctx.EQ(): return "="
+        return {'type': "~"}
 
     def visitSlotSIMPLE(self, ctx):
         return { 'type': "ssimple", 'slot': ctx.ID().getText() }
@@ -112,21 +117,16 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         if ctx.suffix(): res['suffix'] = ctx.suffix().accept(self)
         return res
     def visitPrefix(self, ctx):
-        res = { 'type': "prefix" }
-        if ctx.NOT(): res['not'] = ctx.NOT().getText()
-        if ctx.MINUS(): res['minus'] = ctx.MINUS().getText()
-        if ctx.PLUS(): res['plus'] = ctx.PLUS().getText()
-        return res
+        if ctx.NOT(): return '!'
+        if ctx.MINUS(): return '-'
+        if ctx.PLUS(): return '+'
+        return ""
     def visitPreference(self, ctx):
-        res = { 'type': "preference" }
-        if ctx.MINUS(): res['minus'] = ctx.MINUS().getText()
-        if ctx.PLUS(): res['plus'] = ctx.PLUS().getText()
-        return res
+        if ctx.MINUS(): return '-'
+        if ctx.PLUS(): return '+'
     def visitSuffix(self, ctx):
-        res = { 'type': "suffix" }
-        if ctx.IMPLIES(): res['implies'] = ctx.IMPLIES().getText()
-        if ctx.EQ(): res['eq'] = ctx.EQ().getText()
-        return res
+        if ctx.IMPLIES(): return '?'
+        if ctx.EQ(): return '='
 
 ast_translator = SPLParserTranslateConstraints()
 

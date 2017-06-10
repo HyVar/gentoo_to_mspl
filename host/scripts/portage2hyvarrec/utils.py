@@ -95,58 +95,32 @@ def new_id():
 ### TRANSLATION SIMPLIFICATION FUNCTIONS
 ######################################################################
 
-def get_hyvar_or(ls):
-    ls = [x for x in ls if x != "false"]
-    if "true" in ls:
-        return "true"
-    s = "("
-    if ls:
-        s += "( " + ls[0] + ")"
-        for i in ls[1:]:
-            s += " or (" + i + ")"
-    else:
-        return "false"
-    return s + ")"
-
-def get_hyvar_and(ls):
-    ls = [x for x in ls if x != "true"]
-    if "false" in ls:
-        return "false"
-    s = "("
-    if ls:
-        s += "( " + ls[0] + ")"
-        for i in ls[1:]:
-            s += " and (" + i + ")"
-    else:
-        return "true"
-    return s + ")"
+def is_version(data,name):
+    """
+    given the data returns true if the name is a package with a version, false if it is a base package
+    """
+    assert name in data
+    return "implementations" in data[name]
 
 
-def get_hyvar_impl(x,y):
-    if x == "false" or y == "true":
-        return "true"
-    if y == "false":
-        return "true"
-    if x == "true":
-        return "( " + y + ")"
-    else:
-        return "( " + x + " impl " + y + ")"
-
-def get_hyvar_package(id):
-    return "feature[p" + id + "]"
-
-def get_hyvar_flag(id):
-    return "feature[f" + id + "]"
-
-def get_hyvar_context():
-    return "context[c]"
+def get_base_package(data,name):
+    """
+    given a string returns the base package name if available, "" otherwise
+    """
+    if name in data:
+        if "implementations" in data[name]:
+            return name
+        else:
+            return data[name]["group_name"]
+    m = re.search(VERSION_RE, name)
+    if m:
+        version = m.group()[1:]
+        return name.replace("-" + version, "")
+    return ""
 
 
-def get_hyvar_slot(id):
-    return "attribute[s" + id + "]"
 
-def get_hyvar_subslot(id):
-    return "attribute[ss" + id + "]"
+
 
 
 

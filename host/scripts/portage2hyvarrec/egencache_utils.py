@@ -35,27 +35,18 @@ def get_egencache_files(path):
         files.extend([os.path.join(root, filename) for filename in filenames])
     return files
 
-
-def is_base_package(package_name):
-    """
-    this function tests if an spl is an implementation or a package group
-    :param package: name of the package
-    :return: true if the name of the package is not a version
-    """
-    return "implementations" in mspl[package_name]
-
-
 ######################################################################
 ### FUNCTIONS TO LOAD A PORTAGE MD5-CACHE REPOSITORY
 ######################################################################
 
-def construct_spl(names, versions, environment, slots, features, fm_local, fm_external, fm_runtime):
+def construct_spl(names, versions, environment, slots, features, fm_local, fm_external, fm_runtime,declared_uses):
     """
     create the spl structure from the extracted information
     """
     name, group_name = names
     version_all, version, revision = versions
     environment = environment.split() if environment else ["*"]
+    declared_uses = declared_uses.split() if declared_uses else []
     slots = slots.split("/") if slots else [0, 0]
     slot = str(slots[0])
     has_subslot = (len(slots) == 2)
@@ -66,9 +57,9 @@ def construct_spl(names, versions, environment, slots, features, fm_local, fm_ex
     fm_external = fm_external if fm_external else ""
     fm_runtime = fm_runtime if fm_runtime else ""
     data = {'name': name, 'group_name': group_name, 'features': features, 'environment': environment,
-            'fm': {'local': fm_local, 'external': fm_external, 'runtime': fm_runtime},
+            "fm": {'local': fm_local, 'external': fm_external, 'runtime': fm_runtime},
             'versions': {'full': str(version_all), 'base': str(version), 'revision': str(revision)},
-            'slots': {'slot': slot, 'subslot': subslot}}
+            'slot': slot, 'subslot': subslot, "declared_uses": declared_uses}
     return data
 
 
@@ -96,7 +87,9 @@ def load_file_egencache(filepath):
         data_tmp.get('IUSE'),
         data_tmp.get('REQUIRED_USE'),
         data_tmp.get('DEPEND'),
-        data_tmp.get('RDEPEND'))
+        data_tmp.get('RDEPEND'),
+        data_tmp.get('IUSE')
+    )
 
 
 

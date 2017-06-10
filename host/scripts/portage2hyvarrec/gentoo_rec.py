@@ -66,15 +66,16 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     TARGET_DIR directory where all the files resulting of the translation will be put
     Usually it is ../../../host/portage/json
 
-    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/gen/md5-cache /dev/null
+    Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+    Example: python gentoo_rec.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
     """
 
     # todo handle trust feature declaration in portage file
     # trust_feature_declaration = True
 
     # OPTION: 1. manage number of parallel threads
-    if par > 1:
-        available_cores = max(par, multiprocessing.cpu_count())
+    if par != -1:
+        available_cores = min(par, multiprocessing.cpu_count())
     else:
         available_cores = max(1, multiprocessing.cpu_count() - 1)
     # OPTION: 2. manage verbosity
@@ -149,9 +150,16 @@ def main(input_dir,target_dir,verbose,par,translate_only):
     if translate_only: # print info into debugging mode
         logging.debug("Data: " + json.dumps(data))
 
-
     # todo conversion into smt
     # todo save into file (compressed if possible and option using marshal)
+
+    final_data = {}
+    final_data["mspl"] = data
+    final_data["map_name_id"] = map_name_id
+    final_data["map_id_name "] = map_id_name
+    with open(os.path.join(target_dir, utils.NAME_MAP_FILE), 'w') as f:
+        json.dump(final_data, f)
+
 
 
 if __name__ == "__main__":
