@@ -9,6 +9,8 @@ import utils
 import pysmt.shortcuts as smt
 import logging
 import pysmt.smtlib.printers
+import sys
+import copy
 
 def match_version(template, operator, p_name):
     """
@@ -19,6 +21,7 @@ def match_version(template, operator, p_name):
         return match_version(template + "-r*", "=", p_name) or match_version(template, "=", p_name)
     if operator == "=":
         # update re special chars in the template
+        template = re.sub('\+', '\\\+', template)
         template = re.sub('\.', '\\\.', template)
         template = re.sub('\*', '.*', template) + "$"
         if re.match(template,p_name):
@@ -42,7 +45,7 @@ def match_version(template, operator, p_name):
     elif operator == '<':
         return s_nums > t_nums
     else:
-        raise Exception("Operator " + operator + " not supported for package version comparison")
+        raise Exception("Operator " + unicode(operator) + " not supported for package version comparison")
 
 
 def match_slot(data,slot,p_name):
@@ -70,13 +73,16 @@ def get_packages(data,template,operator,slot="",subslot=""):
     """
 
     base_pkg = utils.get_base_package(data,template)
-    if base_pkg:
-        ls = [x for x in data[base_pkg]["implementations"] if match_version(template,operator,x)]
+    if base_pkg and base_pkg in data:
+        ls = [x for x in data[base_pkg]["implementations"].values() if match_version(template,operator,x)]
         if slot:
             ls = [x for x in ls if match_slot(data,slot,x)]
         if subslot:
             ls = [x for x in ls if match_subslot(data,subslot,x)]
         return ls
+    else:
+        logging.warning("A dependency is looking for " + operator + template + " but no package " +
+                        base_pkg + " has been found.")
     return []
 
 ##############################################
@@ -91,22 +97,32 @@ def get_smt_packages(map_name_id,pkgs):
 
 
 def get_smt_use(map_name_id,p_name,u_name):
-    return smt.Symbol("u" + map_name_id["flag"]["package"][u_name])
+    return smt.Symbol("u" + map_name_id["flag"][p_name][u_name])
 
 def get_smt_context(map_name_id,c_name):
-    return smt.Symbol("u" + map_name_id["context"][c_name])
+    return smt.Symbol("c" + map_name_id["context"][c_name])
 
 def get_no_two_true_expressions(fs):
-    return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(fs) for j in range(fs) if i < j])
+    return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
 
 
 def decompact_atom(ctx):
 
-    def get_use(ctx):
+    def get_use(ctx,prefix=""):
         use = {"use": ctx["use"]}
+        if prefix:
+            use['prefix'] = prefix
         if "preference" in ctx:
             use["preference"] = ctx["preference"]
         return use
+
+    def get_dcondition(ctx,use):
+        new_ctx = {
+            'type': "dcondition",
+            'condition': get_use(use),
+            'els': [{'type': "dsimple", 'atom': {x: ctx[x] for x in ctx if x != "selection"}}]}
+        new_ctx['els'][0]['atom']['decompacted'] = ""
+        return new_ctx
 
     # decompact the comapct atoms
     assert "selection" in ctx
@@ -117,21 +133,17 @@ def decompact_atom(ctx):
             if "suffix" in i:
                 if i["suffix"] == "?":
                     # app - misc / foo[!bar?]    bar? (app - misc / foo) !bar? (app - misc / foo[-bar])
-                    first = {
-                        "condition": {'use': i["use"]},
-                        "els" : [ { x:y for x,y in ctx if x != "selection" and x != "type" }]}
-                    second = first.deepcopy()
+                    first = get_dcondition(ctx,i)
+                    second = get_dcondition(ctx,i)
                     second["condition"]["not"] = ""
-                    second["els"][0]["selection"] = [get_use(i) + {"prefix": "-" }]
+                    second["els"][0]["atom"]["selection"] = [get_use(i,"-")]
                     condELs.extend([first,second])
                 elif i["suffix"] == "=":
                     # app - misc / foo[!bar =]    bar? (app - misc / foo[-bar]) !bar? (app - misc / foo[bar])
-                    first = {
-                        "condition": {'use': i["use"]},
-                        "els" : [ { x:y for x,y in ctx if x != "selection" and x != "type" }]}
-                    second = first.deepcopy()
-                    first["els"][0]["selection"] = [get_use(i) + {"prefix": "-"}]
-                    second["els"][0]["selection"] = [get_use(i)]
+                    first = get_dcondition(ctx,i)
+                    second = get_dcondition(ctx,i)
+                    first["els"][0]["atom"]["selection"] = [get_use(i,"-")]
+                    second["els"][0]["atom"]["selection"] = [get_use(i)]
                     second["condition"]["not"] = ""
                     condELs.extend([first,second])
             else:
@@ -139,21 +151,17 @@ def decompact_atom(ctx):
         elif "suffix" in i:
             if i["suffix"] == "?":
                 # app - misc / foo[bar?]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo)
-                first = {
-                    "condition": {'use': i["use"]},
-                    "els": [{x: y for x, y in ctx if x != "selection" and x != "type"}]}
-                second = first.deepcopy()
-                first["els"][0]["selection"] = [get_use(i)]
+                first = get_dcondition(ctx,i)
+                second = get_dcondition(ctx,i)
+                first["els"][0]["atom"]["selection"] = [get_use(i)]
                 second["condition"]["not"] = ""
                 condELs.extend([first, second])
             elif i["suffix"] == "=":
                 # app - misc / foo[bar =]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo[-bar])
-                first = {
-                    "condition": {'use': i["use"]},
-                    "els": [{x: y for x, y in ctx if x != "selection" and x != "type"}]}
-                second = first.deepcopy()
-                first["els"][0]["selection"] = [get_use(i)]
-                second["els"][0]["selection"] = [get_use(i) + {"prefix": "-"}]
+                first = get_dcondition(ctx,i)
+                second = get_dcondition(ctx,i)
+                first["els"][0]["atom"]["selection"] = [get_use(i)]
+                second["els"][0]["atom"]["selection"] = [get_use(i,"-")]
                 second["condition"]["not"] = ""
                 condELs.extend([first, second])
         else:
@@ -176,22 +184,22 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
     #     return value1
 
     def visitRequired(self, ctx):
-        return smt.And(map(self.mapvisitRequiredEL, ctx))
+        return smt.And(map(self.visitRequiredEL, ctx))
 
     def visitRequiredSIMPLE(self, ctx):
-        assert(self.map_name_id[self.package][ctx["use"]]) # flag must exists
+        assert ctx["use"] in self.map_name_id["flag"][self.package]
         if "not" in ctx:
             return smt.Not(get_smt_use(self.map_name_id,self.package,ctx["use"]))
         else:
             return get_smt_use(self.map_name_id, self.package, ctx["use"])
 
     def visitRequiredCONDITION(self, ctx):
-        formulas = map(self.visitRequiredEL, ctx['els'])
-        assert (self.map_name_id[self.package][ctx['condition']['use']])  # flag must exists
+        formulas = self.visitRequired(ctx['els'])
+        assert (self.map_name_id["flag"][self.package][ctx['condition']['use']])  # flag must exists
         use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
         if 'not' in ctx['condition']:
-            return smt.If(smt.Not(use),smt.And(formulas))
-        return smt.If(use,smt.And(formulas))
+            return smt.Implies(smt.Not(use),smt.And(formulas))
+        return smt.Implies(use,smt.And(formulas))
 
     def visitRequiredCHOICE(self, ctx):
         formulas = map(self.visitRequiredEL, ctx['els'])
@@ -210,7 +218,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.FALSE() # no formula to be satisified
 
     def visitRequiredINNER(self, ctx):
-        return smt.And([map(self.mapvisitRequiredEL, ctx['els'])])
+        return smt.And(self.visitRequired(ctx['els']))
 
     def visitDepend(self, ctx):
         return smt.And(map(self.visitDependEL, ctx))
@@ -222,12 +230,12 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         return formula
 
     def visitDependCONDITION(self, ctx):
-        formulas = map(self.visitDependEL, ctx['els'])
-        assert (self.map_name_id[self.package][ctx['condition']['use']])  # flag must exists
+        formulas = self.visitDepend(ctx['els'])
+        assert self.map_name_id["flag"][self.package][ctx['condition']['use']]  # flag must exists
         use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
         if 'not' in ctx['condition']:
-            return smt.If(smt.Not(use),smt.And(formulas))
-        return smt.If(use,smt.And(formulas))
+            return smt.Implies(smt.Not(use),smt.And(formulas))
+        return smt.Implies(use,smt.And(formulas))
 
     def visitDependCHOICE(self, ctx):
         formulas = map(self.visitDependEL, ctx['els'])
@@ -246,36 +254,38 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             return smt.FALSE() # no formula to be satisified
 
     def visitDependINNER(self, ctx):
-        return smt.And([map(self.mapvisitDependEL, ctx['els'])])
+        return smt.And(self.visitDepend(ctx['els']))
 
     def visitAtom(self, ctx):
 
-        def aux_visit_select(pkgs,sel):
-            if sel["use"] in self.map_name_id["flag"][self.package]:
-                # the package declared the use
-                if "prefix" in sel and sel["prefix"]  == "-":
+        def aux_visit_single_pkg_single_select(pkg,sel):
+            if sel["use"] not in self.map_name_id["flag"][pkg]:
+                # the package considered did not declared the use
+                if "prefix" in sel and sel["prefix"] == "-":
                     if "preference" in sel:
                         if sel["preference"] == "+":
-                            return smt.False()
-                    else: # preference - or absent
-                        return smt.Or(get_smt_packages(self.map_name_id,pkgs))
+                            return smt.FALSE()
+                    # preference - or absent
+                    return get_smt_package(self.map_name_id,pkg)
                 else: # prefix + or absent
                     if "preference" in sel:
                         if sel["preference"] == "+":
-                            return smt.Or(get_smt_packages(self.map_name_id,pkgs))
-                    else: # preference - or absent
-                        return smt.False()
+                            return get_smt_package(self.map_name_id,pkg)
+                    # preference - or absent
+                    return smt.FALSE()
             else: # package declared the use
                 if "prefix" in sel and sel["prefix"] == "-":
-                    return smt.Or(map(lambda x: smt.And(
-                        get_smt_package(self.map_name_id, x),
-                        smt.Not(get_smt_use(self.map_name_id,x,sel["use"]))),pkgs))
+                    return smt.And(
+                        get_smt_package(self.map_name_id, pkg),
+                        smt.Not(get_smt_use(self.map_name_id,pkg,sel["use"])))
                 else: # prefix + or absent
-                    return smt.Or(map(lambda x: smt.And(
-                        get_smt_package(self.map_name_id, x),
-                        get_smt_use(self.map_name_id, x, sel["use"])), pkgs))
+                    return smt.And(
+                        get_smt_package(self.map_name_id, pkg),
+                        get_smt_use(self.map_name_id, pkg, sel["use"]))
 
-        # todo this function can be made more efficient avoiding to redo previous work for compact atoms
+        def aux_visit_select(pkgs,sel):
+            return smt.Or([aux_visit_single_pkg_single_select(x,sel) for x in pkgs])
+
         operator = "="
         if 'version_op' in ctx:
             operator = ctx['version_op']
@@ -289,18 +299,21 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
 
         pkgs = get_packages(self.mspl,ctx["package"], operator, slot, subslot)
 
-        # decompact compact forms
-        if "selection" in ctx:
-            if "type" in ctx: # decompact procedure has not been run yet
-                condELs, normal_sels = decompact_atom(ctx)
+        if pkgs:
+            # decompact compact forms
+            if "selection" in ctx:
+                if not "decompacted" in ctx: # decompact procedure has not been run yet
+                    condELs, normal_sels = decompact_atom(ctx)
+                else:
+                    normal_sels = ctx["selection"]
+                    condELs = []
+                formulas = [aux_visit_select(pkgs, x) for x in normal_sels]
+                formulas.append(self.visitDepend(condELs))
+                return smt.And(formulas)
             else:
-                normal_sels = ctx["selection"]
-                condELs = []
-            formulas = map(self.visitDependCONDITION,condELs)
-            formulas.extend(map(lambda x: aux_visit_select(pkgs,x), normal_sels))
-            return smt.And(formulas)
+                return smt.Or(get_smt_packages(self.map_name_id,pkgs))
         else:
-            return smt.Or(get_smt_packages(self.map_name_id,pkgs))
+            return smt.FALSE()
 
 
 def convert(input_tuple):
@@ -336,43 +349,52 @@ def convert(input_tuple):
             get_smt_package(map_name_id, package),
             get_smt_package(map_name_id,mspl[package]['group_name'])))
 
-        # if package is not selected its flags are not selected either
+        # if package is not selected its flags are neither
         constraints.append(smt.Implies(
             smt.Not(get_smt_package(map_name_id, package)),
-            smt.And(smt.Not(smt.get_smt_packages(map_name_id,map_name_id["flag"][package].keys())))))
+            smt.And(map(lambda x: smt.Not(get_smt_use(map_name_id,package,x)),map_name_id["flag"][package]))))
 
         # if flag is selected then its package is selected too
         constraints.append(smt.Implies(
-            smt.Or(smt.get_smt_packages(map_name_id, map_name_id["flag"][package].keys())),
+            smt.Or(map(lambda x: get_smt_use(map_name_id,package,x),map_name_id["flag"][package])),
             get_smt_package(map_name_id, package)))
 
 
+        # add validity formulas. Context must be one of the possible env
+        envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
+        envs = [x for x in envs if not x.startswith("-")]
 
-    # add validity formulas. Context must be one of the possible env
-
-    envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
-    envs = [x for x in envs if not x.startswith("-")]
-    if envs:
-        if "*" not in envs:
-            validity_formula = smt.Implies(
-                get_smt_package(map_name_id, package),
-                smt.Or(map(lambda x:get_smt_context(map_name_id,x),envs)))
+        if envs:
+            if "*" not in envs:
+                validity_formula = smt.Implies(
+                    get_smt_package(map_name_id, package),
+                    smt.Or(map(lambda x:get_smt_context(map_name_id,x),envs)))
+            else:
+                validity_formula = smt.TRUE()
         else:
-            validity_formula = smt.TRUE()
-    else:
-        logging.warning("Environment empty for package " + package +
-                        ". This package will be treated as not installable.")
-        validity_formula = smt.FALSE()
+            logging.warning("Environment empty for package " + package +
+                            ". This package will be treated as not installable.")
+            validity_formula = smt.FALSE()
 
-    # validity formula added at the end of constraints
-    constraints.append(validity_formula)
+        # validity formula added at the end of constraints
+        constraints.append(validity_formula)
 
     if simplify_mode == "default":
-        return (package,[pysmt.smtlib.printers.to_smtlib(smt.simplify(smt.And(constraints)))])
+        formula = smt.simplify(smt.And(constraints))
+        if smt.FALSE() == formula:
+            logging.warning("Dependencies in package " + package + " make it uninstallable.")
+        return (package,[pysmt.smtlib.printers.to_smtlib(formula)])
     elif simplify_mode == "individual":
-        return (package,map(lambda x: pysmt.smtlib.printers.to_smtlib(smt.simplify(x)),constraints))
+        formulas = []
+        for i in constraints:
+            formula = smt.simplify(smt.And(constraints))
+            if smt.FALSE() == formula:
+                logging.warning("Dependency " + unicode(i) + " in package " + package + " is false." +
+                                "Package can not be installed")
+            formulas.append(formula)
+        return (package,[pysmt.smtlib.printers.to_smtlib(x) for x in formulas])
 
 
 def generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode):
-    ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl.keys()]
+    ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl]
     return concurrent_map(convert,ls)

@@ -197,13 +197,13 @@ def main(input_dir,
         package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
         mspl.update(package_groups)
 
-    # logging.info("Generation of SMT formulas.")
-    # t = time.time()
-    # formulas = smt_encoding.generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode)
-    # logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-    # # add formulas in mspl
-    # for spl_name, formula_list in formulas:
-    #     mspl[spl_name]["smt_constraints"] = {"formulas": formula_list, "features": []}
+    logging.info("Generation of SMT formulas.")
+    t = time.time()
+    formulas = smt_encoding.generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode)
+    logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
+    # add formulas in mspl
+    for spl_name, formula_list in formulas:
+        mspl[spl_name]["smt_constraints"] = {"formulas": formula_list, "features": []}
 
     # todo save into file (compressed if possible and option using marshal)
     logging.info("Saving the file.")

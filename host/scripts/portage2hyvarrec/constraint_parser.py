@@ -95,9 +95,9 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
         if ctx.LEQ(): return "<="
         if ctx.LT(): return "<"
         if ctx.GT(): return ">"
-        if ctx.GEQ(): return ">-"
+        if ctx.GEQ(): return ">="
         if ctx.EQ(): return "="
-        return {'type': "~"}
+        return "~"
 
     def visitSlotSIMPLE(self, ctx):
         return { 'type': "ssimple", 'slot': ctx.ID().getText() }

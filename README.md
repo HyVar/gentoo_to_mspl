@@ -167,6 +167,11 @@ TODO:
  
  Password in scripts
 
+Python Requirements
+-------------------
+
+pysmt 
+click
  
 Task:
 ------------------------ 
