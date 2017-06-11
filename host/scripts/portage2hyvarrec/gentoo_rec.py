@@ -20,6 +20,7 @@ import egencache_utils
 import constraint_parser
 import extract_id_maps
 import extract_dependencies
+import extract_package_groups
 import smt_encoding
 
 
@@ -41,27 +42,6 @@ def store_data_file(file_name,mspl,map_name_id,map_id_name):
         "map_id_name": map_id_name }
     with open(file_name, 'w') as f:
         json.dump(final_data, f)
-
-# extracting package groups and adding their ids into the maps
-def generate_package_groups(concurrent_map,mspl,map_name_id,map_id_name):
-    global package_groups
-    information_list = concurrent_map(__gpg_util, mspl)
-    package_groups = {}
-    for group_name, version, spl_name in information_list:
-        if group_name in package_groups:
-            package_groups[group_name]['implementations'][version] = spl_name
-            package_groups[group_name]['dependencies'].extend(spl_name)
-        else:
-            package_groups[group_name] = {'implementations': {version: spl_name}, 'dependencies': [spl_name]}
-            new_id = utils.new_id()
-            map_name_id["package"][group_name] = new_id
-            map_id_name[new_id] = {'type': 'package', 'name': group_name}
-    return package_groups
-def __gpg_util(spl):
-    '''
-    Auxiliary function used for a pool.map call in generate_package_groups
-    '''
-    return ( spl['group_name'], spl['versions']['full'], spl['name'])
 
 
 @click.command()
@@ -169,12 +149,20 @@ def main(input_dir,
         logging.info("Converting the gentoo dependencies into internal AST representation.")
         t = time.time()
         asts = concurrent_map(constraint_parser.parse_spl, raw_mspl)
+        #asts = map(constraint_parser.parse_spl, raw_mspl)
         logging.info("Conversion completed in " + unicode(time.time() - t) + " seconds.")
         assert asts
     
         logging.info("Extracting ids information from ASTs.")
         t = time.time()
-        map_name_id, map_id_name = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
+        mappings = extract_id_maps.create_empty_name_mappings()
+        map_id_name, map_name_id = mappings
+        mappings_list = concurrent_map(extract_id_maps.generate_name_mappings_spl, raw_mspl)
+        map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
+        # TODO: must remove the following lines when we start loading the profile
+        mappings_list = concurrent_map(extract_id_maps.generate_use_mappings_ast, asts)
+        map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
+        #map_id_name, map_name_id = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
         logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
 
         logging.info("Extract dependencies information from ASTs.")
@@ -194,7 +182,13 @@ def main(input_dir,
         for spl_name, local_ast, combined_ast in asts:
             mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
         # generate the package groups
-        package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
+        package_groups = extract_package_groups.create_empty_package_groups()
+        package_groups_list = concurrent_map(extract_package_groups.generate_package_group_spl, raw_mspl)
+        map(lambda x: extract_package_groups.update_package_groups(package_groups, x), package_groups_list)
+        # update the mspl dictionary with the package groups
+        extract_id_maps.update_name_mappings(mappings, extract_id_maps.generate_name_mappings_package_groups(package_groups))
+        #package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
+        # add the package groups to the mspl
         mspl.update(package_groups)
 
     logging.info("Generation of SMT formulas.")
