@@ -9,7 +9,7 @@ __status__ = "Prototype"
 
 import json
 import sys
-import settings
+import utils
 import logging
 import os
 import re
@@ -17,6 +17,8 @@ from subprocess import PIPE
 import psutil
 import requests
 import click
+import time
+import multiprocessing
 
 # Global variables
 
@@ -34,11 +36,11 @@ def clean():
   Utility for (possibly) cleaning temporary files
   """
   if not KEEP:
-    settings.TMP_FILES_LOCK.acquire()
-    for f in settings.TMP_FILES:
+    utils.TMP_FILES_LOCK.acquire()
+    for f in utils.TMP_FILES:
       if os.path.exists(f):
         os.remove(f)
-    settings.TMP_FILES_LOCK.release()
+    utils.TMP_FILES_LOCK.release()
 
 def read_json(json_file):
     """
@@ -47,6 +49,14 @@ def read_json(json_file):
     with open(json_file) as data_file:
         data = json.load(data_file)
     return data
+
+
+def read_request_file(file_name,concurrent_map):
+    constraints = []
+    with open(file_name,"r") as f:
+        lines = f.readlines()
+
+
 
 
 def run_hyvar(json_data,par,explain_modality):
@@ -87,19 +97,19 @@ def run_remote_hyvar(json_data,url):
     return response.json()
 
 
-def load_mspl(mspl_dir):
-    """
-    loads in memory the json files of the mspl in the directory mspl_dir
-    """
-    global mspl
-    dirs = os.listdir(mspl_dir)
-    for i in dirs:
-        logging.debug("Loading json files from dir " + i)
-        if os.path.isdir(os.path.join(mspl_dir,i)):
-            files = os.listdir(os.path.join(mspl_dir,i))
-            for f in files:
-                name = i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)
-                mspl[name] = read_json(os.path.join(mspl_dir,i,f))
+# def load_mspl(mspl_dir):
+#     """
+#     loads in memory the json files of the mspl in the directory mspl_dir
+#     """
+#     global mspl
+#     dirs = os.listdir(mspl_dir)
+#     for i in dirs:
+#         logging.debug("Loading json files from dir " + i)
+#         if os.path.isdir(os.path.join(mspl_dir,i)):
+#             files = os.listdir(os.path.join(mspl_dir,i))
+#             for f in files:
+#                 name = i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)
+#                 mspl[name] = read_json(os.path.join(mspl_dir,i,f))
 
 
 def get_transitive_closure_of_dependencies(pkgs):
@@ -335,8 +345,8 @@ def get_conf_with_negative_use_flags(conf):
 
 @click.command()
 @click.argument(
-    'input_dir',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
+    'input_file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True))
 @click.argument(
     'request_file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
@@ -358,7 +368,9 @@ def get_conf_with_negative_use_flags(conf):
 @click.option('--explain', is_flag=True, help="Run HyVarRec in explanation mode.")
 @click.option('--url', '-r', default="", help='URL of the remote hyvarrec to use if available (local command otherwise used).')
 @click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for running the local HyVarRec.')
-def main(input_dir,
+@click.option('--save-modality', default="json", type=click.Choice(["json","marshal"]),
+              help='Saving modality. Marshal is supposed to be faster but python version specific.')
+def main(input_file,
          request_file,
          configuration_file,
          new_configuration_file,
@@ -369,7 +381,8 @@ def main(input_dir,
          keep,
          explain,
          url,
-         par):
+         par,
+         save_modality):
     """
     Uses HyVarRec to produce a valid configuration of packages to install.
 
@@ -390,19 +403,36 @@ def main(input_dir,
     global mspl
     global KEEP
 
+    # OPTION: keep intermediate file options. Useful for debug
     if keep:
         KEEP = True
+
+    # OPTION: manage verbosity
     if verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
         logging.info("Verbose output.")
 
-    logging.info("Load the MSPL. This may take a while.")
-    load_mspl(input_dir)
+    # OPTION: manage number of parallel threads
+    if par != -1:
+        available_cores = min(par, multiprocessing.cpu_count())
+    else:
+        available_cores = 1
 
-    logging.info("Load the mapping between names and ids. This may take a while.")
-    map_name_id = read_json(os.path.join(input_dir,settings.NAME_MAP_FILE))
+    # manage concurrency
+    if available_cores > 1:
+        pool = multiprocessing.Pool(available_cores)
+        concurrent_map = pool.map
+    else:
+        concurrent_map = map
+
+    logging.info("Load the MSPL. This may take a while.")
+    t = time.time()
+    mspl,map_name_id,map_id_name = utils.load_data_file(input_file,save_modality)
+    logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
 
     logging.info("Load the request package list.")
+    with open(request_file)
     # features can be requested only when the version of the package is defined
     package_request = read_json(request_file)
     for i in package_request.keys():

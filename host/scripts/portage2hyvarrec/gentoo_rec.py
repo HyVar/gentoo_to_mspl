@@ -29,19 +29,7 @@ def usage():
     print(__doc__)
 
 
-def read_load_data_file(file_name):
-    with open(file_name, "r") as f:
-        data = json.load(f)
-    return data["mspl"],data["map_name_id"],data["map_id_name"]
 
-
-def store_data_file(file_name,mspl,map_name_id,map_id_name):
-    final_data = {
-        "mspl": mspl,
-        "map_name_id": map_name_id,
-        "map_id_name": map_id_name }
-    with open(file_name, 'w') as f:
-        json.dump(final_data, f)
 
 
 @click.command()
@@ -61,8 +49,10 @@ def store_data_file(file_name,mspl,map_name_id,map_id_name):
               help='File path of existing file to load.')
 @click.option('--translate-only', is_flag=True, help="Performs only the translation into SMT formulas." + 
               " Requires the flag --use-existing-data.")
-@click.option('--output-file-name', '-o', default="hyvar_mspl.json",
+@click.option('--output-file-name', '-o', default="hyvar_mspl.gentoorec",
               help='Name (not path!) of the output file.')
+@click.option('--save-modality', default="json", type=click.Choice(["json","marshal"]),
+              help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(input_dir,
          target_dir,
          verbose,
@@ -71,7 +61,8 @@ def main(input_dir,
          simplify_mode,
          use_existing_data,
          translate_only,
-         output_file_name):
+         output_file_name,
+         save_modality):
     """
     Tool that converts the gentoo files
 
@@ -113,7 +104,7 @@ def main(input_dir,
         if os.path.isfile(use_existing_data):
             logging.info("Loading the existing file.")
             t = time.time()
-            mspl,map_name_id, map_id_name = read_load_data_file(use_existing_data)
+            mspl,map_name_id, map_id_name = utils.load_data_file(use_existing_data,save_modality)
             logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         else:
             logging.critical("The file " + use_existing_data + " can not be found.")
@@ -202,7 +193,7 @@ def main(input_dir,
     # todo save into file (compressed if possible and option using marshal)
     logging.info("Saving the file.")
     t = time.time()
-    store_data_file(os.path.join(target_dir, output_file_name),mspl,map_name_id,map_id_name)
+    utils.store_data_file(os.path.join(target_dir, output_file_name),mspl,map_name_id,map_id_name,save_modality)
     logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")
 
 if __name__ == "__main__":

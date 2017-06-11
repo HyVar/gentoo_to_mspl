@@ -12,6 +12,9 @@ __status__ = "Prototype"
 import re
 import uuid
 import multiprocessing
+import json
+import marshal
+import gzip
 
 def inline_combine_dicts(dict1, dict2, inline_combine):
     for k,v in dict2.iteritems():
@@ -61,6 +64,28 @@ def get_new_temp_file(extension):
     __tmp_files_lock.release()
     return name
 
+
+def load_data_file(file_name,save_modality="json"):
+    if save_modality == "marshal":
+        with open(file_name, "r") as f:
+            data = marshal.load(f)
+    else:
+        with gzip.open(file_name, "r") as f:
+            data = json.load(f)
+    return data["mspl"],data["map_name_id"],data["map_id_name"]
+
+
+def store_data_file(file_name,mspl,map_name_id,map_id_name,save_modality="json"):
+    final_data = {
+        "mspl": mspl,
+        "map_name_id": map_name_id,
+        "map_id_name": map_id_name }
+    if save_modality == "marshal": # marshal can not use gzip file directly (possible work around marshal.dumps)
+        with open(file_name, 'w') as f:
+            marshal.dump(final_data,f)
+    else:
+        with gzip.GzipFile(file_name, 'w') as f:
+            json.dump(final_data,f)
 
 ######################################################################
 ### LIST COMPACTION
