@@ -12,7 +12,6 @@ import sys
 import utils
 import logging
 import os
-import re
 from subprocess import PIPE
 import psutil
 import requests
@@ -22,6 +21,12 @@ import multiprocessing
 import constraint_parser
 import smt_encoding
 import extract_dependencies
+import pysmt.shortcuts
+import re
+
+
+from pysmt.smtlib.parser import SmtLib20Parser
+import cStringIO
 
 
 # Global variables
@@ -260,6 +265,31 @@ def get_conf_with_negative_use_flags(conf,map_name_id):
         data[i] = positive_flags + [ "-" + x for x in negative_flags]
     return data
 
+def get_better_explanation(json_result,map_name_id,map_id_name):
+    assert json_result["result"] == "unsat"
+    ls = []
+    parser = SmtLib20Parser()
+    for i in json_result["constraints"]:
+        f = cStringIO.StringIO(i)
+        script = parser.get_script(f)
+        f.close()
+        formula = script.get_last_formula()
+        formula = pysmt.shortcuts.to_smtlib(formula,daggify=False)
+        nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
+        for i in nums:
+            num = int(i)
+            env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
+            assert len(env) == 1
+            formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
+        pkgs = set(re.findall('p([0-9]+)',formula))
+        for pkg in pkgs:
+            formula = re.sub('p([0-9]+)',map_id_name[pkg]["name"],formula)
+        uses = set(re.findall('u([0-9]+)', formula))
+        for use in uses:
+            formula = re.sub('u([0-9]+)', unicode(map_id_name[use]), formula)
+        ls.append(formula)
+    return ls
+
 
 
 @click.command()
@@ -381,8 +411,12 @@ def main(input_file,
         json_result = run_hyvar(job["json"],par,explain)
         logging.info("Execution of HyVarRec took " + unicode(time.time() - t) + " seconds.")
         if json_result["result"] != "sat":
+            if explain:
+                # try to print a better explanation of the constraints
+                constraints = get_better_explanation(json_result,map_name_id,map_id_name)
+                sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
-            exit(1)
+            sys.exit(1)
         logging.debug("HyVarRec output: " + unicode(json_result))
         # update the info on the final configuration
         update_configuration(json_result,configuration,map_name_id)

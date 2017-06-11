@@ -397,14 +397,14 @@ def convert(input_tuple):
 
     if simplify_mode == "default":
         formula = z3.simplify(z3.And(constraints))
-        if z3.BoolVal(False) == formula:
+        if z3.is_false(formula):
             logging.warning("Dependencies in package " + package + " make it uninstallable.")
         return (package,[toSMT2(formula)])
     elif simplify_mode == "individual":
         formulas = []
         for i in constraints:
             formula = z3.simplify(z3.And(i))
-            if z3.BoolVal(False) == formula:
+            if z3.is_false(formula):
                 logging.warning("Dependency " + unicode(i) + " in package " + package + " is false." +
                                 "Package can not be installed")
             formulas.append(formula)
