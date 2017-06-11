@@ -61,20 +61,19 @@ def load_request_file(file_name,concurrent_map,mspl, map_name_id):
     with open(file_name,"r") as f:
         lines = f.readlines()
     # data structure to reuse the parse_spl function
-    spls = [{"name": unicode(i),
+    spls = [{"name": unicode(i), "group_name" : "",
               'fm': {'local': "", 'external': "", 'runtime': lines[i]}} for i in range(len(lines))]
     # get the asts
     asts = concurrent_map(constraint_parser.parse_spl, spls)
-    # get the dependencies
-    all_pkg_names = mspl.keys()
-    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, [(ast,all_pkg_names) for ast in asts])
-    # extract relevant info
     asts = [x for (_,_,x) in asts ]
-    dependencies = [x for (_,x) in dependencies]
+    # get the dependencies
+    visitor = extract_dependencies.GenerateDependenciesAST()
+    dependencies = concurrent_map(visitor.visitDepend,asts)
+    dependencies = [x for sublist in dependencies for x in set(sublist) if x in mspl]
     # get constraints
     visitor = smt_encoding.visitorASTtoSMT(mspl, map_name_id, "")
     constraints = [pysmt.smtlib.printers.to_smtlib(visitor.visitDepend(ast)) for ast in asts]
-    dependencies = [x for sublist in dependencies for x in sublist]
+
     return dependencies,constraints
 
 

@@ -12,7 +12,6 @@ class GenerateDependenciesAST(constraint_ast_visitor.ASTVisitor):
     def visitAtom(self, ctx):
         return [ ctx['package'] ]
 
-# note: this function is called also by reconfigure.py
 def generate_dependencies_ast(input_tuple):
     pkg_name,ast,mspl,pkg_names = input_tuple
     visitor = GenerateDependenciesAST()
