@@ -193,7 +193,8 @@ def main(input_dir,
 
     logging.info("Generation of SMT formulas.")
     t = time.time()
-    formulas = smt_encoding.generate_formulas(concurrent_thread_map,mspl,map_name_id,simplify_mode)
+    # seems also that pysmt is not thread safe. Here unfortunately a lot of memory is used
+    formulas = smt_encoding.generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode)
     logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
     # add formulas in mspl
     for spl_name, formula_list in formulas:
