@@ -90,9 +90,12 @@ def main(input_dir,
     # manage concurrency
     if available_cores > 1 and not translate_only_package:
         pool = multiprocessing.Pool(available_cores)
+        pool_thread = multiprocessing.dummy.Pool(available_cores)
         concurrent_map = pool.map
+        concurrent_thread_map = pool_thread.map
     else:
         concurrent_map = map
+        concurrent_thread_map = map
 
     # OPTION: manage verbosity
     if verbose:
@@ -133,7 +136,7 @@ def main(input_dir,
         # continues the translation, following the different steps
         logging.debug("Considering " + unicode(len(files)) + " files")
         t = time.time()
-        raw_mspl = concurrent_map(egencache_utils.load_file_egencache, files)
+        raw_mspl = concurrent_thread_map(egencache_utils.load_file_egencache, files)
         logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         assert raw_mspl
     
@@ -148,33 +151,37 @@ def main(input_dir,
         t = time.time()
         mappings = extract_id_maps.create_empty_name_mappings()
         map_id_name, map_name_id = mappings
-        mappings_list = concurrent_map(extract_id_maps.generate_name_mappings_spl, raw_mspl)
+        mappings_list = concurrent_thread_map(extract_id_maps.generate_name_mappings_spl, raw_mspl)
         map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
         # TODO: must remove the following lines when we start loading the profile
-        mappings_list = concurrent_map(extract_id_maps.generate_use_mappings_ast, asts)
+        mappings_list = concurrent_thread_map(extract_id_maps.generate_use_mappings_ast, asts)
         map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
         #map_id_name, map_name_id = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
         logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
 
-        logging.info("Extract dependencies information from ASTs.")
-        t = time.time()
-        dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
-        t = time.time() - t
-        logging.info("Extraction completed in " + unicode(t) + " seconds.")
-    
-    
         logging.info("Start to create the mspl dictionary.")
         # add name : spl
         mspl = {spl['name']: spl for spl in raw_mspl}
-        # add dependencies
-        for spl_name,deps in dependencies:
-            mspl[spl_name]['dependencies'] = deps
         # add asts
         for spl_name, local_ast, combined_ast in asts:
             mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
+
+        logging.info("Extract dependencies information from ASTs.")
+        all_pkg_names = set(mspl.keys())
+        t = time.time()
+        dependencies = concurrent_thread_map(
+            extract_dependencies.generate_dependencies_ast,
+            [(pkg,mspl[pkg]["fm"]["combined"],mspl,all_pkg_names) for pkg in mspl])
+        t = time.time() - t
+        logging.info("Extraction completed in " + unicode(t) + " seconds.")
+    
+        # add dependencies
+        for spl_name,deps in dependencies:
+            mspl[spl_name]['dependencies'] = deps
+
         # generate the package groups
         package_groups = extract_package_groups.create_empty_package_groups()
-        package_groups_list = concurrent_map(extract_package_groups.generate_package_group_spl, raw_mspl)
+        package_groups_list = concurrent_thread_map(extract_package_groups.generate_package_group_spl, raw_mspl)
         map(lambda x: extract_package_groups.update_package_groups(package_groups, x), package_groups_list)
         # update the mspl dictionary with the package groups
         extract_id_maps.update_name_mappings(mappings, extract_id_maps.generate_name_mappings_package_groups(package_groups))
@@ -186,7 +193,7 @@ def main(input_dir,
 
     logging.info("Generation of SMT formulas.")
     t = time.time()
-    formulas = smt_encoding.generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode)
+    formulas = smt_encoding.generate_formulas(concurrent_thread_map,mspl,map_name_id,simplify_mode)
     logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
     # add formulas in mspl
     for spl_name, formula_list in formulas:

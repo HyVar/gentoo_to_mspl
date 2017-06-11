@@ -61,18 +61,20 @@ def load_request_file(file_name,concurrent_map,mspl, map_name_id):
     with open(file_name,"r") as f:
         lines = f.readlines()
     # data structure to reuse the parse_spl function
-    spls = [ {"name": unicode(i),
+    spls = [{"name": unicode(i),
               'fm': {'local': "", 'external': "", 'runtime': lines[i]}} for i in range(len(lines))]
     # get the asts
     asts = concurrent_map(constraint_parser.parse_spl, spls)
     # get the dependencies
-    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
+    all_pkg_names = mspl.keys()
+    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, [(ast,all_pkg_names) for ast in asts])
     # extract relevant info
     asts = [x for (_,_,x) in asts ]
     dependencies = [x for (_,x) in dependencies]
     # get constraints
     visitor = smt_encoding.visitorASTtoSMT(mspl, map_name_id, "")
     constraints = [pysmt.smtlib.printers.to_smtlib(visitor.visitDepend(ast)) for ast in asts]
+    dependencies = [x for sublist in dependencies for x in sublist]
     return dependencies,constraints
 
 
@@ -83,7 +85,7 @@ def load_configuration_file(file_name,mspl,map_name_id):
             initial_configuration[i] = [x[1:] for x in initial_configuration[i]
                                         if x.startswith("+") and x[1:] in map_name_id["flag"][i]]
         else:
-            logging.warning("Not found the package " + i + " defined in the initial configuration.")
+            logging.warning("Not found the package " + i + " defined in the initial configuration. It will be ignored.")
             del(initial_configuration[i])
     return initial_configuration
 
@@ -133,10 +135,6 @@ def get_transitive_closure_of_dependencies(mspl,pkgs):
     checked = set()
     while to_check:
         p = to_check.pop()
-        for i in mspl[p]["configures"]:
-            if i not in checked:
-                to_check.append(i)
-                deps.add(i)
         for i in mspl[p]["dependencies"]:
             if i not in checked:
                 to_check.append(i)
@@ -158,11 +156,11 @@ def create_hyvarrec_spls(package_request,
 
     spls = {}
 
-    to_process = set(package_request.keys())
+    to_process = set(package_request)
     # todo: this part can be more efficient using union find
     while to_process:
         i = to_process.pop()
-        spls[i] = get_transitive_closure_of_dependencies([i]+initial_configuration.keys())
+        spls[i] = get_transitive_closure_of_dependencies(mspl,[i]+initial_configuration.keys())
         to_process.difference_update(spls[i])
         intersections = [x for x in spls if spls[i].intersection(spls[x]) and x != i]
         if intersections:
@@ -191,11 +189,12 @@ def create_hyvarrec_spls(package_request,
 
         # add the constraints of the packages
         for j in spls[i]:
-            data["smt_constraints"].extend(mspl[j]["smt_constraints"])
+            if not "implementations" in mspl[j]:
+                data["smt_constraints"]["formulas"].extend(mspl[j]["smt_constraints"])
             # no need to add features since they are already boolean values
 
         # add constraints to select the required packages
-        data["smt_constraints"].extend(request_constraints)
+        data["smt_constraints"]["formulas"].extend(request_constraints)
 
         # add info about the initial configuration
         # only the use need to be defined. Preferences take care about packages
@@ -375,10 +374,7 @@ def main(input_file,
                                     map_name_id)
     logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
 
-    # start solving the reconfiguration problem for the package_requests
     configuration = {}
-    deps_selected = set() # deps that were selected but not yet configured
-
     for job in to_solve:
         logging.info("Running HyVarRec.")
         t = time.time()

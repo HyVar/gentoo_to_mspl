@@ -12,8 +12,12 @@ class GenerateDependenciesAST(constraint_ast_visitor.ASTVisitor):
     def visitAtom(self, ctx):
         return [ ctx['package'] ]
 
-def generate_dependencies_ast(ast_el):
-    spl_name, local_ast, combined_ast = ast_el
+def generate_dependencies_ast(input_tuple):
+    pkg_name,ast,mspl,pkg_names = input_tuple
     visitor = GenerateDependenciesAST()
-    dependencies = visitor.visitDepend(combined_ast)
-    return (spl_name, list(set(dependencies)))
+    dependencies = set(visitor.visitDepend(ast))
+    # consider only the dependencies that we are aware of
+    dependencies.intersection_update(pkg_names)
+    # add dependency to the base package too
+    dependencies.add(mspl[pkg_name]["group_name"])
+    return (pkg_name, dependencies)
