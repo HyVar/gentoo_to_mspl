@@ -403,7 +403,7 @@ def convert(input_tuple):
     elif simplify_mode == "individual":
         formulas = []
         for i in constraints:
-            formula = z3.simplify(z3.And(constraints))
+            formula = z3.simplify(z3.And(i))
             if z3.BoolVal(False) == formula:
                 logging.warning("Dependency " + unicode(i) + " in package " + package + " is false." +
                                 "Package can not be installed")
