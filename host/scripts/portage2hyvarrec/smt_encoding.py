@@ -6,11 +6,16 @@
 import re
 import constraint_ast_visitor
 import utils
-import pysmt.shortcuts as smt
 import logging
-import pysmt.smtlib.printers
-import sys
-import copy
+import z3
+
+
+# function to encode SMT expression into SMTLIB
+def toSMT2(f, status="unknown", name="benchmark", logic=""):
+  v = (z3.Ast * 0)()
+  return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
+      "\n"," ").replace("(check-sat)","").replace("; benchmark (set-info :status unknown)","").strip()
+
 
 def match_version(template, operator, p_name):
     """
@@ -91,7 +96,7 @@ def get_packages(data,template,operator,slot="",subslot=""):
 ##############################################
 
 def get_smt_package(map_name_id,p_name):
-    return smt.Symbol("p" + map_name_id["package"][p_name])
+    return z3.Bool("p" + map_name_id["package"][p_name])
 
 def get_hyvar_pakcage(map_name_id,p_name):
     return "feature[p" + map_name_id["package"][p_name] + "]"
@@ -100,16 +105,16 @@ def get_smt_packages(map_name_id,pkgs):
     return map(lambda x: get_smt_package(map_name_id,x),pkgs)
 
 def get_smt_use(map_name_id,p_name,u_name):
-    return smt.Symbol("u" + map_name_id["flag"][p_name][u_name])
+    return z3.Bool("u" + map_name_id["flag"][p_name][u_name])
 
 def get_hyvar_use(map_name_id,p_name,u_name):
     return "feature[u" + map_name_id["flag"][p_name][u_name]+ "]"
 
 def get_smt_context():
-    return smt.Symbol(utils.CONTEXT_VAR_NAME,pysmt.typing.INT)
+    return z3.Int(utils.CONTEXT_VAR_NAME)
 
 def get_no_two_true_expressions(fs):
-    return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
+    return z3.And([z3.Not(z3.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
 
 
 def decompact_atom(ctx):
@@ -190,12 +195,12 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
     #     return value1
 
     def visitRequired(self, ctx):
-        return smt.And(map(self.visitRequiredEL, ctx))
+        return z3.And(map(self.visitRequiredEL, ctx))
 
     def visitRequiredSIMPLE(self, ctx):
         assert ctx["use"] in self.map_name_id["flag"][self.package]
         if "not" in ctx:
-            return smt.Not(get_smt_use(self.map_name_id,self.package,ctx["use"]))
+            return z3.Not(get_smt_use(self.map_name_id,self.package,ctx["use"]))
         else:
             return get_smt_use(self.map_name_id, self.package, ctx["use"])
 
@@ -204,35 +209,35 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         assert (self.map_name_id["flag"][self.package][ctx['condition']['use']])  # flag must exists
         use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
         if 'not' in ctx['condition']:
-            return smt.Implies(smt.Not(use),smt.And(formulas))
-        return smt.Implies(use,smt.And(formulas))
+            return z3.Implies(z3.Not(use),z3.And(formulas))
+        return z3.Implies(use,z3.And(formulas))
 
     def visitRequiredCHOICE(self, ctx):
         formulas = map(self.visitRequiredEL, ctx['els'])
         if ctx["choice"] == "or":
-            return smt.Or(formulas)
+            return z3.Or(formulas)
         elif ctx["choice"] == "one-max":
             if len(formulas) > 2:
                 return get_no_two_true_expressions(formulas)
             else:
-                return smt.TRUE()
+                return z3.BoolVal(True)
         elif ctx["choice"] == "xor":
             if len(formulas) > 1:
-                return smt.And(smt.Or(formulas),get_no_two_true_expressions(formulas))
+                return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
             elif len(formulas) == 1:
                 return formulas[0]
-            return smt.FALSE() # no formula to be satisified
+            return z3.BoolVal(False) # no formula to be satisified
 
     def visitRequiredINNER(self, ctx):
-        return smt.And(self.visitRequired(ctx['els']))
+        return z3.And(self.visitRequired(ctx['els']))
 
     def visitDepend(self, ctx):
-        return smt.And(map(self.visitDependEL, ctx))
+        return z3.And(map(self.visitDependEL, ctx))
 
     def visitDependSIMPLE(self, ctx):
         formula = self.visitAtom(ctx['atom'])
         if "not" in ctx:
-            return smt.Not(formula)
+            return z3.Not(formula)
         return formula
 
     def visitDependCONDITION(self, ctx):
@@ -240,27 +245,27 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         assert self.map_name_id["flag"][self.package][ctx['condition']['use']]  # flag must exists
         use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
         if 'not' in ctx['condition']:
-            return smt.Implies(smt.Not(use),smt.And(formulas))
-        return smt.Implies(use,smt.And(formulas))
+            return z3.Implies(z3.Not(use),z3.And(formulas))
+        return z3.Implies(use,z3.And(formulas))
 
     def visitDependCHOICE(self, ctx):
         formulas = map(self.visitDependEL, ctx['els'])
         if ctx["choice"] == "or":
-            return smt.Or(formulas)
+            return z3.Or(formulas)
         elif ctx["choice"] == "one-max":
             if len(formulas) > 2:
                 return get_no_two_true_expressions(formulas)
             else:
-                return smt.TRUE()
+                return z3.BoolVal(True)
         elif ctx["choice"] == "xor":
             if len(formulas) > 1:
-                return smt.And(smt.Or(formulas),get_no_two_true_expressions(formulas))
+                return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
             elif len(formulas) == 1:
                 return formulas[0]
-            return smt.FALSE() # no formula to be satisified
+            return z3.BoolVal(False) # no formula to be satisified
 
     def visitDependINNER(self, ctx):
-        return smt.And(self.visitDepend(ctx['els']))
+        return z3.And(self.visitDepend(ctx['els']))
 
     def visitAtom(self, ctx):
 
@@ -270,7 +275,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                 if "prefix" in sel and sel["prefix"] == "-":
                     if "preference" in sel:
                         if sel["preference"] == "+":
-                            return smt.FALSE()
+                            return z3.BoolVal(False)
                     # preference - or absent
                     return get_smt_package(self.map_name_id,pkg)
                 else: # prefix + or absent
@@ -278,19 +283,19 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                         if sel["preference"] == "+":
                             return get_smt_package(self.map_name_id,pkg)
                     # preference - or absent
-                    return smt.FALSE()
+                    return z3.BoolVal(False)
             else: # package declared the use
                 if "prefix" in sel and sel["prefix"] == "-":
-                    return smt.And(
+                    return z3.And(
                         get_smt_package(self.map_name_id, pkg),
-                        smt.Not(get_smt_use(self.map_name_id,pkg,sel["use"])))
+                        z3.Not(get_smt_use(self.map_name_id,pkg,sel["use"])))
                 else: # prefix + or absent
-                    return smt.And(
+                    return z3.And(
                         get_smt_package(self.map_name_id, pkg),
                         get_smt_use(self.map_name_id, pkg, sel["use"]))
 
         def aux_visit_select(pkgs,sel):
-            return smt.Or([aux_visit_single_pkg_single_select(x,sel) for x in pkgs])
+            return z3.Or([aux_visit_single_pkg_single_select(x,sel) for x in pkgs])
 
         template = ctx["package"]
         if 'version_op' in ctx:
@@ -321,11 +326,11 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                     condELs = []
                 formulas = [aux_visit_select(pkgs, x) for x in normal_sels]
                 formulas.append(self.visitDepend(condELs))
-                return smt.And(formulas)
+                return z3.And(formulas)
             else:
-                return smt.Or(get_smt_packages(self.map_name_id,pkgs))
+                return z3.Or(get_smt_packages(self.map_name_id,pkgs))
         else:
-            return smt.FALSE()
+            return z3.BoolVal(False)
 
 
 def convert(input_tuple):
@@ -338,37 +343,37 @@ def convert(input_tuple):
     if utils.is_base_package(mspl,package):
         versions = mspl[package]["implementations"].values()
         # if installed then one of its version should be installed as well
-        constraints.append(smt.Implies(
+        constraints.append(z3.Implies(
             get_smt_package(map_name_id,package),
-            smt.Or(get_smt_packages(map_name_id,versions))))
+            z3.Or(get_smt_packages(map_name_id,versions))))
         # two versions should have different slots or subslots
         possible_slot_matches = [(i,j) for i in versions for j in versions if i < j
                                  and mspl[i]["slot"] == mspl[i]["slot"]
                                  and mspl[i]["subslot"] == mspl[i]["subslot"]]
 
         for i,j in possible_slot_matches:
-            constraints.append(smt.Not(smt.And(get_smt_package(map_name_id,i),get_smt_package(map_name_id,j))))
+            constraints.append(z3.Not(z3.And(get_smt_package(map_name_id,i),get_smt_package(map_name_id,j))))
     else:
         # add local and combined constraints
         visitor = visitorASTtoSMT(mspl,map_name_id,package)
         for i in map(visitor.visitRequiredEL,mspl[package]["fm"]["local"]):
-            constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
+            constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
         for i in map(visitor.visitDependEL, mspl[package]["fm"]["combined"]):
-            constraints.append(smt.Implies(get_smt_package(map_name_id, package),i))
+            constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
 
         # package with version needs its base package to be selected
-        constraints.append(smt.Implies(
+        constraints.append(z3.Implies(
             get_smt_package(map_name_id, package),
             get_smt_package(map_name_id,mspl[package]['group_name'])))
 
         # if package is not selected its flags are neither
-        constraints.append(smt.Implies(
-            smt.Not(get_smt_package(map_name_id, package)),
-            smt.And(map(lambda x: smt.Not(get_smt_use(map_name_id,package,x)),map_name_id["flag"][package]))))
+        constraints.append(z3.Implies(
+            z3.Not(get_smt_package(map_name_id, package)),
+            z3.And(map(lambda x: z3.Not(get_smt_use(map_name_id,package,x)),map_name_id["flag"][package]))))
 
         # if flag is selected then its package is selected too
-        constraints.append(smt.Implies(
-            smt.Or(map(lambda x: get_smt_use(map_name_id,package,x),map_name_id["flag"][package])),
+        constraints.append(z3.Implies(
+            z3.Or(map(lambda x: get_smt_use(map_name_id,package,x),map_name_id["flag"][package])),
             get_smt_package(map_name_id, package)))
 
 
@@ -377,33 +382,33 @@ def convert(input_tuple):
         envs = [x for x in envs if not x.startswith("-")]
         if envs:
             if "*" not in envs:
-                validity_formula = smt.Implies(
+                validity_formula = z3.Implies(
                     get_smt_package(map_name_id, package),
-                    smt.Or([smt.Equals(get_smt_context(),smt.Int(map_name_id["context_int"][x])) for x in envs]))
+                    z3.Or([get_smt_context().__eq__(z3.IntVal(map_name_id["context_int"][x])) for x in envs]))
             else:
-                validity_formula = smt.TRUE()
+                validity_formula = z3.BoolVal(True)
         else:
             logging.warning("Environment empty for package " + package +
                             ". This package will be treated as not installable.")
-            validity_formula = smt.FALSE()
+            validity_formula = z3.BoolVal(False)
 
         # validity formula added at the end of constraints
         constraints.append(validity_formula)
 
     if simplify_mode == "default":
-        formula = smt.simplify(smt.And(constraints))
-        if smt.FALSE() == formula:
+        formula = z3.simplify(z3.And(constraints))
+        if z3.BoolVal(False) == formula:
             logging.warning("Dependencies in package " + package + " make it uninstallable.")
-        return (package,[pysmt.smtlib.printers.to_smtlib(formula)])
+        return (package,[toSMT2(formula)])
     elif simplify_mode == "individual":
         formulas = []
         for i in constraints:
-            formula = smt.simplify(smt.And(constraints))
-            if smt.FALSE() == formula:
+            formula = z3.simplify(z3.And(constraints))
+            if z3.BoolVal(False) == formula:
                 logging.warning("Dependency " + unicode(i) + " in package " + package + " is false." +
                                 "Package can not be installed")
             formulas.append(formula)
-        return (package,[pysmt.smtlib.printers.to_smtlib(x) for x in formulas])
+        return (package,[toSMT2(x) for x in formulas])
 
 
 def generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode):

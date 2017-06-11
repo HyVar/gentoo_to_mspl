@@ -22,8 +22,6 @@ import multiprocessing
 import constraint_parser
 import smt_encoding
 import extract_dependencies
-import pysmt
-import pysmt.shortcuts as smt
 
 
 # Global variables
@@ -72,7 +70,7 @@ def load_request_file(file_name,concurrent_map,mspl, map_name_id):
     dependencies = [x for sublist in dependencies for x in set(sublist) if x in mspl]
     # get constraints
     visitor = smt_encoding.visitorASTtoSMT(mspl, map_name_id, "")
-    constraints = [pysmt.smtlib.printers.to_smtlib(visitor.visitDepend(ast)) for ast in asts]
+    constraints = [smt_encoding.toSMT2(visitor.visitDepend(ast)) for ast in asts]
 
     return dependencies,constraints
 

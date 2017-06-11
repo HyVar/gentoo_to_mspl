@@ -170,7 +170,6 @@ TODO:
 Python Requirements
 -------------------
 
-pysmt 
 click
  
 Task:
