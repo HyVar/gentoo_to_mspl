@@ -19,17 +19,19 @@ import requests
 import click
 import time
 import multiprocessing
+import constraint_parser
+import smt_encoding
+import extract_dependencies
+import pysmt
+import pysmt.shortcuts as smt
+
 
 # Global variables
 
-# stores the json info related to the mspl produced processing the gentoo files
-mspl = {}
-
-# stores the mapping between names and ids
-map_name_id = {}
-
 # keep temporary files
 KEEP = False
+
+REQUEST_DUMMY_PACKAGE_NAME = "request"
 
 def clean():
   """
@@ -51,23 +53,50 @@ def read_json(json_file):
     return data
 
 
-def read_request_file(file_name,concurrent_map):
+def load_request_file(file_name,concurrent_map,mspl, map_name_id):
+    """
+    Parses the request file which is composed by one or more dependencies
+    """
     constraints = []
     with open(file_name,"r") as f:
         lines = f.readlines()
+    # data structure to reuse the parse_spl function
+    spls = [ {"name": unicode(i),
+              'fm': {'local': "", 'external': "", 'runtime': lines[i]}} for i in range(len(lines))]
+    # get the asts
+    asts = concurrent_map(constraint_parser.parse_spl, spls)
+    # get the dependencies
+    dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
+    # extract relevant info
+    asts = [x for (_,_,x) in asts ]
+    dependencies = [x for (_,x) in dependencies]
+    # get constraints
+    visitor = smt_encoding.visitorASTtoSMT(mspl, map_name_id, "")
+    constraints = [pysmt.smtlib.printers.to_smtlib(visitor.visitDepend(ast)) for ast in asts]
+    return dependencies,constraints
 
 
+def load_configuration_file(file_name,mspl,map_name_id):
+    initial_configuration = read_json(file_name)
+    for i in initial_configuration:
+        if i in mspl:
+            initial_configuration[i] = [x[1:] for x in initial_configuration[i]
+                                        if x.startswith("+") and x[1:] in map_name_id["flag"][i]]
+        else:
+            logging.warning("Not found the package " + i + " defined in the initial configuration.")
+            del(initial_configuration[i])
+    return initial_configuration
 
 
 def run_hyvar(json_data,par,explain_modality):
     """
     Run hyvar locally assuming that there is a command hyvar-rec
     """
-    file_name = settings.get_new_temp_file("json")
+    file_name = utils.get_new_temp_file("json")
     with open(file_name,"w") as f:
         json.dump(json_data, f)
         # json.dump(json_data, f,indent=1)
-    cmd = ["hyvar-rec"]
+    cmd = ["hyvar-rec","--features-as-boolean"]
     if par > 1:
         cmd += ["-p",unicode(par)]
     if explain_modality:
@@ -86,37 +115,20 @@ def run_hyvar(json_data,par,explain_modality):
         print(out)
     return json.loads(out)
 
-def run_remote_hyvar(json_data,url):
-    """
-    Run hyvar
-    """
-    logging.debug("Invoking service at url " + url)
-    response = requests.post(url + "/explain",
-                             data=json.dumps(json_data),
-                             headers={'content-type': 'application/json'})
-    return response.json()
-
-
-# def load_mspl(mspl_dir):
+# def run_remote_hyvar(json_data,url):
 #     """
-#     loads in memory the json files of the mspl in the directory mspl_dir
+#     Run hyvar
 #     """
-#     global mspl
-#     dirs = os.listdir(mspl_dir)
-#     for i in dirs:
-#         logging.debug("Loading json files from dir " + i)
-#         if os.path.isdir(os.path.join(mspl_dir,i)):
-#             files = os.listdir(os.path.join(mspl_dir,i))
-#             for f in files:
-#                 name = i + settings.PACKAGE_NAME_SEPARATOR + re.sub('\.json$','',f)
-#                 mspl[name] = read_json(os.path.join(mspl_dir,i,f))
+#     logging.debug("Invoking service at url " + url)
+#     response = requests.post(url + "/explain",
+#                              data=json.dumps(json_data),
+#                              headers={'content-type': 'application/json'})
+#     return response.json()
 
 
-def get_transitive_closure_of_dependencies(pkgs):
-    # returns the transitive closure of the dependencies as the set of packages to configure
-    # dependencies left to configure is left as an empty set
-    # the graph is not needed if we just want the close of the dependencies
-    configures = set(pkgs)
+def get_transitive_closure_of_dependencies(mspl,pkgs):
+    # returns the transitive closure of the dependencies
+    deps = set(pkgs)
     to_check = pkgs
     checked = set()
     while to_check:
@@ -124,182 +136,93 @@ def get_transitive_closure_of_dependencies(pkgs):
         for i in mspl[p]["configures"]:
             if i not in checked:
                 to_check.append(i)
-                configures.add(i)
+                deps.add(i)
         for i in mspl[p]["dependencies"]:
             if i not in checked:
                 to_check.append(i)
-                configures.add(i)
+                deps.add(i)
         checked.add(p)
-    return configures,set()
+    return deps
 
 
-def get_all_dependencies(pkg):
-    # this fucntion get the transitive closure of all the configures exploitng the graph info
-    # it also returns the first level of dependencies
-    # unfortunately this is not enought since missing CTC between dependencies and configures are not captured
-    base_pkg = re.sub(settings.VERSION_RE, "",pkg)
-    # compute the configures. One level is enough because descendants contains already the transitive closure
-    configures = set(mspl[base_pkg]["loop"] + mspl[base_pkg]["descendants"])
-    # add the packages with versions
-    for j in list(configures):
-        configures.update(mspl[j]["implementations"].values())
-    # compute the dependencies. One level should be enough
-    depends = set()
-    for j in configures:
-        depends.update(mspl[j]["dependencies"])
-    depends.difference_update(configures)
-    return configures,depends
-
-
-def create_hyvarrec_spls(package_request,initial_configuration,contex_value,no_selected_pkgs):
+def create_hyvarrec_spls(package_request,
+                         request_constraints,
+                         initial_configuration,
+                         contex_value,
+                         mspl,
+                         map_name_id):
     """
     Given a list of packages it creates its hyvarrec SPL
     """
     # todo read list of configures and depends for all packages
 
-    logging.info("Computing the SPL to generate")
     spls = {}
-    dconf = {}
-    ddep = {}
 
     to_process = set(package_request.keys())
+    # todo: this part can be more efficient using union find
     while to_process:
         i = to_process.pop()
-        # dconf[i],ddep[i] = get_all_dependencies(i)
-        # compute the transitive closure of the dependencies considering also the initial packages
-        # initial packages are needed because we can not trust the initial configuration
-        # and modification could brake it
-        dconf[i], ddep[i] = get_transitive_closure_of_dependencies([i]+initial_configuration.keys())
-        spls[i] = dconf[i].union(ddep[i])
+        spls[i] = get_transitive_closure_of_dependencies([i]+initial_configuration.keys())
         to_process.difference_update(spls[i])
-        intersections = [x for x in spls.keys() if spls[i].intersection(spls[x]) and x != i]
+        intersections = [x for x in spls if spls[i].intersection(spls[x]) and x != i]
         if intersections:
-            pivot = intersections.pop()
-            for j in intersections + [i]:
-                spls[pivot].update(spls[j])
-                dconf[pivot].update(dconf[j])
-                ddep[pivot].update(ddep[j])
+            for j in intersections:
+                spls[i].update(spls[j])
                 del(spls[j])
-                del(dconf[j])
-                del(ddep[j])
-
-    logging.debug("SPLs to generate: " + unicode(len(spls)))
 
     jsons = []
-    for i in spls.keys():
-        json = {"attributes": [],
-                "contexts": [{"id": settings.get_hyvar_context(),
+    for i in spls:
+        data = {"attributes": [],
+                "contexts": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
                               "min": 0,
-                              "max": len(map_name_id["name_to_id"]["context"])-1}],
+                              "max": len(map_name_id["context_int"])-1}],
                 "configuration": {
                     "selectedFeatures": [],
                     "attribute_values": [],
-                    "context_values": [{"id": settings.get_hyvar_context(),
-                                        "value": map_name_id["name_to_id"]["context"][contex_value]}]},
+                    "context_values": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
+                                        "value": map_name_id["context_int"][contex_value]}]},
                 "constraints": [],
                 "preferences": [],
                 "smt_constraints": {
                     "formulas": [],
                     "features": [],
-                    "other_int_symbols": [] }
+                    "other_int_symbols": [ "context[" + utils.CONTEXT_VAR_NAME + "]"] }
                 }
 
-        # process configures
-        feature_symbols = set()
-        for j in dconf[i]:
-            json["attributes"].extend(mspl[j]["attributes"])
-            json["constraints"].extend(mspl[j]["constraints"])
-            if "smt_constraints" in mspl[j]:
-                json["smt_constraints"]["formulas"].extend(mspl[j]["smt_constraints"]["formulas"])
-                feature_symbols.update(mspl[j]["smt_constraints"]["features"])
-        json["smt_constraints"]["features"] = list(feature_symbols)
+        # add the constraints of the packages
+        for j in spls[i]:
+            data["smt_constraints"].extend(mspl[j]["smt_constraints"])
+            # no need to add features since they are already boolean values
 
-
-
-        # add constraints to impose selection of requested packages considering slot and subslots
-        for p in package_request.keys():
-            if p in dconf[i]: # packages needs to be configured
-                if "subslot" in package_request[p]:  # the package requires a specific slot/subslot
-                    vs = [x for x in mspl[re.sub(settings.VERSION_RE, "", p)]["implementations"].values()
-                          if package_request[p]["slot"] in map_name_id["name_to_id"]["slot"][x] and
-                          package_request[p]["subslot"] in map_name_id["name_to_id"]["subslot"][x]]
-                    # here we assume that a version can be installed only in one slots + subslot
-                    c = settings.get_hyvar_or(
-                        [settings.get_hyvar_package(map_name_id["name_to_id"]["package"][x]) + " = 1" for x in vs])
-                    if c == "false":
-                        logging.error("Package " + p + " can not be installed with desired slot/subslot. Existing.")
-                        exit(1)
-                    json["constraints"].append(c)
-                elif "slot" in package_request[p]:
-                    vs = [x for x in mspl[re.sub(settings.VERSION_RE, "", p)]["implementations"].values()
-                          if package_request[p]["slot"] in map_name_id["name_to_id"]["slot"][x]]
-                    # here we assume that a version can be installed only in one slots + subslot
-                    c = settings.get_hyvar_or(
-                        [settings.get_hyvar_package(map_name_id["name_to_id"]["package"][x]) + " = 1" for x in vs])
-                    if c == "false":
-                        logging.error("Package " + p + " can not be installed with desired slot. Existing.")
-                        exit(1)
-                    json["constraints"].append(c)
-                else:
-                    json["constraints"].append(
-                        settings.get_hyvar_package(map_name_id["name_to_id"]["package"][p]) + " = 1")
-
-                # add constraints to impose selection of requested features
-                if "features" in package_request[p]:
-                    json["constraints"].append(settings.get_hyvar_and(
-                        [settings.get_hyvar_flag(map_name_id["name_to_id"]["flag"][p][x]) + " = 1"
-                                                 for x in package_request[p]["features"]]))
-
-        # the constraints added should also require the dependencies, if any.
-        # the only missing constraint is the implication that a versioned package implies its base one
-        ddep[i].difference_update(dconf[i])
-        if ddep[i]:
-            for j in ddep[i]:
-                for k in mspl[j]["implementations"].values():
-                    json["constraints"].append(settings.get_hyvar_impl(
-                        settings.get_hyvar_package(map_name_id["name_to_id"]["package"][k]) + " = 1",
-                        settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j]) + " = 1"))
-
-        # add constraints to impose deselection of not selected packages
-        for j in no_selected_pkgs:
-            if j in dconf[i] or j in ddep[i]:
-                json["constraints"].append(
-                    settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j]) + " = 0")
+        # add constraints to select the required packages
+        data["smt_constraints"].extend(request_constraints)
 
         # add info about the initial configuration
-        # only the flag features need to be defined. Preferences take care about packages
+        # only the use need to be defined. Preferences take care about packages
         for j in initial_configuration.keys():
-            if j in dconf[i]:
+            if j in mspl[i]:
                 for k in initial_configuration[j]:
                     json["configuration"]["selectedFeatures"].append(
-                        settings.get_hyvar_flag(map_name_id["name_to_id"]["flag"][j][k]))
+                        smt_encoding.get_hyvar_use(map_name_id,j,k))
 
         # add preferences: do not remove packages already installed
-        c = "0 "
-        for j in initial_configuration.keys():
-            if j in dconf[i]:
-                c += " + " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
-            elif j in ddep[i]:
-                c += " + " + settings.get_hyvar_package(map_name_id["name_to_id"]["package"][j])
-        json["preferences"].append(c)
+        data["preferences"].append( " + ".join(
+            [ smt_encoding.get_hyvar_pakcage(map_name_id,pkg) for pkg in initial_configuration
+              if pkg in spls[i]]))
 
-        logging.debug("SPL created : attributes " + unicode(len(json["attributes"])) +
-                      ", constraints " + unicode(len(json["constraints"])) +
-                      ", smt formulas " + unicode(len(json["smt_constraints"]["formulas"])))
-        logging.debug("Packages to configure " + unicode(len(dconf[i]))) # + " (" + unicode(dconf[i]) + ")")
+        logging.debug("SPL created : constraints " + unicode(len(data["constraints"])) +
+                      ", smt formulas " + unicode(len(data["smt_constraints"]["formulas"])))
+        logging.debug("Packages to configure " + unicode(len(mspl[i])))
 
-        if ddep[i]:
-            logging.debug("Dependencies not in configure: " + unicode(len(ddep[i])) + " (" + unicode(ddep[i]) + ")")
-        jsons.append({"json":json, "confs": dconf[i],"deps": ddep[i]})
-
+        jsons.append({"json":data, "deps": spls[i]})
     return jsons
 
 
-def update_configuration(hyvarrec_out,configuration):
+def update_configuration(hyvarrec_out,configuration,map_name_id):
     pkgs = []
     flags = []
     for i in hyvarrec_out["features"]:
-        el = map_name_id["id_to_name"][i[1:]]
+        el = map_name_id[i[1:]]
         if el["type"] == "package":
             pkgs.append(el["name"])
         else: # "type" == "flag"
@@ -316,7 +239,7 @@ def update_configuration(hyvarrec_out,configuration):
             configuration[p].append(f)
 
 
-def get_diff_configuration(new_conf,old_conf):
+def get_diff_configuration(new_conf,old_conf,mspl):
     data = {"toUpdate": {}, "toInstall": {}, "toRemove": {}}
     for i in new_conf.keys():
         if "implementations" not in mspl[i]:
@@ -331,10 +254,10 @@ def get_diff_configuration(new_conf,old_conf):
     return data
 
 
-def get_conf_with_negative_use_flags(conf):
+def get_conf_with_negative_use_flags(conf,map_name_id):
     data = {}
     for i in conf.keys():
-        all_flags = map_name_id["name_to_id"]["flag"][i].keys()
+        all_flags = map_name_id["flag"][i].keys()
         positive_flags = conf[i]
         negative_flags = set(all_flags)
         negative_flags.difference_update(positive_flags)
@@ -397,14 +320,13 @@ def main(input_file,
     PACKAGE_USE_FILE File containing the package.use file that will be generated and copied into the guest
 
     EMERGE_COMMANDS_FILE File containing the script to run in the guest to generate the configuration
-    """
 
-    global map_name_id
-    global mspl
-    global KEEP
+    Example: python reconfigure.py -v --save-modality marshal --environment amd64 ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec ../../../git ../../../host/configuration/json/configuration.json host/configuration/json/new_configuration.json host/configuration/package.use host/configuration/update.sh
+    """
 
     # OPTION: keep intermediate file options. Useful for debug
     if keep:
+        global KEEP
         KEEP = True
 
     # OPTION: manage verbosity
@@ -432,77 +354,52 @@ def main(input_file,
 
 
     logging.info("Load the request package list.")
-    with open(request_file)
-    # features can be requested only when the version of the package is defined
-    package_request = read_json(request_file)
-    for i in package_request.keys():
-        if i not in mspl:
-            logging.warning("The requested package " + i + " is not found and will be ignored.")
-            del package_request[i]
-        else:
-            if "features" in package_request[i]:
-                for j in list(package_request[i]["features"]):
-                    if j not in map_name_id["name_to_id"]["flag"][i]:
-                        logging.warning("The flag " + j + " for package "+ i + " is not found. Will be ignored.")
-                        package_request[i]["features"].remove(j)
+    t = time.time()
+    dependencies,constraints = load_request_file(request_file, concurrent_map, mspl, map_name_id)
+    logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+    logging.debug("Dependencies: " + unicode(dependencies))
+    logging.debug("Constraints: " + unicode(constraints))
 
     logging.info("Load the configuration file.")
-    initial_configuration = read_json(configuration_file)
-    for i in initial_configuration.keys():
-        if i in mspl:
-            initial_configuration[i] = [x[1:] for x in initial_configuration[i]
-                                        if x.startswith("+") and x[1:] in map_name_id["name_to_id"]["flag"][i]]
-        else:
-            logging.warning("Not found the package " + i + " defined in the initial configuration.")
-            del(initial_configuration[i])
+    t = time.time()
+    initial_configuration = load_configuration_file(configuration_file, mspl, map_name_id)
+    logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
-    # logging.info("Process the MSPL based on its dependencies graph")
-    # utils.preprocess(mspl,initial_configuration,set(package_request.keys()))
+    logging.info("Computing the SPLs.")
+    t = time.time()
+    to_solve = create_hyvarrec_spls(dependencies,
+                                    constraints,
+                                    initial_configuration,
+                                    environment,
+                                    mspl,
+                                    map_name_id)
+    logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
 
     # start solving the reconfiguration problem for the package_requests
     configuration = {}
-    confs_selected = set()
-    confs_deselected = set() # includes also deps not selected
     deps_selected = set() # deps that were selected but not yet configured
-    to_solve = create_hyvarrec_spls(package_request,initial_configuration,environment,confs_deselected)
 
-    while to_solve:
-        job = to_solve.pop()
-        if url:
-            json_result = run_remote_hyvar(job["json"],url)
-        else:
-            json_result = run_hyvar(job["json"],par,explain)
-        #logging.debug("Answer obtained: " + unicode(json_result))
+    for job in to_solve:
+        logging.info("Running HyVarRec.")
+        t = time.time()
+        # if url:
+        #     json_result = run_remote_hyvar(job["json"],url)
+        # else:
+        json_result = run_hyvar(job["json"],par,explain)
+        logging.info("Execution of HyVarRec took " + unicode(time.time() - t) + " seconds.")
         if json_result["result"] != "sat":
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
             exit(1)
         logging.debug("HyVarRec output: " + unicode(json_result))
         # update the info on the final configuration
-        update_configuration(json_result,configuration)
-        confs_selected.update([x for x in job["confs"] if x in configuration])
-        confs_deselected.update([x for x in job["confs"] if x not in configuration])
-        confs_deselected.update([x for x in job["deps"] if x not in configuration])
-        deps_selected.update(job["deps"])
-        if deps_selected:
-            deps_selected.difference_update(confs_selected)
-        if deps_selected:
-            deps_selected.difference_update(confs_deselected)
-        # logging.debug("Configured " + unicode(confs_selected))
-        # logging.debug("Not selected " + unicode(confs_deselected))
-        # logging.debug("Remaining number of dependencies: " + unicode(len(deps_selected)) +
-        #               "(" + unicode(deps_selected) + ")")
-        # run hyvarrec on the remaining dependencies selected (deep first search of the MSPL)
-        if len(to_solve) == 0 and deps_selected:
-            logging.debug("Attemping to configure remaining dependency " + unicode(deps_selected))
-            to_solve = create_hyvarrec_spls({p: {} for p in deps_selected},
-                                      initial_configuration, environment, confs_deselected)
+        update_configuration(json_result,configuration,map_name_id)
 
     # remove all the pacakges without version from final configuration
-    for i in configuration.keys():
+    for i in configuration:
         if "implementations" in mspl[i]:
             del(configuration[i])
 
-    configuration_diff = get_diff_configuration(configuration,initial_configuration)
+    configuration_diff = get_diff_configuration(configuration,initial_configuration,mspl)
     logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
     logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
     logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
@@ -518,7 +415,7 @@ def main(input_file,
                 " " + " ".join(["=" + x for x in configuration_diff["toInstall"].keys()]) + "\n")
 
     logging.debug("Printing the final configuration with all the positive and negative use flags.")
-    final_conf = get_conf_with_negative_use_flags(configuration)
+    final_conf = get_conf_with_negative_use_flags(configuration,map_name_id)
     with open(new_configuration_file,"w") as f:
         json.dump(final_conf,f,indent=1)
 
@@ -529,8 +426,7 @@ def main(input_file,
 
     logging.info("Cleaning.")
     clean()
-    logging.info("Execution gterminated correctly.")
-
+    logging.info("Execution terminated correctly.")
 
 
 if __name__ == "__main__":

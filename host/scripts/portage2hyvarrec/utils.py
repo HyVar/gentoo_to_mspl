@@ -115,6 +115,7 @@ def new_id():
         __id_current = __id_current + 1
     return unicode(res)
 
+CONTEXT_VAR_NAME = "ccc"
 
 ######################################################################
 ### TRANSLATION SIMPLIFICATION FUNCTIONS

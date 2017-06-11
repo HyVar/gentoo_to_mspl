@@ -180,6 +180,8 @@ def main(input_dir,
         extract_id_maps.update_name_mappings(mappings, extract_id_maps.generate_name_mappings_package_groups(package_groups))
         #package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
         # add the package groups to the mspl
+        # context keywords are treaded differently
+        extract_id_maps.add_context_ints(map_name_id)
         mspl.update(package_groups)
 
     logging.info("Generation of SMT formulas.")
@@ -188,7 +190,7 @@ def main(input_dir,
     logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
     # add formulas in mspl
     for spl_name, formula_list in formulas:
-        mspl[spl_name]["smt_constraints"] = {"formulas": formula_list, "features": []}
+        mspl[spl_name]["smt_constraints"] = formula_list
 
     # todo save into file (compressed if possible and option using marshal)
     logging.info("Saving the file.")

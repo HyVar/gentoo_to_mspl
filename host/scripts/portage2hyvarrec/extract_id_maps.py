@@ -107,6 +107,12 @@ def generate_use_mappings_ast(ast_el):
             update_mappings(mappings, 'flag', spl_name, use)
     return mappings
 
+def add_context_ints(map_name_id):
+    map_name_id["context_int"] = {}
+    counter = 0
+    for i in map_name_id["context"]:
+        map_name_id["context_int"][i] = counter
+        counter += 1
 
 
 #def generate_name_mappings(concurrent_map,mspl,asts):

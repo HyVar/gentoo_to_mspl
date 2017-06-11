@@ -72,7 +72,8 @@ def get_packages(data,template,operator,slot="",subslot=""):
     :return: list of versioned packages that match with the given paramters
     """
 
-    base_pkg = utils.get_base_package(data,template)
+    no_star_template = re.sub('\*','',template) # star messes up with get_base_package regular expression
+    base_pkg = utils.get_base_package(data,no_star_template)
     if base_pkg and base_pkg in data:
         ls = [x for x in data[base_pkg]["implementations"].values() if match_version(template,operator,x)]
         if slot:
@@ -92,15 +93,20 @@ def get_packages(data,template,operator,slot="",subslot=""):
 def get_smt_package(map_name_id,p_name):
     return smt.Symbol("p" + map_name_id["package"][p_name])
 
+def get_hyvar_pakcage(map_name_id,p_name):
+    return "feature[p" + map_name_id["package"][p_name] + "]"
+
 def get_smt_packages(map_name_id,pkgs):
     return map(lambda x: get_smt_package(map_name_id,x),pkgs)
-
 
 def get_smt_use(map_name_id,p_name,u_name):
     return smt.Symbol("u" + map_name_id["flag"][p_name][u_name])
 
-def get_smt_context(map_name_id,c_name):
-    return smt.Symbol("c" + map_name_id["context"][c_name])
+def get_hyvar_use(map_name_id,p_name,u_name):
+    return "feature[u" + map_name_id["flag"][p_name][u_name]+ "]"
+
+def get_smt_context():
+    return smt.Symbol(utils.CONTEXT_VAR_NAME,pysmt.typing.INT)
 
 def get_no_two_true_expressions(fs):
     return smt.And([smt.Not(smt.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
@@ -286,9 +292,15 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         def aux_visit_select(pkgs,sel):
             return smt.Or([aux_visit_single_pkg_single_select(x,sel) for x in pkgs])
 
-        operator = "="
+        template = ctx["package"]
         if 'version_op' in ctx:
             operator = ctx['version_op']
+            if "times"in ctx:
+                template += "*"
+        else:
+            operator = "="
+            template += "*"
+
         slot = ""
         subslot = ""
         if "slots" in ctx:
@@ -297,7 +309,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
             if "subslot" in ctx["slots"]:
                 subslot = ctx["slots"]["subslot"]
 
-        pkgs = get_packages(self.mspl,ctx["package"], operator, slot, subslot)
+        pkgs = get_packages(self.mspl,template, operator, slot, subslot)
 
         if pkgs:
             # decompact compact forms
@@ -363,12 +375,11 @@ def convert(input_tuple):
         # add validity formulas. Context must be one of the possible env
         envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
         envs = [x for x in envs if not x.startswith("-")]
-
         if envs:
             if "*" not in envs:
                 validity_formula = smt.Implies(
                     get_smt_package(map_name_id, package),
-                    smt.Or(map(lambda x:get_smt_context(map_name_id,x),envs)))
+                    smt.Or([smt.Equals(get_smt_context(),smt.Int(map_name_id["context_int"][x])) for x in envs]))
             else:
                 validity_formula = smt.TRUE()
         else:
