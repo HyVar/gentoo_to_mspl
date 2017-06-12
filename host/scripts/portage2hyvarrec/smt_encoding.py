@@ -46,9 +46,9 @@ def match_version(template, operator, p_name):
     elif operator == '>=':
         return s_nums >= t_nums
     elif operator == '>':
-        return s_nums < t_nums
-    elif operator == '<':
         return s_nums > t_nums
+    elif operator == '<':
+        return s_nums < t_nums
     else:
         raise Exception("Operator " + unicode(operator) + " not supported for package version comparison")
 
