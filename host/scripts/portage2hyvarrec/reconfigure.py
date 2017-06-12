@@ -355,7 +355,7 @@ def main(input_file,
 
     EMERGE_COMMANDS_FILE File containing the script to run in the guest to generate the configuration
 
-    Example: python reconfigure.py -v --save-modality marshal --environment amd64 ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec ../../../git ../../../host/configuration/json/configuration.json host/configuration/json/new_configuration.json host/configuration/package.use host/configuration/update.sh
+    Exampe: python reconfigure.py -v --save-modality marshal --environment amd64 ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec ../../../git ../../../host/configuration/json/configuration.json ../../../host/configuration/json/new_configuration.json ../../../host/configuration/package.use ../../../host/configuration/update.sh 2>&1 | tee log1.log
     """
 
     # OPTION: keep intermediate file options. Useful for debug

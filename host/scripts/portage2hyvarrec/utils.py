@@ -15,6 +15,7 @@ import multiprocessing
 import json
 import marshal
 import gzip
+import threading
 
 def inline_combine_dicts(dict1, dict2, inline_combine):
     for k,v in dict2.iteritems():
@@ -49,7 +50,8 @@ def process_keyword(s):
 ######################################################################
 
 TEMP_DIR = 'tmp'
-NAME_MAP_FILE = 'name_maps.json'
+TMP_FILES_LOCK = threading.Lock()
+TMP_FILES = []
 
 # List of the temp files.
 __tmp_files = []
