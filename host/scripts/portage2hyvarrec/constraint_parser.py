@@ -14,25 +14,27 @@ import utils
 class SPLParserErrorListener(ErrorListener):
     def __init__(self):
         super(ErrorListener, self).__init__()
+        self.spl = None
+        self.stage = None
+        self.parsed_string = None
     def syntaxError(self, recognizer, offendingSymbol, line, column, msg, e):
-        msg = "Parsing error in \"" + self.processing + "\" (stage " + self.stage + "): column " + str(column) + " " + msg + "\nSentence: " + self.parsed_string
+        msg = "Parsing error in spl \"" + self.spl + "\" (stage " + self.stage + "): column " + str(column) + " " + msg + "\nSentence: " + self.parsed_string
         raise Exception(msg)
 
-syntax_error_listener = SPLParserErrorListener()
 
-def SPLParserlocal(to_parse):
-    parser = __SPLParserparser(to_parse)
+def SPLParserlocal(to_parse, syntax_error_listener):
+    parser = __SPLParserparser(to_parse, syntax_error_listener)
     return parser.required()
 
-def SPLParserexternal(to_parse):
-    parser = __SPLParserparser(to_parse)
+def SPLParserexternal(to_parse, syntax_error_listener):
+    parser = __SPLParserparser(to_parse, syntax_error_listener)
     return parser.depend()
 
-def __SPLParserparser(to_parse):
+def __SPLParserparser(to_parse, syntax_error_listener):
     lexer = DepGrammarLexer(InputStream(to_parse))
-    #lexer._listeners = [ syntax_error_listener ]
+    lexer._listeners = [ syntax_error_listener ]
     parser = DepGrammarParser(CommonTokenStream(lexer))
-    #parser._listeners = [ syntax_error_listener ]
+    parser._listeners = [ syntax_error_listener ]
     return parser
 
 class SPLParserTranslateConstraints(DepGrammarVisitor):
@@ -134,9 +136,28 @@ def parse_spl(spl):
     """
     this function translates the constraints into our AST, and simplifies them
     """
-    local_ast = ast_translator.visitRequired(SPLParserlocal(spl['fm']['local']))
-    external_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['external']))
-    runtime_ast = ast_translator.visitDepend(SPLParserexternal(spl['fm']['runtime']))
+    # 1. create the error listener
+    syntax_error_listener = SPLParserErrorListener()
+    syntax_error_listener.spl = spl['name']
+
+    # 2. parse the local constraint
+    to_parse = spl['fm']['local']
+    syntax_error_listener.stage = 'local'
+    syntax_error_listener.parsed_string = to_parse
+    local_ast = ast_translator.visitRequired(SPLParserlocal(to_parse, syntax_error_listener))
+
+    # 3. parse the external constraints
+    to_parse = spl['fm']['external']
+    syntax_error_listener.stage = 'external'
+    syntax_error_listener.parsed_string = to_parse
+    external_ast = ast_translator.visitDepend(SPLParserexternal(to_parse, syntax_error_listener))
+
+    # 3. parse the external constraints
+    to_parse = spl['fm']['runtime']
+    syntax_error_listener.stage = 'runtime'
+    syntax_error_listener.parsed_string = to_parse
+    runtime_ast = ast_translator.visitDepend(SPLParserexternal(to_parse, syntax_error_listener))
+
     # simplify the constraint
     local_ast = utils.compact_list(local_ast)
     #combined_ast = list(set(external_ast + runtime_ast))

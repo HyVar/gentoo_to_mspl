@@ -12,18 +12,18 @@ required: requiredEL? (SPACE+ requiredEL)* ;
 
 requiredEL:
     NOT? SPACE* use=ID                                       #requiredSIMPLE
-  | condition SPACE* LPAREN SPACE* requiredEL* SPACE* RPAREN               #requiredCONDITION
-  | choice SPACE* LPAREN SPACE* requiredEL* SPACE* RPAREN                  #requiredCHOICE
-  | LPAREN SPACE* requiredEL* SPACE* RPAREN                         #requiredINNER
+  | condition SPACE* LPAREN requiredEL? (SPACE+ requiredEL)* SPACE* RPAREN               #requiredCONDITION
+  | choice SPACE* LPAREN requiredEL? (SPACE+ requiredEL)* SPACE* RPAREN                  #requiredCHOICE
+  | LPAREN requiredEL? (SPACE+ requiredEL)* SPACE* RPAREN                         #requiredINNER
   ;
 
 depend: dependEL? (SPACE+ dependEL)* ;
 
 dependEL:
     (NOT NOT?)? SPACE* atom                               #dependSIMPLE
-  | condition SPACE* LPAREN SPACE* dependEL* SPACE* RPAREN                 #dependCONDITION
-  | choice SPACE* LPAREN SPACE* dependEL* SPACE* RPAREN                    #dependCHOICE
-  | LPAREN SPACE* dependEL* SPACE* RPAREN                           #dependINNER
+  | condition SPACE* LPAREN dependEL? (SPACE+ dependEL)* SPACE* RPAREN                 #dependCONDITION
+  | choice SPACE* LPAREN dependEL? (SPACE+ dependEL)* SPACE* RPAREN                    #dependCHOICE
+  | LPAREN dependEL? (SPACE+ dependEL)* SPACE* RPAREN                           #dependINNER
   ;
 
 choice: OR | ONEMAX | XOR ;
