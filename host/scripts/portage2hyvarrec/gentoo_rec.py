@@ -28,10 +28,6 @@ def usage():
     """Print usage"""
     print(__doc__)
 
-
-
-
-
 @click.command()
 @click.argument(
     'input_dir',
@@ -124,14 +120,14 @@ def main(input_dir,
         os.makedirs(target_dir)
 
     if not translate_only:
-        # starts the extraction
         logging.info("Load the egencache files.")
+        t = time.time()
         if translate_only_package: # process just one package
-            t = time.time()
             files = [os.path.join(input_dir,translate_only_package)]
             logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         else:
             files = egencache_utils.get_egencache_files(input_dir)
+            logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
         # continues the translation, following the different steps
         logging.debug("Considering " + unicode(len(files)) + " files")
@@ -195,7 +191,10 @@ def main(input_dir,
     t = time.time()
     # this process is too memory consuming. Using map instead of a concurrent map
     # not possible to use threads due to the use of z3 :-(
-    formulas = smt_encoding.generate_formulas(map,mspl,map_name_id,simplify_mode)
+    if translate_only_package:
+        formulas = [smt_encoding.convert((mspl, map_name_id, simplify_mode, translate_only_package))]
+    else:
+        formulas = smt_encoding.generate_formulas(map,mspl,map_name_id,simplify_mode)
     logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
     # add formulas in mspl
     for spl_name, formula_list in formulas:
