@@ -17,11 +17,13 @@ import gentoo_rec
 path_to_data = os.path.realpath("../../../host/portage/gen/md5-cache")
 
 # Grammar test
-constraint = "media-libs/freetype:2 virtual/opengl"
-def constraint_test():
-	global constraint
-	ast = constraint_parser.SPLParserexternal(constraint)
-	print(json.dumps(ast, sort_keys=True, indent=4, separators=(',', ': ')))
+def constraint_test(constraint_list):
+	for constraint in constraint_list:
+		antlr_ast = constraint_parser.SPLParserexternal(constraint)
+		ast = constraint_parser.ast_translator.visitDepend(antlr_ast)
+		print("==========")
+		#print(str(ast))
+		print(json.dumps(ast, sort_keys=True, indent=4, separators=(',', ': ')))
 
 # Single test
 test_filename1 = "sys-fs/udev-232-r2"
@@ -96,6 +98,12 @@ def test_jquery(): # 10/06/2017: bug found by jacopo
 	paths = [ os.path.join(path_to_data, filename) for filename in os.listdir(path_to_data) if "jquery-ui-rails-" in filename ]
 	list_test(map, paths)
 
+
+constraint_list = [ "media-libs/freetype:2 virtual/opengl",
+	#">=kde-frameworks/kactivities-5.29.0:5 >=kde-frameworks/kauth-5.29.0:5[policykit] >=kde-frameworks/kcompletion-5.29.0:5 >=kde-frameworks/kconfig-5.29.0:5 >=kde-frameworks/kconfigwidgets-5.29.0:5 >=kde-frameworks/kcoreaddons-5.29.0:5 >=kde-frameworks/kcrash-5.29.0:5 >=kde-frameworks/kdbusaddons-5.29.0:5 >=kde-frameworks/kdelibs4support-5.29.0:5 >=kde-frameworks/kglobalaccel-5.29.0:5 >=kde-frameworks/ki18n-5.29.0:5 >=kde-frameworks/kidletime-5.29.0:5 >=kde-frameworks/kio-5.29.0:5 >=kde-frameworks/knotifications-5.29.0:5 >=kde-frameworks/knotifyconfig-5.29.0:5 >=kde-frameworks/kservice-5.29.0:5 >=kde-frameworks/kwayland-5.29.0:5 >=kde-frameworks/kwidgetsaddons-5.29.0:5 >=kde-frameworks/kxmlgui-5.29.0:5 >=kde-frameworks/solid-5.29.0:5 >=kde-plasma/libkscreen-5.8.5:5 >=kde-plasma/plasma-workspace-5.8.5:5 >=dev-qt/qtdbus-5.6.1:5 >=dev-qt/qtgui-5.6.1:5 >=dev-qt/qtwidgets-5.6.1:5 >=dev-qt/qtx11extras-5.6.1:5 virtual/libudev:= x11-libs/libxcb wireless? ( >=kde-frameworks/bluez-qt-5.29.0:5 >=kde-frameworks/networkmanager-qt-5.29.0:5 ) sys-devel/make >=dev-util/cmake-3.7.2 >=sys-apps/sed-4 dev-util/desktop-file-utils x11-misc/shared-mime-info >=kde-frameworks/extra-cmake-modules-5.29.0:5 handbook? ( >=kde-frameworks/kdoctools-5.29.0:5 ) >=dev-qt/qtcore-5.6.1:5 dev-util/desktop-file-utils app-arch/xz-utils"
+	"media-libs/freetype:2= virtual/opengl"
+	]
+
 if __name__ == "__main__":
-	#load_test()
-	test_jquery()
+	constraint_test(constraint_list)
+	#test_jquery()

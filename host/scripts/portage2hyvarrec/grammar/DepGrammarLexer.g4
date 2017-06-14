@@ -2,8 +2,8 @@ lexer grammar DepGrammarLexer;
 
 // To generate files run: antlr4 -Dlanguage=Python2 -no-listener DepGrammarLexer.g4
 
-fragment SPACE: [ \t\r\n]+ ;
-WS: SPACE -> skip ;
+SPACE: [ \t\r\n] ;
+//WS: SPACE -> skip ;
 
 ///////////////////////////////////////////////////////////
 // mode: default:
