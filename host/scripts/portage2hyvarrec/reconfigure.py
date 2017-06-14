@@ -150,7 +150,8 @@ def create_hyvarrec_spls(package_request,
                          initial_configuration,
                          contex_value,
                          mspl,
-                         map_name_id):
+                         map_name_id,
+                         map_id_name):
     """
     Given a list of packages it creates its hyvarrec SPL
     """
@@ -199,11 +200,10 @@ def create_hyvarrec_spls(package_request,
         data["smt_constraints"]["formulas"].extend(request_constraints)
 
         # add info about the initial configuration
-        # only the use need to be defined. Preferences take care about packages
-        for j in initial_configuration.keys():
+        for j in initial_configuration:
             if j in mspl[i]:
                 for k in initial_configuration[j]:
-                    json["configuration"]["selectedFeatures"].append(
+                    data["configuration"]["selectedFeatures"].append(
                         smt_encoding.get_hyvar_use(map_name_id,j,k))
 
         # add preferences: do not remove packages already installed
@@ -219,11 +219,11 @@ def create_hyvarrec_spls(package_request,
     return jsons
 
 
-def update_configuration(hyvarrec_out,configuration,map_name_id):
+def update_configuration(hyvarrec_out,configuration,map_name_id,map_id_name):
     pkgs = []
     flags = []
     for i in hyvarrec_out["features"]:
-        el = map_name_id[i[1:]]
+        el = map_id_name[i[1:]]
         if el["type"] == "package":
             pkgs.append(el["name"])
         else: # "type" == "flag"
@@ -265,11 +265,10 @@ def get_conf_with_negative_use_flags(conf,map_name_id):
         data[i] = positive_flags + [ "-" + x for x in negative_flags]
     return data
 
-def get_better_explanation(json_result,mspl,map_name_id,map_id_name):
-    assert json_result["result"] == "unsat"
+def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name):
     ls = []
     parser = SmtLib20Parser()
-    for i in json_result["constraints"]:
+    for i in constraints:
         f = cStringIO.StringIO(i)
         script = parser.get_script(f)
         f.close()
@@ -406,7 +405,8 @@ def main(input_file,
                                     initial_configuration,
                                     environment,
                                     mspl,
-                                    map_name_id)
+                                    map_name_id,
+                                    map_id_name)
     logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
 
     configuration = {}
@@ -421,16 +421,17 @@ def main(input_file,
         if json_result["result"] != "sat":
             if explain:
                 # try to print a better explanation of the constraints
-                constraints = get_better_explanation(json_result,mspl,map_name_id,map_id_name)
+                constraints = get_better_constraint_visualization(
+                    json_result["constraints"],mspl,map_name_id,map_id_name)
                 sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
             sys.exit(1)
         logging.debug("HyVarRec output: " + unicode(json_result))
         # update the info on the final configuration
-        update_configuration(json_result,configuration,map_name_id)
+        update_configuration(json_result,configuration,map_name_id,map_id_name)
 
     # remove all the pacakges without version from final configuration
-    for i in configuration:
+    for i in configuration.keys():
         if "implementations" in mspl[i]:
             del(configuration[i])
 
