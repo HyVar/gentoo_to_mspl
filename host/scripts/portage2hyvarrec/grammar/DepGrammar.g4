@@ -8,7 +8,7 @@ options { tokenVocab=DepGrammarLexer; }
 ///////////////////////////////////////////////////////////
 // MAIN
 
-required: requiredEL? (SPACE+ requiredEL)* ;
+required: requiredEL? (SPACE+ requiredEL)* SPACE* ;
 
 requiredEL:
     NOT? SPACE* use=ID                                       #requiredSIMPLE
@@ -17,7 +17,7 @@ requiredEL:
   | LPAREN requiredEL? (SPACE+ requiredEL)* SPACE* RPAREN                         #requiredINNER
   ;
 
-depend: dependEL? (SPACE+ dependEL)* ;
+depend: dependEL? (SPACE+ dependEL)* SPACE* ;
 
 dependEL:
     (NOT NOT?)? SPACE* atom                               #dependSIMPLE
