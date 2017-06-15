@@ -71,41 +71,6 @@ def generate_name_mappings_package_groups(package_groups):
 
 
 
-# extracting use mappings from the ast
-class GenerateUseMappingsAST(constraint_ast_visitor.ASTVisitor):
-    def __init__(self):
-        super(constraint_ast_visitor.ASTVisitor, self).__init__()
-    def DefaultValue(self):
-        return {}
-    def CombineValue(self, value1, value2):
-        utils.inline_combine_dicts(value1, value2, utils.inline_combine_lists)
-        return value1
-
-    def visitRequiredSIMPLE(self, ctx):
-        return { self.spl_name: [ ctx['use'] ] }
-    def visitCondition(self, ctx):
-        return { self.spl_name: [ ctx['use'] ] }
-    def visitAtom(self, ctx):
-        self.local_package_name = ctx['package']
-        return constraint_ast_visitor.ASTVisitor.visitAtom(self, ctx)
-    def visitSelection(self,ctx):
-        res = { self.local_package_name: [ ctx['use'] ] }
-        if 'suffix' in ctx: res[self.spl_name] = [ ctx['use'] ]
-        return  res
-
-def generate_use_mappings_ast(ast_el):
-    spl_name, local_ast, combined_ast = ast_el
-    visitor = GenerateUseMappingsAST()
-    visitor.spl_name = spl_name
-    uses = visitor.visitRequired(local_ast)
-    utils.inline_combine_dicts(uses, visitor.visitDepend(combined_ast), utils.inline_combine_lists)
-    mappings = create_empty_name_mappings()
-    map_id_name, map_name_id = mappings
-    for spl_name, uses in uses.iteritems():
-        map_name_id['flag'][spl_name] = {}
-        for use in set(uses):
-            update_mappings(mappings, 'flag', spl_name, use)
-    return mappings
 
 def add_context_ints(map_name_id):
     map_name_id["context_int"] = {}

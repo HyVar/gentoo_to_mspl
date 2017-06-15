@@ -115,7 +115,7 @@ class SPLParserTranslateConstraints(DepGrammarVisitor):
     def visitSelection(self, ctx):
         res = { 'type': "selection", 'use': ctx.ID().getText() }
         if ctx.prefix(): res['prefix'] = ctx.prefix().accept(self)
-        if ctx.preference(): res['preference'] = ctx.preference().accept(self)
+        if ctx.preference(): res['default'] = ctx.preference().accept(self)
         if ctx.suffix(): res['suffix'] = ctx.suffix().accept(self)
         return res
     def visitPrefix(self, ctx):
@@ -164,3 +164,7 @@ def parse_spl(spl):
     combined_ast = utils.compact_list(external_ast + runtime_ast)
     del spl['fm'] # try to save memory
     return (spl['name'], local_ast, combined_ast)
+
+
+def parse_mspl(concurrent_map, raw_mspl):
+    return concurrent_map(parse_spl, raw_mspl)

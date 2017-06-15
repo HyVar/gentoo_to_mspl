@@ -132,25 +132,32 @@ def main(input_dir,
         # continues the translation, following the different steps
         logging.debug("Considering " + unicode(len(files)) + " files")
         t = time.time()
-        raw_mspl = concurrent_thread_map(egencache_utils.load_file_egencache, files)
+        raw_mspl = egencache_utils.load_files_egencache(concurrent_thread_map, files)
         logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
         assert raw_mspl
     
         logging.info("Converting the gentoo dependencies into internal AST representation.")
         t = time.time()
-        asts = concurrent_map(constraint_parser.parse_spl, raw_mspl)
+        asts = constraint_parser.parse_mspl(concurrent_map, raw_mspl)
         #asts = map(constraint_parser.parse_spl, raw_mspl)
         logging.info("Conversion completed in " + unicode(time.time() - t) + " seconds.")
         assert asts
+
+        logging.info("Creating the package group information.")
+        package_groups = extract_package_groups.from_mspl_list(concurrent_map, raw_mspl)
+        assert package_groups
+
+        logging.info("Matching every atoms constraint to the list of its correponding spls.")
+
     
+        logging.info("Extending spl with implicit iuse declarations")
+        #apply_profile.on_mspl()
+
         logging.info("Extracting ids information from ASTs.")
         t = time.time()
         mappings = extract_id_maps.create_empty_name_mappings()
         map_id_name, map_name_id = mappings
         mappings_list = concurrent_thread_map(extract_id_maps.generate_name_mappings_spl, raw_mspl)
-        map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
-        # TODO: must remove the following lines when we start loading the profile
-        mappings_list = concurrent_thread_map(extract_id_maps.generate_use_mappings_ast, asts)
         map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
         #map_id_name, map_name_id = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
         logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
@@ -175,10 +182,8 @@ def main(input_dir,
         for spl_name,deps in dependencies:
             mspl[spl_name]['dependencies'] = deps
 
-        # generate the package groups
-        package_groups = extract_package_groups.create_empty_package_groups()
-        package_groups_list = concurrent_thread_map(extract_package_groups.generate_package_group_spl, raw_mspl)
-        map(lambda x: extract_package_groups.update_package_groups(package_groups, x), package_groups_list)
+        # clean the package groups from links to their different implementations
+        extract_package_groups.clean(concurrent_map, package_groups)
         # update the mspl dictionary with the package groups
         extract_id_maps.update_name_mappings(mappings, extract_id_maps.generate_name_mappings_package_groups(package_groups))
         #package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)

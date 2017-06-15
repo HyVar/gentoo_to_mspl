@@ -321,25 +321,5 @@ def main():
 		json.dump(data.toDict(), f)
 
 
-
-# TODO: deal with package configuration set in the .ebuild itself...
-#	iterate over all egencache files, extract the IUSE, and the ones with + and - give a partial configuration
-# TODO: deal with /etc/portage/package.use ...
-#	not different from what I already did with the other package.use
-# TODO: deal with /etc/portage/make.conf
-#	not different from what I will do with the other make.defaults
-# TODO: make things concurrent, as we have a lot of data to manage, like usually...
-
 if __name__ == "__main__":
-	#profile_list = get_profile_folders(os.path.realpath("/etc/portage/make.profile"))
-	#profile_list.reverse()
-	#print(str(profile_list))
-	#print(split_string("net-analyzer/metasploit nexpose openvas"))
-	#print(split_string(">=dev-scheme/slib-3.2.5 gambit scm"))
-	#print(split_string("sys-boot/grub:2 grub_platforms_xen-32"))
 	main()
-	#data = ProfileData()
-	#with open("/usr/portage/profiles/arch/amd64/use.mask", 'r') as f:
-	#	analyse_use_mask(f, data)
-	#analyse_make_defaults(data, "/usr/portage/profiles/releases/make.defaults")
-	#print(str(data))

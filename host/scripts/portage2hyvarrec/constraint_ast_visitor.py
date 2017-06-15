@@ -98,14 +98,14 @@ class ASTVisitor(object):
         res = self.DefaultValue()
         if 'prefix' in ctx:
             res = self.CombineValue(res, self.visitPrefix(ctx['prefix']))
-        if 'preference' in ctx:
-            res = self.CombineValue(res, self.visitPreference(ctx['preference']))
+        if 'default' in ctx:
+            res = self.CombineValue(res, self.visitDefault(ctx['default']))
         if 'suffix' in ctx:
             res = self.CombineValue(res, self.visitSuffix(ctx['suffix']))
         return res
     def visitPrefix(self, ctx):
         return self.DefaultValue()
-    def visitPreference(self, ctx):
+    def visitDefault(self, ctx):
         return self.DefaultValue()
     def visitSuffix(self, ctx):
         return self.DefaultValue()
