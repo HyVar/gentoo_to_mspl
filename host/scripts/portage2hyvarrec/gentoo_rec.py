@@ -172,16 +172,10 @@ def main(input_dir,
         logging.info("Extract dependencies information from ASTs.")
         all_pkg_names = set(mspl.keys())
         t = time.time()
-        dependencies = concurrent_thread_map(
-            extract_dependencies.generate_dependencies_ast,
-            [(pkg,mspl[pkg]["fm"]["combined"],mspl,all_pkg_names) for pkg in mspl])
+        extract_dependencies.generate_dependencies_mspl(concurrent_thread_map, mspl)
         t = time.time() - t
         logging.info("Extraction completed in " + unicode(t) + " seconds.")
     
-        # add dependencies
-        for spl_name,deps in dependencies:
-            mspl[spl_name]['dependencies'] = deps
-
         # clean the package groups from links to their different implementations
         extract_package_groups.clean(concurrent_map, package_groups)
         # update the mspl dictionary with the package groups

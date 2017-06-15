@@ -62,12 +62,14 @@ def test_list(concurrent_map, paths):
 	print("===============")
 	for k, v in atom_mapping.iteritems():
 		print(str(k) + " => " + str([ spl['name'] for spl in v ]))
-	return
 	print("===============")
 	print("Dependencies:")
-	dependencies = concurrent_map(extract_dependencies.generate_dependencies_ast, asts)
+	mspl = { spl['name']: spl for spl in raw_mspl }
+	for spl_name, local_ast, combined_ast in asts:
+		mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
+	extract_dependencies.generate_dependencies_mspl(concurrent_map, mspl)
 	print("===============")
-	print(json.dumps(dependencies, sort_keys=True, indent=4, separators=(',', ': ')))
+	#print(json.dumps(dependencies, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
 	print("Name Mapping:")
 	mappings = extract_id_maps.create_empty_name_mappings()
@@ -77,8 +79,6 @@ def test_list(concurrent_map, paths):
 	print("===============")
 	print(json.dumps({'map_name_id': map_name_id, 'map_id_name': map_id_name}, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
-	for spl_name,deps in dependencies:
-		print(spl_name + ": " + str(deps))
 
 
 def test_full():
@@ -148,7 +148,8 @@ filenames = [ "sys-fs/udev-232-r2", "kde-plasma/powerdevil-5.8.5", "sys-devel/au
 if __name__ == "__main__":
 	#print(str(test_comparison1("sys-libs/ncurses-5.9-r3", "sys-libs/ncurses-5.9-r101")))
 	#test_comparison("1", "-")
-	test_package_groups([ "app-shells/bash", "sys-libs/ncurses", "virtual/libintl", "sys-libs/readline" ]) 
+	test_package_groups([ "dev-lang/python-exec-2.0.1-r1" ]) 
+	#test_package_groups([ "app-shells/bash", "sys-libs/ncurses", "virtual/libintl", "sys-libs/readline" ]) 
 	#print( "\"10.toto\" < \"1.tata\": " + str("10.toto" < "1.tata"))
 	#print("\"1.15_alpha\" < \"1.15_beta\": " + str("1.15_alpha" < "1.15_beta"))
 	#load_test()

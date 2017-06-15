@@ -50,9 +50,9 @@ def generate_name_mappings_spl(spl):
     spl_name = spl['name']
     mappings = create_name_mappings(spl_name)
     global trust_feature_declaration
-    if trust_feature_declaration:
-        for use in spl['features']:
-            update_mappings(mappings, 'flag', spl_name, use)
+    print("found features: " + str(spl['features']))
+    for use in spl['features']:
+        update_mappings(mappings, 'flag', spl_name, use)
     update_mappings(mappings, 'slot', spl_name, spl['slot'])
     update_mappings(mappings, 'subslot', spl_name, spl['subslot'])
     for keyword in spl['environment']:
