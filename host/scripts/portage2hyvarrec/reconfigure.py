@@ -293,7 +293,7 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
         # translate uses
         uses = set(re.findall('u([0-9]+)', formula))
         for use in uses:
-            formula = re.sub('u' + use, unicode(map_id_name[use]), formula)
+            formula = re.sub('u' + use, map_id_name[use]["package"] +  "[[" + map_id_name[use]["name"] + "]]", formula)
         ls.append(where_declared + formula)
     return ls
 

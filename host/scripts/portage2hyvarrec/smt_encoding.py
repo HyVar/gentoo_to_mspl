@@ -359,23 +359,28 @@ def convert(input_tuple):
         for i in map(visitor.visitRequiredEL,mspl[package]["fm"]["local"]):
             constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
         for i in map(visitor.visitDependEL, mspl[package]["fm"]["combined"]):
+            # print "--------"
+            # print mspl[package]["fm"]["combined"][counter]
+            # counter += 1
+            # print toSMT2(z3.Implies(get_smt_package(map_name_id, package),i))
             constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
+
+
 
         # package with version needs its base package to be selected
         constraints.append(z3.Implies(
             get_smt_package(map_name_id, package),
             get_smt_package(map_name_id,mspl[package]['group_name'])))
 
-        # if package is not selected its flags are neither
+        # if package is not selected then its flags are not selected neither
         constraints.append(z3.Implies(
             z3.Not(get_smt_package(map_name_id, package)),
-            z3.And(map(lambda x: z3.Not(get_smt_use(map_name_id,package,x)),map_name_id["flag"][package]))))
+            z3.And([z3.Not(get_smt_use(map_name_id,package,x)) for x in map_name_id["flag"][package]])))
 
         # if flag is selected then its package is selected too
-        constraints.append(z3.Implies(
-            z3.Or(map(lambda x: get_smt_use(map_name_id,package,x),map_name_id["flag"][package])),
-            get_smt_package(map_name_id, package)))
-
+        constraints.extend([z3.Implies(
+            get_smt_use(map_name_id,package,x),
+            get_smt_package(map_name_id, package)) for x in map_name_id["flag"][package]])
 
         # add validity formulas. Context must be one of the possible env
         envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
