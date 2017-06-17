@@ -163,7 +163,7 @@ def parse_spl(spl):
     #combined_ast = list(set(external_ast + runtime_ast))
     combined_ast = utils.compact_list(external_ast + runtime_ast)
     del spl['fm'] # try to save memory
-    return (spl['name'], local_ast, combined_ast)
+    return (spl, local_ast, combined_ast)
 
 
 def parse_mspl(concurrent_map, raw_mspl):

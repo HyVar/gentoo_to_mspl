@@ -10,6 +10,8 @@ import constraint_ast_visitor
 ### SIMPLE HASH-AWARE CLASS TO MATCH AN SPL
 ######################################################################
 
+# TODO: pattern constructor from an actual name?
+
 def compare_version(s1, s2):
 	i, len1, len2 = 0, len(s1), len(s2)
 	maximum = min(len1, len2)
@@ -125,16 +127,20 @@ class ExtractAtoms(constraint_ast_visitor.ASTVisitor):
     def __init__(self):
         super(constraint_ast_visitor.ASTVisitor, self).__init__()
     def DefaultValue(self):
-        return set([])
+        #return set([])
+        return []
     def CombineValue(self, value1, value2):
-    	value1.update(value2)
+    	#value1.update(value2)
+        #return value1
+        value1.extend(value2)
         return value1
 
     def visitAtom(self, ctx):
-        return set([ PackagePattern(ctx) ])
+        #return set([ PackagePattern(ctx) ])
+        return [ PackagePattern(ctx) ]
 
     def visit_ast(self, ast):
-    	spl_name, local_ast, combined_ast = ast
+    	spl, local_ast, combined_ast = ast
     	return self.visitDepend(combined_ast)
 
 def pattern_match_pattern(pattern, package_groups):

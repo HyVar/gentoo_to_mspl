@@ -148,10 +148,16 @@ def main(input_dir,
         assert package_groups
 
         logging.info("Matching every atoms constraint to the list of its correponding spls.")
-
+        t = time.time()
+        atom_mapping = atom_matching.extract_atom_mapping(concurrent_thread_map, package_groups, asts)
+        logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
+        assert atom_mapping
     
         logging.info("Extending spl with implicit iuse declarations")
-        #apply_profile.on_mspl()
+        t = time.time()
+        # profile_iuse = ???
+        #apply_profile.on_mspl(concurrent_map, atom_mapping, asts, profile_iuse)
+        logging.info("Completion completed in " + unicode(time.time() - t) + " seconds.")
 
         logging.info("Extracting ids information from ASTs.")
         t = time.time()
@@ -166,8 +172,8 @@ def main(input_dir,
         # add name : spl
         mspl = {spl['name']: spl for spl in raw_mspl}
         # add asts
-        for spl_name, local_ast, combined_ast in asts:
-            mspl[spl_name]['fm'] = {'local': local_ast, 'combined': combined_ast}
+        for spl, local_ast, combined_ast in asts:
+            spl['fm'] = {'local': local_ast, 'combined': combined_ast}
 
         logging.info("Extract dependencies information from ASTs.")
         all_pkg_names = set(mspl.keys())
