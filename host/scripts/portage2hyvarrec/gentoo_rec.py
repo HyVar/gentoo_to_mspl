@@ -70,7 +70,7 @@ def main(input_dir,
 
     Example: python gentoo_rec.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
     Example: python gentoo_rec.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-    Example: python gentoo_rec.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.json --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+    Example: python gentoo_rec.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
 
     """
 
