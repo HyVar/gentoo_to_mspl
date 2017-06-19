@@ -2,12 +2,9 @@
 
 # clean the local gentoo from hyvarrec data
 
-# 1. clean /etc/portage/make.conf
-sed -i '/ACCEPT_KEYWORDS=.*$/d' /etc/portage/make.conf
+GUEST_INSTALL_DIR="${1}"
+GUEST_GEN_DIR="${2}"
 
-# 2. clean ~/hyvar
+[ -e ${GUEST_INSTALL_DIR} ] && rm -rf ${GUEST_INSTALL_DIR}
+[ -e ${GUEST_GEN_DIR} ] && rm -rf ${GUEST_GEN_DIR}\"
 
-path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd && echo x)"
-path="${path%x}"
-
-rm -rf $path

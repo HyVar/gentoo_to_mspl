@@ -4,7 +4,9 @@
 ### LOADS THE MAKE.CONF / MAKE.DEFAULTS FILE
 ######################################################################
 
-source ${1}
+if [ -n "${1}" ]; then 
+	source ${1}
+fi
 
 # seems to me that the make.defaults must be loaded in sequence, together...
 
