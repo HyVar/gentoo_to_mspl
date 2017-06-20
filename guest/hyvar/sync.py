@@ -7,6 +7,7 @@ import os.path
 import logging
 import subprocess
 import multiprocessing
+import json
 
 #def get_patterns(string):
 #	return re.findall(">?<?=?[a-zA-Z0-9._@][a-zA-Z0-9._\-+@/:]*", string)
@@ -18,12 +19,14 @@ import multiprocessing
 # input
 
 input_dir_portage = os.path.realpath("/usr/portage/metadata/md5-cache/")
-input_dir_portage_deprecated = os.path.realpath("/var/lib/pkg/")
+input_dir_portage_deprecated = os.path.realpath("/var/db/pkg/")
 
 input_file_profile = "/etc/portage/make.profile"
 
 input_dir_user_configuration = os.path.realpath("/etc/portage/")
 input_file_user_world = os.path.realpath("/var/lib/portage/world")
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
 # output
 
@@ -38,7 +41,7 @@ output_file_user_configuration = None
 
 # concurrency
 
-concurrent_map = map # the different load processes must be done in sequence
+non_concurrent_map = map # the different load processes must be done in sequence
 
 ######################################################################
 ### UTILITY FUNCTIONS AND CLASSES
@@ -60,7 +63,10 @@ def packages_required_update_simple(packages_required, package_set, package):
 	if package[0] == '-':
 		to_update.discard(package[1:])
 	else:
-		to_update.add(keyword)
+		to_update.add(package)
+
+def packages_required_set_to_list(packages_required):
+	return { k: list(v) for k, v in packages_required.iteritems() }
 
 
 # PACKAGE MASKING
@@ -72,6 +78,10 @@ def packages_mask_create():
 
 def packages_mask_update_simple(packages_mask, pattern, sign):
 	packages_mask.append( { 'sign': sign, 'pattern': pattern } )
+
+
+def packages_mask_set_to_list(packages_mask):
+	return packages_mask
 
 
 # USE AND PACKAGE USE
@@ -93,6 +103,10 @@ def use_list_invert(uses):
 	return map(use_invert, uses)
 
 
+def configuration_use_set_to_list(configuration_use):
+	return configuration_use
+
+
 # ACCEPT_KEYWORDS
 # similarily to use flag partial configuration, we have again a sequence of declaration for package patterns
 # however this is simply than for use flags, as there are no declaration of opposites
@@ -102,6 +116,10 @@ def accept_keywords_create():
 def accept_keywords_update_simple(accept_keywords, pattern, keywords):
 	accept_keywords.append( { 'pattern': pattern, 'keywords': keywords } )
 
+def accept_keywords_set_to_list(accept_keywords):
+	return accept_keywords
+
+
 # full configuration container
 class Configuration(object):
 	def __init__(self):
@@ -110,7 +128,7 @@ class Configuration(object):
 		self.package_provided = set([]) # list of packages that is assumed to be correctly installed
 		self.package_required = packages_required_create()
 		self.package_mask = packages_mask_create()
-		self.package_configuration_use = {}
+		self.package_configuration_use = configuration_use_create()
 		self.package_accept_keywords = accept_keywords_create()
 
 	def update_arch_list(self, arches):
@@ -138,10 +156,11 @@ class Configuration(object):
 		return {
 			'arches': list(self.arches),
 			'iuses': list(self.iuses),
-			'package_required': self.package_required,
-			'package_mask': self.package_mask,
-			'package_configuration_use': self.package_configuration_use,
-			'package_accept_keywords': self.package_accept_keywords
+			'package_provided': list(self.package_provided),
+			'package_required': packages_required_set_to_list(self.package_required),
+			'package_mask': packages_mask_set_to_list(self.package_mask),
+			'package_configuration_use': configuration_use_set_to_list(self.package_configuration_use),
+			'package_accept_keywords': accept_keywords_set_to_list(self.package_accept_keywords)
 		}
 
 	def __repr__(self):
@@ -156,10 +175,11 @@ class Configuration(object):
 ######################################################################
 
 # MANAGE FILES: make.defaults and make.conf bash files
+script_load_make_defaults = os.path.join(script_dir, "load_make_defaults.sh")
 bash_environment = {}
 def update_bash_environment(filename = ""):
 	global bash_environment
-	process = subprocess.Popen(["bash", "./load_make_defaults.sh", filename ], stdout=subprocess.PIPE, env=bash_environment)
+	process = subprocess.Popen(["bash", script_load_make_defaults, filename ], stdout=subprocess.PIPE, env=bash_environment)
 	out, err = process.communicate()
 	# reset the environment
 	bash_environment = {}
@@ -191,7 +211,7 @@ def analyse_make_defaults(data, filename):
 
 
 # MANAGE FILES: the other, simpler files
-def extact_lines_from_file(f):
+def extract_lines_from_file(f):
 	res = []
 	for line in f:
 		line = line[:-1] # remove trailing endline
@@ -199,13 +219,13 @@ def extact_lines_from_file(f):
 		line.strip() # remove starting and trailing spaces
 		if len(line) == 0:
 			continue # skip all comments
-		res.append(line))
+		res.append(line)
 	return res
 
 # file: "packages", in profile configuration
 def analyse_packages(data, lines):
 	for line in lines:
-		if line[0] = "*":
+		if line[0] == "*":
 			data.update_package_required("system", line[1:])
 		else:
 			data.update_package_required("profile", line)
@@ -240,21 +260,21 @@ def analyse_package_unmask(data, lines):
 def analyse_package_use(data, lines):
 	for line in lines:
 		els = line.split()
-		data.configuration_use_update_simple(els[0], els[1:])
+		data.update_package_configuration_use(els[0], els[1:])
 
 # file: "package.use.mask*", in profile configuration
 def analyse_package_use_mask(data, lines):
 	for line in lines:
 		els = line.split()
-		data.configuration_use_update_simple(els[0], use_list_invert(els[1:]))
+		data.update_package_configuration_use(els[0], use_list_invert(els[1:]))
 
 # file "use.force", in profile configuration
 def analyse_use(data, lines):
-	data.configuration_use_update_simple("*/*", lines)
+	data.update_package_configuration_use("*/*", lines)
 
 # file "use.mask", in profile configuration
 def analyse_use_mask(data, lines):
-	data.configuration_use_update_simple("*/*", use_invert(line))
+	data.update_package_configuration_use("*/*", use_list_invert(lines))
 
 
 
@@ -280,7 +300,7 @@ def analyse_configuration_file(data, parameter):
 	function, filename = parameter
 	if function != analyse_make_defaults:
 		with open(filename, 'r') as f:
-			lines = extact_lines_from_file(f)
+			lines = extract_lines_from_file(f)
 		function(data, lines)
 	else: # make.defaults
 		function(data,filename)
@@ -288,7 +308,7 @@ def analyse_configuration_file(data, parameter):
 
 def analyse_configuration_files(function_file_list):
 		data = Configuration()
-		non_concurrent_map(lambda parameter: analyse_configuration_file(data, parameter), input_data_files)
+		non_concurrent_map(lambda parameter: analyse_configuration_file(data, parameter), function_file_list)
 		return data
 
 ######################################################################
@@ -321,7 +341,7 @@ def load_profile():
 	last_update = None
 	input_data_files = []
 	# 1. check if we have a profile file
-	if not os.path.exits(output_file_profile_configuration):
+	if not os.path.exists(output_file_profile_configuration):
 		load = True
 	else:
 		last_update = os.path.getmtime(output_file_profile_configuration)
@@ -367,7 +387,7 @@ def get_user_configuration_files():
 	# 1. make.conf
 	file_make_conf = os.path.join(input_dir_user_configuration, "make.conf")
 	if os.path.isfile(file_make_conf):
-		res.append(None, file_make_conf)
+		res.append( (analyse_make_defaults, file_make_conf) )
 	# 2. package.accept_keywords / package.keywords 
 	files_package_accept_keywords = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.accept_keywords"))
 	files_package_accept_keywords.extend(get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.keywords")))
@@ -391,7 +411,8 @@ def get_user_configuration_files():
 	files_package_provided = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "profile/package.provided"))
 	res.extend([ (analyse_package_provided, filename) for filename in files_package_provided ]) 
 	# 9. the world and set/* file
-	files_package_set.add(input_file_user_world)
+	files_package_set = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "sets"))
+	files_package_set.append(input_file_user_world)
 	res.extend([ (lambda data, lines: analyse_package_set(filename, data, lines), filename) for filename in files_package_set])
 	return res
 
@@ -400,14 +421,14 @@ def load_user_configuration():
 	last_update = None
 	input_data_files = []
 	# 1. check if we have a profile file
-	if not os.path.exits(output_file_user_configuration):
+	if not os.path.exists(output_file_user_configuration):
 		load = True
 	else:
 		last_update = os.path.getmtime(output_file_user_configuration)
 	# 2. check if we need to update
 	if not load:
 		input_data_files = get_user_configuration_files()
-		for filename in [ filename in input_data_files.values() ]:
+		for function, filename in input_data_files :
 			if last_update < os.path.getmtime(filename):
 				load = True
 				break;
@@ -428,6 +449,15 @@ def load_user_configuration():
 
 # this works differently from the other update functions, as the diff will be performed on the host
 # here we simply update the packages/deprecated folder
+
+def get_package_group(package_name):
+	els = package_name.split("-")
+	if els[-1][0] == "r":
+		return "-".join(els[:-2])
+	else:
+		return "-".join(els[:-1])
+
+script_load_ebuild = os.path.join(script_dir, "load_ebuild.sh")
 def load_portage():
 	if not os.path.isdir(output_file_portage_deprecated):
 		logging.error("The location  \"" + output_file_portage_deprecated + "\" does not exist or is not a folder")
@@ -439,21 +469,26 @@ def load_portage():
 		for package in os.listdir(path):
 			if not os.path.exists(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package)):
 				os.remove(os.path.join(path, package))
-				els = package.split("-")
-				if els[-1][0] == "r":
-					package_group = "-".join(els[:-2])
-				else:
-					package_group = "-".join(els[:-1])
+				package_group = get_package_group(package)
+
 			elif os.path.exists(os.path.exists(os.path.join(os.path.join(input_dir_portage,directory),package_group)),package + ".ebuild"):
 				os.remove(os.path.join(path, package))
 	# 2. add new files
 	for directory in os.listdir(input_dir_portage_deprecated):
-		path = os.path.join(output_file_portage_deprecated, directory)
+		path = os.path.join(input_dir_portage_deprecated, directory)
 		for package_dir in os.listdir(path):
-			new_path = os.path.join(os.path.join(output_file_portage_deprecated,directory),package_dir)
+			# 2.1. check that this is indeed a deprecated package
+			package_group = get_package_group(package_dir)
+			if os.path.exists(os.path.join(os.path.join(input_dir_portage,directory),package_dir)):
+				continue
+			# 2.2. create file if does not already exist
+			new_path_dir = os.path.join(output_file_portage_deprecated,directory)
+			new_path = os.path.join(new_path_dir,package_dir)
 			if not os.path.exists(new_path):
 				old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir),package_dir + ".ebuild")
-				subprocess.call("load_ebuild.sh", old_path, new_path)
+				if not os.path.exists(new_path_dir):
+					os.makedirs(new_path_dir)
+				subprocess.call(["bash", script_load_ebuild, old_path, new_path])
 
 
 
@@ -489,7 +524,7 @@ def main(given_output_dir):
 	# 4. load portage
 	load_portage()
 	# 5. load the profile
-	load_profile(concurrent_map)
+	load_profile()
 	# 6. load the user configuration
 	load_user_configuration()
 

@@ -25,7 +25,7 @@ HOST_HOST_GEN_DIR="./host/hyvar/gen"
 ### UTILITY FUNCTIONS
 ######################################################################
 
-check_environment() {
+function check_environment {
 	if [ ! -e "${HOST_HOST_INSTALL_DIR}" ]; then
 		mkdir -p "${HOST_HOST_INSTALL_DIR}"
 	fi
@@ -34,7 +34,7 @@ check_environment() {
 	fi
 }
 
-clean_host() {
+function clean_host {
 	if [ -e "${HOST_HOST_INSTALL_DIR}" ]; then
 		rm -rf "${HOST_HOST_INSTALL_DIR}"
 	fi
@@ -43,7 +43,7 @@ clean_host() {
 	fi	
 }
 
-clean_guest() {
+function clean_guest {
 	sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no ${GUEST_USER}@${GUEST} "echo ${GUEST_PWD_ROOT} | sudo -S sh ${GUEST_INSTALL_DIR}/clean.sh ${GUEST_INSTALL_DIR} ${GUEST_GEN_DIR}"
 
 }
@@ -54,15 +54,32 @@ clean_guest() {
 ######################################################################
 
 
-setup_guest() {
+function setup_guest {
 	sshpass -p ${GUEST_PWD_USER} scp -o PubkeyAuthentication=no -P ${GUEST_PORT}  -r "${HOST_GUEST_INSTALL_DIR}"  "${GUEST_USER}@${GUEST}:${GUEST_INSTALL_DIR}"
 	sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no "${GUEST_USER}@${GUEST}" "echo ${GUEST_PWD_ROOT} | sudo -S sh ${GUEST_INSTALL_DIR}/setup.sh ${GUEST_GEN_DIR}"
 }
 
-sync_guest() {
+function sync_guest {
+	check_environment
 	sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no ${GUEST_USER}@${GUEST} "echo ${GUEST_PWD_ROOT} | sudo -S python ${GUEST_INSTALL_DIR}/sync.py ${GUEST_GEN_DIR}"
 	sshpass -p ${GUEST_PWD_USER} rsync -rLptgoDz -e "ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no" ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
 	#sshpass -p ${GUEST_PWD_USER} scp -o PubkeyAuthentication=no -P ${GUEST_PORT}  ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
 }
 
 
+
+
+
+######################################################################
+### MAIN
+######################################################################
+
+if [ -n "${1}" ]; then
+	case "${1}" in
+		setup_guest)
+			setup_guest
+			;;
+		sync_guest)
+			sync_guest
+	esac
+fi
