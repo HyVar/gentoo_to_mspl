@@ -7,6 +7,7 @@ import os.path
 import logging
 import subprocess
 import multiprocessing
+import bz2
 import json
 
 #def get_patterns(string):
@@ -39,6 +40,7 @@ output_file_profile_configuration = None
 
 output_file_user_configuration = None
 
+output_file_installed_packages = None
 # concurrency
 
 non_concurrent_map = map # the different load processes must be done in sequence
@@ -457,6 +459,74 @@ def get_package_group(package_name):
 	else:
 		return "-".join(els[:-1])
 
+
+def load_installed_package(package_path, outfile):
+	iuses = None
+	keywords = None
+	slots = None
+	required_use = None
+	depend = None
+	rdepend = None
+	pdepend = None
+	# parse "environment.bz2" in which all variables are declared
+	variable = None
+	value = None
+	with bz2.BZ2File(os.path.join(package_path, "environment.bz2"), 'r') as f:
+		for line in f.readlines(): # to deal with multiple-line variables
+			line = line[:-1]
+			if value:
+				value = value + " " + line
+			else:
+				array = line.split("=", 1)
+				if (len(array) == 2) and (array[0].startswith("declare")):
+					variable = array[0]
+					value=array[1]
+				else:
+					variable = None
+					value = None
+			if variable:
+				if value[-1] == "\"":
+					value = value[1:-1]
+					#print(variable + " = " + value)
+					# set the correct variables
+					if variable.endswith("IUSE_EFFECTIVE"):
+						iuses = value
+					elif (variable.endswith("IUSE")) and (iuses is None):
+						iuses = value
+					elif variable.endswith("KEYWORDS"):
+						keywords = value
+					elif variable.endswith("SLOT"):
+						slot = value
+					elif variable.endswith("REQUIRED_USE"):
+						required_use = value
+					elif variable.endswith("DEPEND"):
+						depend = value
+					elif variable.endswith("RDEPEND"):
+						rdepend = value
+					elif variable.endswith("PDEPEND"):
+						pdepend = value
+					# reset the data
+					variable = None
+					value = None
+	# 3. write file
+	with open(outfile, 'w') as f:
+		if iuses:
+			f.write("IUSE=" + iuses + "\n")
+		if keywords:
+			f.write("KEYWORDS=" + keywords + "\n")
+		if slots:
+			f.write("SLOT=" + slots + "\n")
+		if required_use:
+			f.write("DEPEND=" + required_use + "\n")
+		if depend:
+			f.write("DEPEND=" + depend + "\n")
+		if rdepend:
+			f.write("RDEPEND=" + rdepend + "\n")
+		if pdepend:
+			f.write("PDEPEND=" + pdepend + "\n")
+
+
+
 script_load_ebuild = os.path.join(script_dir, "load_ebuild.sh")
 def load_portage():
 	if not os.path.isdir(output_file_portage_deprecated):
@@ -485,11 +555,58 @@ def load_portage():
 			new_path_dir = os.path.join(output_file_portage_deprecated,directory)
 			new_path = os.path.join(new_path_dir,package_dir)
 			if not os.path.exists(new_path):
-				old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir),package_dir + ".ebuild")
+				#old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir),package_dir + ".ebuild")
+				old_path = os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir)
 				if not os.path.exists(new_path_dir):
 					os.makedirs(new_path_dir)
-				subprocess.call(["bash", script_load_ebuild, old_path, new_path])
+				load_installed_package(old_path, new_path)
+				#subprocess.call(["bash", script_load_ebuild, old_path, new_path])
 
+
+######################################################################
+### LOAD INSTALLED PACKAGE CONFIGURATION
+######################################################################
+
+
+def load_installed_package_uses(package_path):
+	path_iuses = os.path.join(package_path, "IUSE")
+	if not os.path.exists(path_iuses):
+		return { 'positive': [], 'negative': [] }
+	else:
+		with open(path_iuses, 'r') as f:
+			iuses = f.read().split()
+		iuses = [ iuse[1:] if iuse[0] in "+-" else iuse for iuse in iuses ]
+		with open(os.path.join(package_path, "USE"), 'r') as f:
+			uses = f.read().split()
+		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
+		return { 'positive': uses, 'negative': nuses }
+
+
+def load_installed_packages():
+	data  = {}
+	last_update = None
+	# 1. check if we have a profile file and load it
+	if os.path.exists(output_file_installed_packages):
+		last_update = os.path.getmtime(output_file_installed_packages)
+		with open(output_file_installed_packages, 'r') as f:
+			data = json.load(f)
+	# 2. update the data
+	to_keep = []
+	for directory in os.listdir(input_dir_portage_deprecated):
+		path = os.path.join(input_dir_portage_deprecated, directory)
+		for package in os.listdir(path):
+			package_name = directory + "/" + package
+			#print("looking at " + package_name)
+			to_keep.append(package_name)
+			complete_path = os.path.join(path, package)
+			out = None
+			if (package_name not in data.keys()) or (last_update < os.path.getmtime(complete_path)):
+				uses = load_installed_package_uses(complete_path)
+				data[package_name] = uses
+	data = { k: data[k] for k in to_keep }
+	# 3. write the file
+	with open(output_file_installed_packages, 'w') as f:
+		json.dump(data, f)
 
 
 ######################################################################
@@ -502,11 +619,13 @@ def setup_output_files(given_output_dir):
 	global output_file_portage_deprecated
 	global output_file_profile_configuration
 	global output_file_user_configuration
+	global output_file_installed_packages
 	output_dir = os.path.realpath(given_output_dir)
 	output_file_portage = os.path.join(output_dir, "packages/portage-tree")
 	output_file_portage_deprecated = os.path.join(output_dir, "packages/deprecated")
 	output_file_profile_configuration = os.path.join(output_dir, "profile_configuration.json")
 	output_file_user_configuration = os.path.join(output_dir, "user_configuration.json")
+	output_file_installed_packages = os.path.join(output_dir, "installed_packages.json")
 
 
 def main(given_output_dir):
@@ -527,10 +646,8 @@ def main(given_output_dir):
 	load_profile()
 	# 6. load the user configuration
 	load_user_configuration()
-
-
-
-
+	# 7. load the current set of installed packages with their configuration
+	load_installed_packages()
 
 
 if __name__ == "__main__":
