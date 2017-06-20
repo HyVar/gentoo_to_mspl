@@ -11,15 +11,21 @@ GUEST_USER="osboxes"
 GUEST_PWD_ROOT="osboxes.org"
 GUEST_PWD_USER="osboxes.org"
 
-GUEST_SCRIPT_DIRECTORY_NAME="hyvar"
 
+
+GUEST_SCRIPT_DIRECTORY_NAME="hyvar"
 
 GUEST_INSTALL_DIR="/home/${GUEST_USER}/${GUEST_SCRIPT_DIRECTORY_NAME}"
 GUEST_GEN_DIR="${GUEST_INSTALL_DIR}/gen/"
 
-HOST_GUEST_INSTALL_DIR="./guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
-HOST_HOST_INSTALL_DIR="./host/hyvar/portage"
-HOST_HOST_GEN_DIR="./host/hyvar/gen"
+
+HOST_SCRIPT_DIRECTORY=$(realpath "./host/scripts")
+HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/translate-portage.py"
+HOST_SCRIPT_RECONFIGURE="${HOST_SCRIPT_DIRECTORY}/reconfigure.py"
+
+HOST_GUEST_INSTALL_DIR=$(realpath "./guest/${GUEST_SCRIPT_DIRECTORY_NAME}")
+HOST_HOST_INSTALL_DIR=$(realpath "./host/data/portage")
+HOST_HOST_GEN_DIR=$(realpath "./host/data/hyvar")
 
 ######################################################################
 ### UTILITY FUNCTIONS
@@ -53,6 +59,17 @@ function clean_guest {
 ### BASE FUNCTIONS
 ######################################################################
 
+function print_usage {
+	echo "${0} action [options] ..."
+	echo "  valid actions:"
+	echo "   setup_guest   install files on the guest machine"
+	echo "   sync_guest    upload portage files from guest"
+	echo "   translate     translate uploaded portage files into internal representation"
+	echo "   emerge        compute valid new configuration with the specified packages installed/removed"
+	echo "  valid options:"
+	echo "   -v   verbose mode"
+}
+
 
 function setup_guest {
 	sshpass -p ${GUEST_PWD_USER} scp -o PubkeyAuthentication=no -P ${GUEST_PORT}  -r "${HOST_GUEST_INSTALL_DIR}"  "${GUEST_USER}@${GUEST}:${GUEST_INSTALL_DIR}"
@@ -67,7 +84,13 @@ function sync_guest {
 }
 
 
+function translate {
+	echo "not implemented yet"
+}
 
+function emerge {
+	echo "not implemented yet"
+}
 
 
 ######################################################################
@@ -81,5 +104,14 @@ if [ -n "${1}" ]; then
 			;;
 		sync_guest)
 			sync_guest
+			;;
+		translate)
+			shift 1
+			"${HOST_SCRIPT_TRANSLATE}" $@ "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}"
+			echo $@
+			;;
+		*)
+			echo "unknown action \"${1}\""
+			print_usage
 	esac
 fi
