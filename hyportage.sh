@@ -66,8 +66,9 @@ function print_usage {
 	echo "   sync_guest    upload portage files from guest"
 	echo "   translate     translate uploaded portage files into internal representation"
 	echo "   emerge        compute valid new configuration with the specified packages installed/removed"
-	echo "  valid options:"
-	echo "   -v   verbose mode"
+	echo "     valid options:"
+	echo "       -v     verbose mode"
+	echo "       -p n   uses n parallel processes when possible"
 }
 
 

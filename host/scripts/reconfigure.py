@@ -382,7 +382,8 @@ def main(input_file,
 
     logging.info("Load the MSPL. This may take a while.")
     t = time.time()
-    mspl,map_name_id,map_id_name = utils.load_data_file(input_file,save_modality)
+    data = utils.load_data_file(input_file,save_modality)
+    mspl,map_name_id,map_id_name = data["mspl"],data["map_name_id"],data["map_id_name"]
     logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
 

@@ -27,33 +27,71 @@ def compare_version(s1, s2):
 		else:
 			return ord(s1[i]) - ord(s2[i])
 
-class PackagePattern(object):
-	def __init__(self, atom):
-		self.package_group, self.version_all, self.version, self.revision = egencache_utils.structure_package_name(atom['package'])
-		if 'version_op' in atom:
-			self.version_op = atom['version_op']
-		else:
-			self.version_op = None
-		if 'times' in atom:
-			self.time = True
-		else:
-			self.time = False
-		if 'slots' in atom:
-			slots = atom['slots']
-			if 'slot' in slots:
-				self.slot = slots['slot']
-				if 'subslot' in slots:
-					self.subslot = slots['subslot']
-				else:
-					self.subslot = None
-			else:
-				self.slot = None
-				self.subslot = None
-		else:
-			self.slot = None
-			self.subslot = None
 
-	def match(self, spl):
+class pattern_all(object):
+	def match(self, whatever):
+		return True
+
+class pattern_complete(object):
+	def match_full_spl(self, spl):
+		return self.match_full(spl['group_name'], spl['versions']['full'], spl['versions']['base'], spl['slot'], spl['subslot'])
+
+	def match_simple_spl(self, spl):
+		return self.match_only_package_version(spl['versions']['full'], spl['versions']['base']) and self.match_only_slot(spl['slot'], spl['subslot'])
+		
+	def match_simple_spl_name(self, spl_name):
+		package_group, version_full, version, revision = egencache_utils.structure_package_name(atom['package'])
+		return self.match_only_package_group(package_group) and self.match_only_package_version(version_full, version)
+
+	def match_only_package_group(self, group_name):
+		return self.package_group != group_name
+
+	def match_only_package_version(self, version_full, version_base):
+		if self.version_op:
+			compare = compare_version(version_full, self.version_full)
+			if self.version_op == ">=":
+				if compare < 0:
+					return False
+			elif self.version_op == ">":
+				if compare <= 0:
+					return False
+			elif self.version_op == "~":
+				if res.version != version_base:
+					return False
+			elif self.version_op == "=":
+				if self.time:
+					if not version_full.startwith(self.version_all):
+						return False
+				else:
+					if compare != 0:
+						return False
+			elif self.version_op == "<=":
+				if compare > 0:
+					return False
+			elif self.version_op == "<":
+				if compare >= 0:
+					return False
+		return True
+
+	def match_only_slot(self, slot, subslot):
+		if self.slot:
+			if self.slot != slot:
+				return False
+		if self.subslot:
+			if self.subslot != subslot:
+				return False
+
+		return True
+
+
+	def match_spl_name(self, group_name, version_full, version_base):
+
+
+	def match_full(self, group_name, version_full, version_base, slot, subslot):
+		return self.match_only_package_group(group_name) and self.match_only_package_version(version_full, version_base) and self.match_only_slot(slot, subslot)
+
+
+	def __match_old(self, spl):
 		# 1. check the name
 		if self.package_group != spl['group_name']:
 			return False
@@ -93,7 +131,7 @@ class PackagePattern(object):
 		return True
 
 	def match_package_groups(self, package_groups):
-		return filter(self.match, package_groups[self.package_group])
+		return filter(self.match_simple_spl, package_groups[self.package_group])
 
 
 	def __hash__(self):
@@ -110,14 +148,43 @@ class PackagePattern(object):
 		else:
 			res = ""
 		res = res + self.package_group
-		if self.version_all:
-			res = res + "-" + self.version_all
+		if self.version_full:
+			res = res + "-" + self.version_full
 		if self.slot:
 			res = res + ":" + self.slot
 			if self.subslot:
 				res = res + "/" + res.subslot
 		return res
 
+
+def pattern_from_atom(atom):
+	res = pattern_complete()
+	res.package_group, res.version_full, res.version = egencache_utils.structure_package_name(atom['package'])
+	if 'version_op' in atom:
+		res.version_op = atom['version_op']
+	else:
+		res.version_op = None
+	if 'times' in atom:
+		res.time = True
+	else:
+		res.time = False
+	if 'slots' in atom:
+		slots = atom['slots']
+		if 'slot' in slots:
+			res.slot = slots['slot']
+			if 'subslot' in slots:
+				res.subslot = slots['subslot']
+			else:
+				res.subslot = None
+		else:
+			res.slot = None
+			res.subslot = None
+	else:
+		res.slot = None
+		res.subslot = None
+	return res
+
+def pattern_
 
 ######################################################################
 ### FUNCTION TO CREATE A MAPPING ATOM -> MATCHING PACKAGES
