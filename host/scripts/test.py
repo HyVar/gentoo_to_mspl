@@ -7,16 +7,28 @@ import time
 import re
 import timeit
 
-import egencache_utils
-import constraint_parser
-import extract_id_maps
-import extract_dependencies
-import extract_package_groups
-import atom_matching
+import utils_portage
+import utils_hyportage
+#import constraint_parser
+#import extract_id_maps
+#import extract_dependencies
+#import extract_package_groups
+#import atom_matching
 
 
-path_to_data = os.path.realpath("../../../host/portage/gen/md5-cache")
+path_to_data = os.path.realpath("../../host/hyvar/portage/packages/portage-tree/")
 filenames = ["sys-fs/udev-232-r2", "kde-plasma/powerdevil-5.8.5", "sys-devel/automake-1.15"]
+
+
+def load_spl_from_egencache_file(file_path):
+	package_name, package_group, deprecated, version_full, version, keywords, slot, subslot, iuse_raw_list, fm_local, fm_external, fm_runtime, fm_unloop = utils_portage.load_file_egencache(file_path)
+	return utils_hyportage.spl_create(
+		package_name, package_group, deprecated,
+		version_full, version,
+		keywords,
+		slot, subslot,
+		iuse_raw_list,
+		fm_local, fm_external, fm_runtime, fm_unloop )
 
 constraint_list = [ "media-libs/freetype:2 virtual/opengl",
 	">=kde-frameworks/kactivities-5.29.0:5 >=kde-frameworks/kauth-5.29.0:5[policykit] >=kde-frameworks/kcompletion-5.29.0:5 >=kde-frameworks/kconfig-5.29.0:5 >=kde-frameworks/kconfigwidgets-5.29.0:5 >=kde-frameworks/kcoreaddons-5.29.0:5 >=kde-frameworks/kcrash-5.29.0:5 >=kde-frameworks/kdbusaddons-5.29.0:5 >=kde-frameworks/kdelibs4support-5.29.0:5 >=kde-frameworks/kglobalaccel-5.29.0:5 >=kde-frameworks/ki18n-5.29.0:5 >=kde-frameworks/kidletime-5.29.0:5 >=kde-frameworks/kio-5.29.0:5 >=kde-frameworks/knotifications-5.29.0:5 >=kde-frameworks/knotifyconfig-5.29.0:5 >=kde-frameworks/kservice-5.29.0:5 >=kde-frameworks/kwayland-5.29.0:5 >=kde-frameworks/kwidgetsaddons-5.29.0:5 >=kde-frameworks/kxmlgui-5.29.0:5 >=kde-frameworks/solid-5.29.0:5 >=kde-plasma/libkscreen-5.8.5:5 >=kde-plasma/plasma-workspace-5.8.5:5 >=dev-qt/qtdbus-5.6.1:5 >=dev-qt/qtgui-5.6.1:5 >=dev-qt/qtwidgets-5.6.1:5 >=dev-qt/qtx11extras-5.6.1:5 virtual/libudev:= x11-libs/libxcb wireless? ( >=kde-frameworks/bluez-qt-5.29.0:5 >=kde-frameworks/networkmanager-qt-5.29.0:5 ) sys-devel/make >=dev-util/cmake-3.7.2 >=sys-apps/sed-4 dev-util/desktop-file-utils x11-misc/shared-mime-info >=kde-frameworks/extra-cmake-modules-5.29.0:5 handbook? ( >=kde-frameworks/kdoctools-5.29.0:5 ) >=dev-qt/qtcore-5.6.1:5 dev-util/desktop-file-utils app-arch/xz-utils",
@@ -24,13 +36,6 @@ constraint_list = [ "media-libs/freetype:2 virtual/opengl",
 	"virtual/pkgconfig java? ( >=virtual/jdk-1.4 ) python? ( >=dev-python/cython-0.16[python_targets_python2_7(-)?,python_targets_python3_4(-)?,python_targets_python3_5(-)?,-python_single_target_python2_7(-),-python_single_target_python3_4(-),-python_single_target_python3_5(-)] ) bluetooth? ( net-wireless/bluez ) gpm? ( >=sys-libs/gpm-1.20 ) iconv? ( virtual/libiconv ) icu? ( dev-libs/icu:= ) python? ( python_targets_python2_7? ( >=dev-lang/python-2.7.5-r2:2.7 ) python_targets_python3_4? ( dev-lang/python:3.4 ) python_targets_python3_5? ( dev-lang/python:3.5 ) >=dev-lang/python-exec-2:=[python_targets_python2_7(-)?,python_targets_python3_4(-)?,python_targets_python3_5(-)?,-python_single_target_python2_7(-),-python_single_target_python3_4(-),-python_single_target_python3_5(-)] ) ncurses? ( sys-libs/ncurses:0= ) nls? ( virtual/libintl ) tcl? ( >=dev-lang/tcl-8.4.15:0= ) usb? ( virtual/libusb:0 ) X? ( x11-libs/libXaw ) ocaml? ( >=dev-ml/findlib-1.0.4-r1 ) java? ( >=dev-java/java-config-2.2.0-r3 ) !<sys-devel/gettext-0.18.1.1-r3 || ( >=sys-devel/automake-1.15:1.15 ) >=sys-devel/autoconf-2.69 >=sys-devel/libtool-2.4 virtual/pkgconfig virtual/pkgconfig"
 	]
 
-__syntax_error_listener = constraint_parser.SPLParserErrorListener()
-__syntax_error_listener.spl = "test"
-__syntax_error_listener.stage = 'external'
-def __translate_constraint(c):
-	__syntax_error_listener.parsed_string = c
-	return constraint_parser.ast_translator.visitDepend(constraint_parser.SPLParserexternal(c, __syntax_error_listener))
-constraint_list_parsed = map(__translate_constraint, constraint_list)
 
 # Grammar test
 def constraint_test(constraint_list):
@@ -50,10 +55,13 @@ def constraint_test(constraint_list):
 
 def test_list(concurrent_map, paths):
 	print("Translated MSPL:")
-	raw_mspl = egencache_utils.load_files_egencache(concurrent_map, paths)
+	raw_mspl = concurrent_map(load_spl_from_egencache_file, paths)
 	print("===============")
-	print(json.dumps(raw_mspl, sort_keys=True, indent=4, separators=(',', ': ')))
+	#print(json.dumps(raw_mspl, sort_keys=True, indent=4, separators=(',', ': ')))
+	print(str(raw_mspl))
 	print("===============")
+
+	"""
 	print("Package Groups:")
 	package_groups = extract_package_groups.from_mspl_list(concurrent_map, raw_mspl)
 	print("===============")
@@ -87,6 +95,7 @@ def test_list(concurrent_map, paths):
 	print("===============")
 	print(json.dumps({'map_name_id': map_name_id, 'map_id_name': map_id_name}, sort_keys=True, indent=4, separators=(',', ': ')))
 	print("===============")
+	"""
 
 
 def test_full():
@@ -104,7 +113,7 @@ def test_full():
 def test_package_groups(package_groups): # 10/06/2017: bug found by jacopo
 	pool = multiprocessing.Pool(3)
 	concurrent_map = pool.map # fails, I don't know why
-	concurrent_map = map
+	#concurrent_map = map
 	filenames = []
 	for package_group in package_groups:
 		array = package_group.split("/")
@@ -156,7 +165,7 @@ filenames = [ "sys-fs/udev-232-r2", "kde-plasma/powerdevil-5.8.5", "sys-devel/au
 if __name__ == "__main__":
 	#print(str(test_comparison1("sys-libs/ncurses-5.9-r3", "sys-libs/ncurses-5.9-r101")))
 	#test_comparison("1", "-")
-	test_package_groups([ "dev-lang/python-exec-2.0.1-r1" ]) 
+	test_package_groups([ "dev-lang/python-exec" ]) 
 	#test_package_groups([ "app-shells/bash", "sys-libs/ncurses", "virtual/libintl", "sys-libs/readline" ]) 
 	#print( "\"10.toto\" < \"1.tata\": " + str("10.toto" < "1.tata"))
 	#print("\"1.15_alpha\" < \"1.15_beta\": " + str("1.15_alpha" < "1.15_beta"))

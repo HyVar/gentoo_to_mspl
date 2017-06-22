@@ -16,7 +16,8 @@ import click
 import time
 import sys
 
-import egencache_utils
+import utils_portage
+import utils_hyportage
 import constraint_parser
 import extract_id_maps
 import extract_dependencies
@@ -28,22 +29,45 @@ def usage():
 	"""Print usage"""
 	print(__doc__)
 
-def filter_egencache_file(path_file, last_update, patterns):
-    if last_update < os.path.getmtime(path_file):
-        return True
-    for pattern in patterns:
-        if pattern.match_package_name(utils_egencache.get_package_name_from_path(path_file)):
-            return True
-    return False
+
+######################################################################
+### LOADING SPL FROM EGENCACHE FILE
+######################################################################
+
+def filter_egencache_file(path_file, last_update):
+	return last_update < os.path.getmtime(path_file)
+
+def filter_egencache_file_full(path_file, last_update, patterns):
+	if last_update < os.path.getmtime(path_file):
+		return True
+	for pattern in patterns:
+		if constraint_parser.match_package_path(path_file):
+			return True
+	return False
+
+def load_spl_from_egencache_file(file_path):
+	package_name, package_group, deprecated, version_full, version, keywords, slot, subslot, iuse_raw_list, fm_local, fm_external, fm_runtime, fm_unloop = utils_portage.load_file_egencache(file_path)
+	return utils_hyportage.spl_create(
+		package_name, package_group, deprecated,
+		version_full, version,
+		keywords,
+		slot, subslot,
+		iuse_raw_list,
+		fm_local, fm_external, fm_runtime, fm_unloop )
+
+
+######################################################################
+### USE CONFIGURATION MANIPULATION
+######################################################################
 
 @click.command()
 @click.argument(
 	'dir_portage',
-	help="the directory containing the portage files",
+	#help="the directory containing the portage files",
 	type=click.Path(exists=True, file_okay=False, dir_okay=True, writable=False, readable=True, resolve_path=True))
 @click.argument(
 	'dir_hyportage',
-	help="the directory containing the hyportage files (generate by this tool)",
+	#help="the directory containing the hyportage files (generate by this tool)",
 	type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
 @click.option(
 	'--input-files', '-i',
@@ -51,10 +75,9 @@ def filter_egencache_file(path_file, last_update, patterns):
 	default=("profile_configuration.json", "user_configuration.json", "installed_packages.json", "packages"),
 	help='the three json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
 @click.option(
-	'--output-files', '-o',
-	nargs=2,
-	default=("hyvar_core.enc", "hyvar_annex.enc"),
-	help='the two files in which are saved the hyportage data')
+	'--output-file', '-o',
+	default="hyportage.enc",
+	help='the file in which are saved the hyportage data')
 @click.option(
 	'--verbose', '-v',
 	count=True,
@@ -78,8 +101,8 @@ def filter_egencache_file(path_file, last_update, patterns):
 def main(
 	dir_portage,
 	dir_hyportage,
-	portage_file_names,
-	hyportage_file_names,
+	input_files,
+	output_file,
 	verbose,
 	par,
 	force,
@@ -132,6 +155,7 @@ def main(
 	elif verbose >= 3: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
+	# DEPRECATED
 	# OPTION: load data file if available
 	if use_existing_data:
 		if os.path.isfile(use_existing_data):
@@ -158,39 +182,51 @@ def main(
 	dir_portage = os.path.abspath(dir_portage)
 	dir_hyportage = os.path.abspath(dir_hyportage)
 
-	filename_hyportage_core, filename_hyportage_annex = hyportage_file_names
-	path_hyportage_core = os.path.join(dir_hyportage, filename_hyportage_mspl)
-	path_hyportage_annex = os.path.join(dir_hyportage, filename_hyportage_annex)
+	path_hyportage = os.path.join(dir_hyportage, output_file)
 
 	last_update = 0.0
 
-	if os.path.exists(path_hyportage_mspl):
-		last_update = os.path.getmtime(path_hyportage_core)
-		core = utils.load_data_file(path_hyportage_core, save_modality)
-		annex = utils.load_data_file(path_hyportage_annex, save_modality)
+	if os.path.exists(path_hyportage):
+		logging.info("Loading the existing file.")
+		t = time.time()
+		last_update = os.path.getmtime(path_hyportage)
+		hyportage = utils.load_data_file(path_hyportage, save_modality)
+		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 	else:
-		core = { 'arch': [], 'mspl': {} }
-		annex = { 'patterns': {}, 'name_to_id': {}, 'id_to_name': {} }
+		hyportage = { 'arch': [], 'mspl': {}, 'patterns': {}, 'name_to_id': {}, 'id_to_name': {} }
 
 	# 2. check if there is something to do
-    filename_portage_profile_configuration, filename_portage_user_configuration, filename_portage_installed_packages, path_portage_packages = portage_file_names
+	logging.info("Load the egencache files.")
+	t = time.time()
 
-    patterns = []
-    if force:
-        for pattern_string in force.split():
-            if pattern_string = "*/*":
-                patterns = [ atom_matching.pattern_full() ]
-                break
-            else:
-                pattern.append(atom_matching.pattern_from_atom(constraint_parser.parse_atom(pattern_string)))
+	filename_portage_profile_configuration, filename_portage_user_configuration, filename_portage_installed_packages, path_portage_packages = input_files
 
-	egencache_files_to_load = utils_egencache.get_all_egencache_files(os.path.join(dir_portage, path_portage_packages), last_update, patterns)
-    egencache_files_to_load = filter(lambda path_file: , egencache_files_to_load)
+	if force:
+		patterns = [ constraint_parser.pattern_create_from_atom(atom) for atom in force.split() ]
+		filter_function = lambda path_file: filter_egencache_file_full(path_file, last_update, patterns)
+	else:
+		filter_function = lambda path_file: filter_egencache_file(path_file, last_update)
 
-	fully_apply_profile = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_profile_configuration) )
-	fully_apply_user = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_user_configuration) )
+	egencache_files_to_load = utils_portage.get_egencache_files(os.path.join(dir_portage, path_portage_packages), filter_function)
 
-    # 3. load the data
+	fully_apply_profile = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_profile_configuration)) )
+	fully_apply_user = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_user_configuration)) )
+
+	logging.debug("Considering " + unicode(len(egencache_files_to_load)) + " files")
+
+	# 3. load the new data
+	spls = concurrent_map(load_spl_from_egencache_file, egencache_files_to_load)
+	logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+	# need to update the package group, the pattern mapping, and the other data in a consistent way
+
+
+
+
+
+
+"""
+
 
 	# setup the output directory
 	if not os.path.exists(dir_hyportage):
@@ -287,7 +323,7 @@ def main(
 	t = time.time()
 	final_data = { "mspl": mspl, "map_name_id": map_name_id, "map_id_name": map_id_name }
 	utils.store_data_file(os.path.join(dir_hyportage, output_file_name),final_data,save_modality)
-	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")
+	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")"""
 
 if __name__ == "__main__":
 	main()

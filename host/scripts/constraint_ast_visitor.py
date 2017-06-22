@@ -5,9 +5,9 @@ Module defining the AST visitor created by parsing the gentoo dependencies
 __author__ = "Michael Lienhardt & Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
 __license__ = "ISC"
-__version__ = "0.1"
-__maintainer__ = "Jacopo Mauro"
-__email__ = "mauro.jacopo@gmail.com"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 class ASTVisitor(object):
@@ -65,33 +65,6 @@ class ASTVisitor(object):
         return self.DefaultValue()
 
     def visitAtom(self, ctx):
-        res = self.DefaultValue()
-        if 'version_op' in ctx:
-            res = self.CombineValue(res, self.visitVersion_op(ctx['version_op']))
-        if 'slots' in ctx:
-            res = self.CombineValue(res, self.visitSlot(ctx['slots']))
-        if 'selection' in ctx:
-            res = reduce(self.__mapvisitSelection, ctx['selection'], res)
-        return res
-
-    def visitVersion_op(self, ctx):
-        return self.DefaultValue()
-    def visitSlot(self, ctx):
-        if ctx['type'] == "ssimple":
-            return self.visitSlotSIMPLE(ctx)
-        elif ctx['type'] == "sfull":
-            return self.visitSlotFULL(ctx)
-        elif ctx['type'] == "seq":
-            return self.visitSlotEQ(ctx)
-        elif ctx['type'] == "sstar":
-            return self.visitSlotSTAR(ctx)
-    def visitSlotSIMPLE(self, ctx):
-        return self.DefaultValue()
-    def visitSlotFULL(self, ctx):
-        return self.DefaultValue()
-    def visitSlotEQ(self, ctx):
-        return self.DefaultValue()
-    def visitSlotSTAR(self, ctx):
         return self.DefaultValue()
 
     def visitSelection(self, ctx):

@@ -4,6 +4,7 @@ import multiprocessing
 import string
 import os
 
+import constraint_parser
 
 # in portage, we only consider the egencache files (and the other ones we generate), as it is the default behavior of emerge
 
@@ -58,18 +59,13 @@ def get_package_name_from_path(package_path):
 	return (package_name, deprecated)
 
 
-######################################################################
-### TRANSLATE ATOMS INTO HASHABLE PATTERNS
-######################################################################
-
-
 
 ######################################################################
-### LOAD A PORTAGE MD5-CACHE REPOSITORY
+### LOAD A PORTAGE MD5-CACHE REPOSITORY INTO HYPORTAGE
 ######################################################################
 
 
-def construct_spl(package_name, package_group, deprecated, version_full, version, keywords_string, slots_string, iuses_string, fm_local, fm_external, fm_runtime):
+def construct_spl(package_name, package_group, deprecated, version_full, version, keywords_string, slots_string, iuses_string, fm_local, fm_external, fm_runtime, fm_unloop):
 	"""
 	create the spl structure from the extracted information
 	"""
@@ -79,36 +75,21 @@ def construct_spl(package_name, package_group, deprecated, version_full, version
 	slot = str(slots[0])
 	subslot = (str(slots[1]) if (len(slots) == 2) else "0")
 
-
-	iuses = []
-	use_configuration_default = utils_hyportage.use_configuration_create()
-	for iuse in (iuses_string.split() if iuses_string else []):
-		if iuse[0] == "+":
-			iuse = iuse[1:]
-			iuses.append(iuse)
-			utils_hyportage.use_configuration_add(use_configuration_default, iuse)
-		elif iuse[0] == "-":
-			iuse = iuse[1:]
-			iuses.append(iuse)
-			utils_hyportage.use_configuration_remove(use_configuration_default, iuse)
-		else:
-			iuses.append(iuse)
+	iuses = iuses_string.split() if iuses_string else []
 
 	fm_local = fm_local if fm_local else ""
 	fm_external = fm_external if fm_external else ""
 	fm_runtime = fm_runtime if fm_runtime else ""
+	fm_runtime = fm_runtime if fm_runtime else ""
+	fm_unloop = fm_unloop if fm_unloop else ""
 
-	data = {'name': package_name, 'group': package_group, 'features': features, 'environment': keywords,
-			'fm': { 'local': fm_local, 'external': fm_external, 'runtime': fm_runtime },
-			'versions': {'full': str(version_full), 'base': str(version) },
-			'slot': slot, 'subslot': subslot}
-	return utils_hyportage.spl_create(
+	return (
 		package_name, package_group, deprecated,
 		version_full, version,
 		keywords,
 		slot, subslot,
-		iuses, use_configuration_default,
-		fm_local, fm_external, fm_runtime )
+		iuses,
+		fm_local, fm_external, fm_runtime, fm_unloop )
 
 
 def load_file_egencache(file_path):
@@ -117,10 +98,10 @@ def load_file_egencache(file_path):
 	"""
 	# 1. base information from the file name
 	package_name, deprecated = get_package_name_from_path(file_path)
-	package_group, version_full, version = structure_package_name(package_name)
+	package_group, version_full, version = constraint_parser.parse_package_name(package_name)
 	# 2. informations from the file content
 	data_tmp = {}
-	with open(filepath, 'r') as f:
+	with open(file_path, 'r') as f:
 		for line in f:
 			array = string.split(line, "=", 1)
 			data_tmp[array[0]] = array[1][:-1]  # remove the \n at the end of the line
@@ -133,7 +114,8 @@ def load_file_egencache(file_path):
 		data_tmp.get('IUSE'),
 		data_tmp.get('REQUIRED_USE'),
 		data_tmp.get('DEPEND'),
-		data_tmp.get('RDEPEND')
+		data_tmp.get('RDEPEND'),
+		data_tmp.get('PDEPEND')
 	)
 
 
