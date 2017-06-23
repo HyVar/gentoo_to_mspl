@@ -29,6 +29,21 @@ manage_variable_list() {
 	fi
 }
 
+manage_use() {
+	if [ "${1:0:1}" == "-" ]; then
+		TMP_PREFIX="-"
+		[ "${PREFIX}" == "-" ] && TMP_PREFIX="+"
+		PREFIX="${TMP_PREFIX}"
+		RESULT="${1:1}"
+	elif [ "${1:0:1}" == "+" ]; then
+		TMP_PREFIX="+"
+		[ "${PREFIX}" == "-" ] && TMP_PREFIX="-"
+		PREFIX="${TMP_PREFIX}"
+		RESULT="${1:1}"
+	else
+		RESULT="${1}"
+	fi
+}
 
 EXPANDED_USE=""
 EXPANDED_IUSE=""
@@ -38,7 +53,8 @@ function_use_expand() { # does not implicitly add use flag to IUSE
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${RESULT}"
 	done
 }
 
@@ -47,8 +63,9 @@ function_use_expand_implicit() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${i}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} ${VARIABLE,,}_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} ${VARIABLE,,}_${RESULT}"
 	done
 }
 
@@ -57,7 +74,8 @@ function_use_expand_unprefixed() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${RESULT}"
 	done
 }
 
@@ -66,8 +84,9 @@ function_use_expand_values_arch() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}arch_${i}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} arch_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}arch_${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} arch_${RESULT}"
 	done
 }
 
@@ -76,8 +95,9 @@ function_use_expand_values_elibc() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}elibc_${i}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} elibc_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}elibc_${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} elibc_${RESULT}"
 	done
 }
 
@@ -86,8 +106,9 @@ function_use_expand_values_kernel() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}kernel_${i}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} kernel_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}kernel_${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} kernel_${RESULT}"
 	done
 }
 
@@ -96,8 +117,9 @@ function_use_expand_values_userland() {
 	VARIABLE=$2
 	eval TMP=\$${VARIABLE}
 	for i in ${TMP}; do
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}userland_${i}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} userland_${i}"
+		manage_use "$i"
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}userland_${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} userland_${RESULT}"
 	done
 }
 
@@ -106,16 +128,6 @@ function_use_expand_values_userland() {
 ### PERFORM THE VARIABLE EXPANSION
 ######################################################################
 
-my_test() {
-	eval TMP=\$${2}
-	echo "$2 = ${TMP}"
-}
-
-#TEST0="titi"
-#TEST1="toto"
-#TEST2="TEST0 TEST1"
-#manage_variable_list my_test "${TEST2}"
-#manage_variable_list my_test "${USE_EXPAND}"
 
 
 EXPANDED_IUSE="${IUSE_IMPLICIT}"
