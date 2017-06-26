@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 ######################################################################
 ### CONFIGURATION
 ######################################################################
@@ -19,13 +21,13 @@ GUEST_INSTALL_DIR="/home/${GUEST_USER}/${GUEST_SCRIPT_DIRECTORY_NAME}"
 GUEST_GEN_DIR="${GUEST_INSTALL_DIR}/gen/"
 
 
-HOST_SCRIPT_DIRECTORY=$(realpath "./host/scripts")
+HOST_SCRIPT_DIRECTORY="${SCRIPT_DIR}/host/scripts"
 HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/translate-portage.py"
 HOST_SCRIPT_RECONFIGURE="${HOST_SCRIPT_DIRECTORY}/reconfigure.py"
 
-HOST_GUEST_INSTALL_DIR=$(realpath "./guest/${GUEST_SCRIPT_DIRECTORY_NAME}")
-HOST_HOST_INSTALL_DIR=$(realpath "./host/data/portage")
-HOST_HOST_GEN_DIR=$(realpath "./host/data/hyvar")
+HOST_GUEST_INSTALL_DIR="${SCRIPT_DIR}/guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
+HOST_HOST_INSTALL_DIR="${SCRIPT_DIR}/host/data/portage"
+HOST_HOST_GEN_DIR="${SCRIPT_DIR}/host/data/hyportage"
 
 
 
@@ -56,7 +58,6 @@ function setup_guest {
 }
 
 function sync_guest {
-	check_environment
 	sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no ${GUEST_USER}@${GUEST} "echo ${GUEST_PWD_ROOT} | sudo -S python ${GUEST_INSTALL_DIR}/sync.py ${GUEST_GEN_DIR}"
 	sshpass -p ${GUEST_PWD_USER} rsync -rLptgoDz -e "ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no" ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
 	#sshpass -p ${GUEST_PWD_USER} scp -o PubkeyAuthentication=no -P ${GUEST_PORT}  ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
@@ -91,6 +92,11 @@ function clean_host {
 
 function translate {
 	shift 1
+	if [ -n "${PYTHONPATH}" ]; then
+		PYTHONPATH="${PYTHONPATH}:${HOST_GUEST_INSTALL_DIR}"
+	else
+		PYTHONPATH="${HOST_GUEST_INSTALL_DIR}"
+	fi
 	python "${HOST_SCRIPT_TRANSLATE}" $@ "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}"
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }

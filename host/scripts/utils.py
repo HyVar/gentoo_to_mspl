@@ -17,15 +17,38 @@ import marshal
 import gzip
 import threading
 
-def inline_combine_dicts(dict1, dict2, inline_combine):
+
+######################################################################
+### BASE STRUCTURED DICTIONARIES AND LISTS MANIPULATION
+######################################################################
+
+def dict_create(parameter):
+    key, val = parameter
+    return { key: val }
+
+def list_creat(parameter):
+    return [parameter]
+
+
+def dict_put_inline(dictionary, key, val, el_create, el_put_inline):
+    if key in dictionary: el_put_inline(dictionary[key], val)
+    else: dictionary[key] = el_create(val)
+
+def list_put_inline(l, val):
+    l.append(val)
+
+
+def dict_combine_inline(dict1, dict2, inline_combine):
 	for k,v in dict2.iteritems():
 		if k in dict1:
 			inline_combine(dict1[k], dict2[k])
 		else:
 			dict1[k] = dict2[k]
-def inline_combine_lists(l1,l2):
+
+def list_combine_inline(l1,l2):
 	return l1.extend(l2)
-def inline_combine_drop(val1, val2):
+
+def all_combine_inline_drop(val1, val2):
 	pass
 
 ######################################################################
@@ -112,6 +135,15 @@ def new_id():
 		res = __id_current
 		__id_current = __id_current + 1
 	return unicode(res)
+
+def new_ids(nb=1):
+	global __id_current
+	global __id_current_lock
+	with __id_current_lock:
+		res = [ unicode(i) for i in xrange(__id_current, __id_current + nb - 1) ]
+		__id_current = __id_current + nb
+	return res
+
 
 CONTEXT_VAR_NAME = "ccc"
 

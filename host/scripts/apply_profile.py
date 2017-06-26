@@ -24,7 +24,7 @@ class ExtractUseFromAST(constraint_ast_visitor.ASTVisitor):
     def DefaultValue(self):
         return {}
     def CombineValue(self, value1, value2):
-        utils.inline_combine_dicts(value1, value2, utils.inline_combine_lists)
+        utils.dict_combine_inline(value1, value2, utils.list_combine_inline)
         return value1
 
     def visitRequiredSIMPLE(self, ctx):
@@ -47,7 +47,7 @@ def extract_use_from_ast(ast_el):
     visitor = ExtractUseFromAST()
     visitor.spl_name = SPLWrapper(spl)
     uses = visitor.visitRequired(local_ast)
-    utils.inline_combine_dicts(uses, visitor.visitDepend(combined_ast), utils.inline_combine_lists)
+    utils.dict_combine_inline(uses, visitor.visitDepend(combined_ast), utils.list_combine_inline)
     return uses
 
 
@@ -79,7 +79,7 @@ def apply_profile(concurrent_map, atom_mapping, raw_asts, profile_iuse):
 	# 1. get the necessary use flags for every components
 	use_mapping_list = concurrent_map(extract_use_from_ast, raw_asts)
 	use_mapping = {}
-	map(lambda x: utils.inline_combine_dicts(use_mapping, x, utils.inline_combine_lists), use_mapping_list)
+	map(lambda x: utils.dict_combine_inline(use_mapping, x, utils.list_combine_inline), use_mapping_list)
     use_mapping = { k: set(l) for k,l in use_mapping.iteritems() } # replace every list with sets
 	# 2. check for all spl that they have no missing iuse
 	implicit_iuse = set(profile_iuse)

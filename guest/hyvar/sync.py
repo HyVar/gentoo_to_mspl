@@ -10,8 +10,8 @@ import multiprocessing
 import bz2
 import json
 
-#def get_patterns(string):
-#	return re.findall(">?<?=?[a-zA-Z0-9._@][a-zA-Z0-9._\-+@/:]*", string)
+import configuration
+
 
 ######################################################################
 ### CONFIGURATION
@@ -20,7 +20,7 @@ import json
 # input
 
 input_dir_portage = os.path.realpath("/usr/portage/metadata/md5-cache/")
-input_dir_portage_deprecated = os.path.realpath("/var/db/pkg/")
+input_dir_portage_installed = os.path.realpath("/var/db/pkg/")
 
 input_file_profile = "/etc/portage/make.profile"
 
@@ -45,136 +45,19 @@ output_file_installed_packages = None
 
 non_concurrent_map = map # the different load processes must be done in sequence
 
-######################################################################
-### UTILITY FUNCTIONS AND CLASSES
-######################################################################
-
-
-# PACKAGE REQUIREMENT
-# in portage, it is possible to statically (in files) request of package installation
-# this is simply a list of real package groups with two operations: add and remove
-# portage distinguish different sets of package requirement (user can specify some in the "/etc/portage/sets" folder)
-def packages_required_create():
-	return {}
-
-def packages_required_update_simple(packages_required, package_set, package):
-	to_update = packages_required.get(package_set)
-	if not to_update:
-		to_update = set([])
-		packages_required[package_set] = to_update
-	if package[0] == '-':
-		to_update.discard(package[1:])
-	else:
-		to_update.add(package)
-
-def packages_required_set_to_list(packages_required):
-	return { k: list(v) for k, v in packages_required.iteritems() }
-
-
-# PACKAGE MASKING
-# in portage, one can define sequence of masking and unmasking requests
-# as these requests use package patterns, we cannot apply them without knowing which packages are present in the portage tree
-# Hence, here we simply store them in a list
-def packages_mask_create():
-	return []
-
-def packages_mask_update_simple(packages_mask, pattern, sign):
-	packages_mask.append( { 'sign': sign, 'pattern': pattern } )
-
-
-def packages_mask_set_to_list(packages_mask):
-	return packages_mask
-
-
-# USE AND PACKAGE USE
-# similarily to package masking, it is possible in portage to define sequence of partial configuration for packages
-# these partial configuration uses package patterns, and so we cannot apply them directly
-# we thus store them in a list
-def configuration_use_create():
-	return []
-
-def configuration_use_update_simple(configuration_use, pattern, uses):
-	configuration_use.append( { 'pattern': pattern, 'uses': uses } )
-
-
-def use_invert(use):
-	if use[0] == "-": return use[1:]
-	else: return "-" + use
-
-def use_list_invert(uses):
-	return map(use_invert, uses)
-
-
-def configuration_use_set_to_list(configuration_use):
-	return configuration_use
-
-
-# ACCEPT_KEYWORDS
-# similarily to use flag partial configuration, we have again a sequence of declaration for package patterns
-# however this is simply than for use flags, as there are no declaration of opposites
-def accept_keywords_create():
-	return []
-
-def accept_keywords_update_simple(accept_keywords, pattern, keywords):
-	accept_keywords.append( { 'pattern': pattern, 'keywords': keywords } )
-
-def accept_keywords_set_to_list(accept_keywords):
-	return accept_keywords
-
-
-# full configuration container
-class Configuration(object):
-	def __init__(self):
-		self.arches = set([]) # list of valid architectures for the current hardware
-		self.iuses = set([])  # list of implicitly declared use flags
-		self.package_provided = set([]) # list of packages that is assumed to be correctly installed
-		self.package_required = packages_required_create()
-		self.package_mask = packages_mask_create()
-		self.package_configuration_use = configuration_use_create()
-		self.package_accept_keywords = accept_keywords_create()
-
-	def update_arch_list(self, arches):
-		self.arches.update(arches)
-
-	def update_iuse_list(self, iuses):
-		self.iuses.update(iuses)
-
-	def update_package_provided(self, packages):
-		self.package_provided.update(packages)
-
-	def update_package_required(self, package_set, package):
-		packages_required_update_simple(self.package_required, package_set, package)
-
-	def update_package_mask(self, pattern, sign):
-		packages_mask_update_simple(self.package_mask, pattern, sign)
-
-	def update_package_configuration_use(self, pattern, uses):
-		configuration_use_update_simple(self.package_configuration_use, pattern, uses)
-
-	def update_packages_accept_keywords(self, pattern, keywords):
-		accept_keywords_update_simple(self.package_accept_keywords, pattern, keywords)
-
-	def to_dict(self):
-		return {
-			'arches': list(self.arches),
-			'iuses': list(self.iuses),
-			'package_provided': list(self.package_provided),
-			'package_required': packages_required_set_to_list(self.package_required),
-			'package_mask': packages_mask_set_to_list(self.package_mask),
-			'package_configuration_use': configuration_use_set_to_list(self.package_configuration_use),
-			'package_accept_keywords': accept_keywords_set_to_list(self.package_accept_keywords)
-		}
-
-	def __repr__(self):
-		return repr(self.to_dict())
-
-	def __str__(self):
-		return str(self.to_dict())
-
 
 ######################################################################
 ### UTILITY FUNCTIONS FOR LOADING A CONFIGURATION
 ######################################################################
+
+def parse_use(use):
+	return (use[1:], "-") if use[0] == "-" else (use, "+")
+
+
+def parse_use_list(uses):
+	res = configuration.use_configuration_create()
+	for use in uses:
+		use, sign = parse_use(use)
 
 # MANAGE FILES: make.defaults and make.conf bash files
 script_load_make_defaults = os.path.join(script_dir, "load_make_defaults.sh")
@@ -202,13 +85,31 @@ def update_bash_environment(filename = ""):
 			bash_environment[variable] = value
 			value = None
 
-def analyse_make_defaults(data, filename):
+def analyse_make_defaults(conf, filename):
 	update_bash_environment(filename)
 	# update the data
-	if 'USE' in bash_environment: data.update_package_configuration_use("*/*", bash_environment['USE'].split())
-	if 'IUSE' in bash_environment: data.update_iuse_list(bash_environment['IUSE'].split())
-	if 'ARCH' in bash_environment: data.update_arch_list(bash_environment['ARCH'].split())
-	if 'ACCEPT_KEYWORDS' in bash_environment: data.update_arch_list(bash_environment['ACCEPT_KEYWORDS'].split())
+	iuse_configuration = configuration.configuration_get_iuse(conf)
+	if 'USE' in bash_environment:
+		for use in bash_environment['USE'].split():
+			if use[0] == '-':
+				configuration.iuse_configuration_remove(iuse_configuration, use[1:])
+			else:
+				configuration.iuse_configuration_add(iuse_configuration, use)
+		bash_environment.pop('USE') # reset the variable
+	if 'IUSE' in bash_environment:
+		for use in bash_environment['IUSE'].split():
+			if use[0] == '-':
+				configuration.iuse_configuration_remove(iuse_configuration, use[1:])
+			elif use[0] == "+":
+				configuration.iuse_configuration_add(iuse_configuration, use[1:])
+			else:
+				configuration.iuse_configuration_update(iuse_configuration, use)
+		bash_environment.pop('IUSE') # reset the variable
+	if 'ARCH' in bash_environment: configuration.configuration_set_arch(conf, bash_environment['ARCH'])
+	if 'ACCEPT_KEYWORDS' in bash_environment:
+		accept_keywords = configuration.configuration_get_pattern_accept_keywords(conf)
+		for keyword in bash_environment['ACCEPT_KEYWORDS'].split():
+			configuration.pattern_accept_keywords_add(accept_keywords, configuration.wildcardpattern, keyword)
 
 
 
@@ -225,58 +126,75 @@ def extract_lines_from_file(f):
 	return res
 
 # file: "packages", in profile configuration
-def analyse_packages(data, lines):
+def analyse_packages(conf, lines):
+	package_required = configuration.configuration_get_required_package(conf)
 	for line in lines:
 		if line[0] == "*":
-			data.update_package_required("system", line[1:])
+			configuration.required_package_add(package_required, "system", line[1:])
 		else:
-			data.update_package_required("profile", line)
+			configuration.required_package_add(package_required, "profile", line)
 
 # file: "world" and "set/*" in user configuration
-def analyse_package_set(filepath, data, lines):
+def analyse_package_set(filepath, conf, lines):
+	package_required = configuration.configuration_get_required_package(conf)
 	package_set = os.path.basename(filepath)
 	for line in lines:
-		data.update_package_required(package_set, line)
+		configuration.required_package_add(package_required, package_set, line)
 
 # file: "package.provided" in user configuration
-def analyse_package_provided(data, lines):
-	data.update_package_provided(lines)
+def analyse_package_provided(conf, lines):
+	package_provided = configuration.configuration_get_provided_package(conf)
+	for package_name in lines:
+		configuration.provided_package_configuration_add(package_provided, package_name)
 
 # file: "package.accept_keywords", in user configuration
-def analyse_package_accept_keywords(data, lines):
+def analyse_package_accept_keywords(conf, lines):
+	pattern_accept_keywords = configuration.configuration_get_pattern_accept_keywords(conf)
 	for line in lines:
 		els = line.split()
-		data.update_packages_accept_keywords(els[0], els[1:])	
+		configuration.pattern_accept_keywords_add(pattern_accept_keywords, els[0], els[1:])
 
 # file: "package.mask", in profile and user configuration
-def analyse_package_mask(data, lines):
+def analyse_package_mask(conf, lines):
+	pattern_masked = configuration.configuration_get_pattern_masked(conf)
 	for line in lines:
-		data.update_package_mask(line, "mask")
+		configuration.pattern_masked_add(pattern_masked, line)
 
 # file: "package.unmask", in user configuration
-def analyse_package_unmask(data, lines):
+def analyse_package_unmask(conf, lines):
+	pattern_masked = configuration.configuration_get_pattern_masked(conf)
 	for line in lines:
-		data.update_package_mask(line, "unmask")
+		configuration.pattern_masked_remove(pattern_masked, line)
 
 # file: "package.use*", in profile and user configuration
-def analyse_package_use(data, lines):
+def analyse_package_use(conf, lines):
+	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		data.update_package_configuration_use(els[0], els[1:])
+		uses = configuration.use_configuration_create_from_uses_list(els[1:])
+		configuration.pattern_configuration_add(pattern_configuration, els[0], uses)
 
 # file: "package.use.mask*", in profile configuration
-def analyse_package_use_mask(data, lines):
+def analyse_package_use_mask(conf, lines):
+	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		data.update_package_configuration_use(els[0], use_list_invert(els[1:]))
+		uses = configuration.use_configuration_create_from_uses_list(els[1:])
+		configuration.use_configuration_invert(uses)
+		configuration.pattern_configuration_add(pattern_configuration, els[0], uses)
 
 # file "use.force", in profile configuration
-def analyse_use(data, lines):
-	data.update_package_configuration_use("*/*", lines)
+def analyse_use(conf, lines):
+	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
+	uses = configuration.use_configuration_create_from_uses_list(lines)
+	configuration.pattern_configuration_add(pattern_configuration, configuration.wildcardpattern, uses)
 
 # file "use.mask", in profile configuration
-def analyse_use_mask(data, lines):
-	data.update_package_configuration_use("*/*", use_list_invert(lines))
+def analyse_use_mask(conf, lines):
+	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
+	uses = configuration.use_configuration_create_from_uses_list(lines)
+	configuration.use_configuration_invert(uses)
+	configuration.pattern_configuration_add(pattern_configuration, configuration.wildcardpattern, uses)
 
 
 
@@ -298,20 +216,20 @@ configuration_analyse_mapping = {
 	"use.stable.mask":			analyse_use_mask
 }
 
-def analyse_configuration_file(data, parameter):
+def analyse_configuration_file(conf, parameter):
 	function, filename = parameter
 	if function != analyse_make_defaults:
 		with open(filename, 'r') as f:
 			lines = extract_lines_from_file(f)
-		function(data, lines)
+		function(conf, lines)
 	else: # make.defaults
-		function(data,filename)
+		function(conf, filename)
 
 
 def analyse_configuration_files(function_file_list):
-		data = Configuration()
-		non_concurrent_map(lambda parameter: analyse_configuration_file(data, parameter), function_file_list)
-		return data
+		conf = configuration.configuration_create()
+		non_concurrent_map(lambda parameter: analyse_configuration_file(conf, parameter), function_file_list)
+		return conf
 
 ######################################################################
 ### LOAD PROFILE
@@ -364,10 +282,10 @@ def load_profile():
 	# 3. recreate the profile files
 	if load:
 		# 3.1. load the profile
-		data = analyse_configuration_files(input_data_files)
+		conf = analyse_configuration_files(input_data_files)
 		# 3.2. write the files
 		with open(output_file_profile_configuration, 'w') as f:
-			json.dump(data.to_dict(), f)
+			json.dump(configuration.configuration_to_save_format(conf), f)
 
 ######################################################################
 ### LOAD USER-DEFINED FILES
@@ -439,10 +357,10 @@ def load_user_configuration():
 	# 3. recreate the user configuration file
 	if load:
 		# 3.1. load the user configuration
-		data = analyse_configuration_files(input_data_files)
+		conf = analyse_configuration_files(input_data_files)
 		# 3.2. write the files
 		with open(output_file_user_configuration, 'w') as f:
-			json.dump(data.to_dict(), f)
+			json.dump(configuration.configuration_to_save_format(conf), f)
 
 
 ######################################################################
@@ -527,7 +445,7 @@ def load_installed_package(package_path, outfile):
 
 
 
-script_load_ebuild = os.path.join(script_dir, "load_ebuild.sh")
+#script_load_ebuild = os.path.join(script_dir, "load_ebuild.sh")
 def load_portage():
 	if not os.path.isdir(output_file_portage_deprecated):
 		logging.error("The location  \"" + output_file_portage_deprecated + "\" does not exist or is not a folder")
@@ -537,15 +455,15 @@ def load_portage():
 	for directory in os.listdir(output_file_portage_deprecated):
 		path = os.path.join(output_file_portage_deprecated, directory)
 		for package in os.listdir(path):
-			if not os.path.exists(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package)):
+			if not os.path.exists(os.path.join(os.path.join(input_dir_portage_installed,directory),package)):
 				os.remove(os.path.join(path, package))
 				package_group = get_package_group(package)
 
 			elif os.path.exists(os.path.exists(os.path.join(os.path.join(input_dir_portage,directory),package_group)),package + ".ebuild"):
 				os.remove(os.path.join(path, package))
 	# 2. add new files
-	for directory in os.listdir(input_dir_portage_deprecated):
-		path = os.path.join(input_dir_portage_deprecated, directory)
+	for directory in os.listdir(input_dir_portage_installed):
+		path = os.path.join(input_dir_portage_installed, directory)
 		for package_dir in os.listdir(path):
 			# 2.1. check that this is indeed a deprecated package
 			package_group = get_package_group(package_dir)
@@ -555,8 +473,8 @@ def load_portage():
 			new_path_dir = os.path.join(output_file_portage_deprecated,directory)
 			new_path = os.path.join(new_path_dir,package_dir)
 			if not os.path.exists(new_path):
-				#old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir),package_dir + ".ebuild")
-				old_path = os.path.join(os.path.join(input_dir_portage_deprecated,directory),package_dir)
+				#old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_installed,directory),package_dir),package_dir + ".ebuild")
+				old_path = os.path.join(os.path.join(input_dir_portage_installed,directory),package_dir)
 				if not os.path.exists(new_path_dir):
 					os.makedirs(new_path_dir)
 				load_installed_package(old_path, new_path)
@@ -571,7 +489,7 @@ def load_portage():
 def load_installed_package_uses(package_path):
 	path_iuses = os.path.join(package_path, "IUSE")
 	if not os.path.exists(path_iuses):
-		return { 'positive': [], 'negative': [] }
+		return configuration.use_configuration_create()
 	else:
 		with open(path_iuses, 'r') as f:
 			iuses = f.read().split()
@@ -579,21 +497,21 @@ def load_installed_package_uses(package_path):
 		with open(os.path.join(package_path, "USE"), 'r') as f:
 			uses = f.read().split()
 		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
-		return { 'positive': uses, 'negative': nuses }
+		return configuration.use_configuration_create(uses, nuses)
 
 
 def load_installed_packages():
-	data  = {}
+	data  = configuration.package_installed_create()
 	last_update = None
 	# 1. check if we have a profile file and load it
 	if os.path.exists(output_file_installed_packages):
 		last_update = os.path.getmtime(output_file_installed_packages)
 		with open(output_file_installed_packages, 'r') as f:
-			data = json.load(f)
+			data = configuration.package_installed_from_save_format(json.load(f))
 	# 2. update the data
 	to_keep = []
-	for directory in os.listdir(input_dir_portage_deprecated):
-		path = os.path.join(input_dir_portage_deprecated, directory)
+	for directory in os.listdir(input_dir_portage_installed):
+		path = os.path.join(input_dir_portage_installed, directory)
 		for package in os.listdir(path):
 			package_name = directory + "/" + package
 			#print("looking at " + package_name)
@@ -602,11 +520,11 @@ def load_installed_packages():
 			out = None
 			if (package_name not in data.keys()) or (last_update < os.path.getmtime(complete_path)):
 				uses = load_installed_package_uses(complete_path)
-				data[package_name] = uses
+				configuration.package_installed_set(data, package_name, uses)
 	data = { k: data[k] for k in to_keep }
 	# 3. write the file
 	with open(output_file_installed_packages, 'w') as f:
-		json.dump(data, f)
+		json.dump(configuration.package_installed_to_save_format(data), f)
 
 
 ######################################################################

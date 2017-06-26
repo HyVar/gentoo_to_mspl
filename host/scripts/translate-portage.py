@@ -41,19 +41,9 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 	if last_update < os.path.getmtime(path_file):
 		return True
 	for pattern in patterns:
-		if constraint_parser.match_package_path(path_file):
+		if hyportage_pattern.match_package_path(path_file):
 			return True
 	return False
-
-def load_spl_from_egencache_file(file_path):
-	package_name, package_group, deprecated, version_full, version, keywords, slot, subslot, iuse_raw_list, fm_local, fm_external, fm_runtime, fm_unloop = utils_portage.load_file_egencache(file_path)
-	return utils_hyportage.spl_create(
-		package_name, package_group, deprecated,
-		version_full, version,
-		keywords,
-		slot, subslot,
-		iuse_raw_list,
-		fm_local, fm_external, fm_runtime, fm_unloop )
 
 
 ######################################################################
@@ -75,8 +65,9 @@ def load_spl_from_egencache_file(file_path):
 	default=("profile_configuration.json", "user_configuration.json", "installed_packages.json", "packages"),
 	help='the three json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
 @click.option(
-	'--output-file', '-o',
-	default="hyportage.enc",
+	'--output-files', '-o',
+    nargs=2,
+	default=("hyportage.enc", "annex.enc"),
 	help='the file in which are saved the hyportage data')
 @click.option(
 	'--verbose', '-v',
@@ -90,25 +81,26 @@ def load_spl_from_egencache_file(file_path):
 	'--force',
 	default=None,
 	help='force the translation of the given packages.')
-@click.option('--simplify-mode', default="default", type=click.Choice(["default","individual"]),			   # UNCLEAR
-			  help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')  # UNCLEAR
-@click.option('--use-existing-data', default="",		  # DEPRECATED 
-			  help='File path of existing file to load.') # DEPRECATED 
-@click.option('--translate-only', is_flag=True, help="Performs only the translation into SMT formulas." + 
-			  " Requires the flag --use-existing-data.")
-@click.option('--save-modality', default="json", type=click.Choice(["json","marshal"]),
-			  help='Saving modality. Marshal is supposed to be faster but python version specific.')
+@click.option(
+    '--simplify-mode',
+    type=click.Choice(["default","individual"]), default="default",			   # UNCLEAR
+	help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')  # UNCLEAR
+#@click.option('--translate-only',
+#    is_flag=True,
+#    help="Only performs only the translation into SMT formulas.")
+@click.option(
+    '--save-modality',
+    type=click.Choice(["json","marshal"]), default="json",
+	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(
 	dir_portage,
 	dir_hyportage,
 	input_files,
-	output_file,
+	output_files,
 	verbose,
 	par,
 	force,
 	simplify_mode,
-	use_existing_data,
-	translate_only,
 	save_modality
 	):
 	"""
@@ -147,6 +139,7 @@ def main(
 		concurrent_thread_map = map
 
 	# OPTION: manage verbosity
+    logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 	if verbose != 0: logging.info("Verbose (" + str(verbose) + ") output.")
 	else: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
 
@@ -155,36 +148,136 @@ def main(
 	elif verbose >= 3: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
 
-	# DEPRECATED
-	# OPTION: load data file if available
-	if use_existing_data:
-		if os.path.isfile(use_existing_data):
-			logging.info("Loading the existing file.")
-			t = time.time()
-			data = utils.load_data_file(use_existing_data,save_modality)
-			mspl,map_name_id, map_id_name = data["mspl"],data["map_name_id"],data["map_id_name"]
+	##########################################################################
+	### 2. COMPUTE WHAT TO DO
+	##########################################################################
+
+    dir_portage = os.path.abspath(dir_portage)
+    dir_hyportage = os.path.abspath(dir_hyportage)
+
+    input_files_portage_profile_configuration, input_files_portage_user_configuration, input_files_portage_installed_packages, input_files_portage_packages = input_files
+    path_portage_profile_configuration = os.path.join(dir_portage, input_files_portage_profile_configuration)
+    path_portage_user_configuration = os.path.join(dir_portage, input_files_portage_user_configuration)
+    path_portage_installed_packages = os.path.join(dir_portage, input_files_portage_installed_packages)
+    path_portage_packages = os.path.join(dir_portage, input_files_portage_packages)
+
+    output_files_hyportage, output_files_annex = output_files
+    path_hyportage = os.path.join(dir_hyportage, output_files_hyportage)
+    path_hyportage_annex = os.path.join(dir_hyportage, output_files_annex)
+
+    ## compute the difference from the previous state
+
+	logging.info("Computing what to do.")
+	t = time.time()
+    last_update = 0.0
+    if os.path.exists(path_hyportage_annex)
+        last_update = os.path.getmtime(path_hyportage_annex)
+        with open(path_hyportage_annex, 'r') as f:
+        	hyportage_annex = hyportage_annex_from_save_format(utils.load_data_file(f, save_modality))
+    else:
+    	hyportage_annex = hyportage_data.hyportage_annex_create()
+
+    must_apply_profile = ( last_update < os.path.getmtime(path_portage_profile_configuration) )
+	must_apply_user = ( last_update < os.path.getmtime(path_portage_user_configuration) )
+
+	egencache_files = hyportage_from_egencache.get_egencache_files()
+	if force:
+		patterns = [ hyportage_pattern.pattern_create_from_atom(atom) for atom in force.split() ]
+		filter_function = lambda path_file: filter_egencache_file_full(path_file, last_update, patterns)
+	else:
+		filter_function = lambda path_file: filter_egencache_file(path_file, last_update)
+    egencache_files_to_load = filter(filter_function, egencache_files)
+
+	logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
+
+
+	##########################################################################
+	### 3. UPDATE THE MSPL DATA IF NECESSARY
+	##########################################################################
+
+	nb_egencache_files_to_load = len(egencache_files_to_load)
+	if nb_egencache_files_to_load > 0:
+		mspl_loaded = True
+
+		## load hyportage files
+
+		logging.info("Loading the " + str(len(egencache_files_to_load)) + "egencache files.")
+		raw_spls = concurrent_map(load_spl_from_egencache_file, egencache_files_to_load)
+		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+		## load the full mspl data, and remove overwritten data
+
+		logging.info("Loading the stored mspl.")
+		with open(path_hyportage, 'r') as f:
+			pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
+
+		package_to_add    = []
+	    package_to_update = []
+	    for spl in raw_spls:
+	    	if hyportage_data.spl_get_name(spl) in mspl: package_to_update.append(spl)
+	    	else: package_to_add.append(spl)
+    	package_name_to_remove = hyportage_data.hyportage_annex_get_package_list(hyportage_annex) - [ hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files ]
+    	package_update_info = [ (hyportage_data.spl_get_name(spl), spl) for spl in package_to_update ] + [ (el, None) for el in package_name_to_remove ]
+
+		for package_name, new_spl in package_update_info: # remove these spl from the loaded data if present
+			old_spl = mspl.pop(package_name)
+			# remove patterns from pattern repository
+			for pattern in hyportage_data.raw_dependencies_get_patterns(hyportage_data.spl_get_raw_dependencies(old_spl)):
+				hyportage_pattern.pattern_repository_remove_pattern(pattern_repository, pattern)
+			# remove entries from id repository: must be entierly re-generated
+			hyportage_ids.hyportage_id_repository_remove_spl(id_repository, package_name)
+
+			if new_spl:
+				# add the new version of the spl
+				mspl[package_name] = new_spl
+				# add the new patterns
+				for pattern in hyportage_data.raw_dependencies_get_patterns(hyportage_data.spl_get_raw_dependencies(new_spl)):
+					hyportage_pattern.pattern_repository_add_pattern(pattern)
+				# update the link in package group
+				hyportage_data.spl_group_replace_spl(spl_groups, old_spl, new_spl)
+			else:
+				# remove the spl from the pattern repository
+				hyportage_pattern.pattern_repository_remove_spl(pattern_repository, old_spl)
+				# remove link from package group
+				hyportage_data.spl_group_remove_spl(spl_groups, old_spl)
+		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+	else: # no update to perform on the content of the mspl data, do not load anything
+		mspl_loaded = False
+		#logging.info("Loading the stored mspl.")
+		#with open(path_hyportage, 'r') as f:
+		#	pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
+		#logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+
+	##########################################################################
+	### 4. APPLY THE CONFIGURATION IF NECESSARY, AND REGENERATE THE IDS
+	##########################################################################
+
+	# profile configuration
+	if must_apply_profile:
+		if not mspl_loaded:
+			mspl_loaded = True
+			logging.info("Loading the stored mspl.")
+			with open(path_hyportage, 'r') as f:
+				pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
 			logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-		else:
-			logging.critical("The file " + use_existing_data + " can not be found.")
-			sys.exit(1)
+		with open(path_portage_profile_configuration, 'r') as f:
+			profile_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
+		# apply the configuration on all spl in the mspl
 
-	# OPTION: check if the flag --translate-only is properly used
-	if translate_only:
-		if not use_existing_data:
-			logging.critical("The option --translate-only requires the option --use-existing-data.")
-			sys.exit(1)
+	elif nb_egencache_files_to_load > 0:
+		with open(path_portage_profile_configuration, 'r') as f:
+			profile_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
+		# apply the configuratin on all spl in raw_spl
 
-	##########################################################################
-	### 2. LOAD THE DATA
-	##########################################################################
 
-	# 1. load hyportage files
-	dir_portage = os.path.abspath(dir_portage)
-	dir_hyportage = os.path.abspath(dir_hyportage)
+	# user configuration
 
-	path_hyportage = os.path.join(dir_hyportage, output_file)
 
-	last_update = 0.0
+	# 3.3. update the ids
+		with open(path_portage_user_configuration, 'r') as f:
+			user_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
 
 	if os.path.exists(path_hyportage):
 		logging.info("Loading the existing file.")
@@ -199,7 +292,8 @@ def main(
 	logging.info("Load the egencache files.")
 	t = time.time()
 
-	filename_portage_profile_configuration, filename_portage_user_configuration, filename_portage_installed_packages, path_portage_packages = input_files
+
+
 
 	if force:
 		patterns = [ constraint_parser.pattern_create_from_atom(atom) for atom in force.split() ]
@@ -207,6 +301,7 @@ def main(
 	else:
 		filter_function = lambda path_file: filter_egencache_file(path_file, last_update)
 
+    # NOT WORKING: need to know also which packages are removed
 	egencache_files_to_load = utils_portage.get_egencache_files(os.path.join(dir_portage, path_portage_packages), filter_function)
 
 	fully_apply_profile = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_profile_configuration)) )

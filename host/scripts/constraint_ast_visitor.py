@@ -65,7 +65,9 @@ class ASTVisitor(object):
         return self.DefaultValue()
 
     def visitAtom(self, ctx):
-        return self.DefaultValue()
+        if "selection" in ctx:
+            return reduce(self.__mapvisitSelection, ctx['selection'], self.DefaultValue())
+        else: return self.DefaultValue()
 
     def visitSelection(self, ctx):
         res = self.DefaultValue()
