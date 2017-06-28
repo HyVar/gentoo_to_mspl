@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import lrparsing
+import hyportage_pattern
 
 ######################################################################
 ### LRPARSING PARSERS
@@ -157,7 +158,7 @@ def visit_node_depend_element(parse_tree):
 	else:
 		atom = parse_tree[1][1]
 		i = 2
-	res = { 'type': "dsimple", 'atom': pattern_create_from_atom(atom) }
+	res = { 'type': "dsimple", 'atom': hyportage_pattern.pattern_create_from_atom(atom) }
 	if neg: res['not'] = neg
 	if len(parse_tree) > i:
 		res['selection'] = [ visit_node_selection(el) for el in filter(lambda x: x[0].name == "selection", parse_tree[i:])]

@@ -78,24 +78,22 @@ def is_selection_required(ctx):
 
 
 class get_dependencies(constraint_ast_visitor.ASTVisitor):
-    def __init__(self, package_name):
-        super(constraint_ast_visitor.ASTVisitor, self).__init__()
-        self.main_package_name = package_name
-        self.res = hyportage_data.raw_dependencies_create()
+	def __init__(self, package_name):
+		super(constraint_ast_visitor.ASTVisitor, self).__init__()
+		self.main_package_name = package_name
+		self.res = hyportage_data.raw_dependencies_create()
 
-    def visitRequiredSIMPLE(self, ctx):
-    	hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
-    def visitCondition(self, ctx):
-    	hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
-    def visitAtom(self, ctx):
-    	self.pattern = ctx['atom']
-    	hyportage_data.raw_dependencies_add_pattern(self.res, self.pattern)
-    def visitSelection(self,ctx):
-    	use = ctx['use']
-    	if is_selection_required(ctx): hyportage_data.raw_dependencies_add_pattern_use(self.res, self.pattern, use)
-    	if 'suffix' in ctx: hyprtage_data.raw_dependencies_add_use(sef.res, use)
-
-def compute_ids(spl):
+	def visitRequiredSIMPLE(self, ctx):
+		hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
+	def visitCondition(self, ctx):
+		hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
+	def visitAtom(self, ctx):
+		self.pattern = ctx['atom']
+		hyportage_data.raw_dependencies_add_pattern(self.res, self.pattern)
+	def visitSelection(self,ctx):
+		use = ctx['use']
+		if is_selection_required(ctx): hyportage_data.raw_dependencies_add_pattern_use(self.res, self.pattern, use)
+		if 'suffix' in ctx: hyprtage_data.raw_dependencies_add_use(sef.res, use)
 
 
 ######################################################################
@@ -130,7 +128,7 @@ def create_spl_from_egencache_file(file_path):
 
 	slots = slots_string.split("/") if slots_string else ["0", "0"]
 	slot = slots[0]
-	subslot = slots[1] if (len(slots) == 2) else "0")
+	subslot = slots[1] if len(slots) == 2 else "0"
 
 	iuses, use_selection = hyportage_data.use_selection_from_iuse_list(iuses_string.split() if iuses_string else [])
 
