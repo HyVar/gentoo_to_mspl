@@ -1,20 +1,19 @@
 #!/usr/bin/python
 
 import sys
-import time
 import os
 import os.path
 import logging
 import subprocess
-import multiprocessing
 import bz2
 import json
 
-import configuration
+import core_data
+import portage_data
 
 
 ######################################################################
-### CONFIGURATION
+# FILE PATHS
 ######################################################################
 
 # input
@@ -26,6 +25,8 @@ input_file_profile = "/etc/portage/make.profile"
 
 input_dir_user_configuration = os.path.realpath("/etc/portage/")
 input_file_user_world = os.path.realpath("/var/lib/portage/world")
+
+input_file_keyword_list = os.path.realpath("/usr/portage/profiles/arch.list")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -41,13 +42,16 @@ output_file_profile_configuration = None
 output_file_user_configuration = None
 
 output_file_installed_packages = None
+
+output_file_keyword_list = None
+
 # concurrency
 
 non_concurrent_map = map # the different load processes must be done in sequence
 
 
 ######################################################################
-### UTILITY FUNCTIONS FOR LOADING A CONFIGURATION
+# UTILITY FUNCTIONS FOR LOADING A CONFIGURATION
 ######################################################################
 
 def parse_use(use):
@@ -55,13 +59,15 @@ def parse_use(use):
 
 
 def parse_use_list(uses):
-	res = configuration.use_configuration_create()
+	res = portage_data.use_configuration_create()
 	for use in uses:
 		use, sign = parse_use(use)
 
 # MANAGE FILES: make.defaults and make.conf bash files
 script_load_make_defaults = os.path.join(script_dir, "load_make_defaults.sh")
 bash_environment = {}
+
+
 def update_bash_environment(filename = ""):
 	global bash_environment
 	process = subprocess.Popen(["bash", script_load_make_defaults, filename ], stdout=subprocess.PIPE, env=bash_environment)
@@ -85,32 +91,32 @@ def update_bash_environment(filename = ""):
 			bash_environment[variable] = value
 			value = None
 
+
 def analyse_make_defaults(conf, filename):
 	update_bash_environment(filename)
 	# update the data
-	iuse_configuration = configuration.configuration_get_iuse(conf)
+	iuse_configuration = portage_data.configuration_get_iuse_configuration(conf)
 	if 'USE' in bash_environment:
 		for use in bash_environment['USE'].split():
 			if use[0] == '-':
-				configuration.iuse_configuration_remove(iuse_configuration, use[1:])
+				portage_data.iuse_configuration_remove(iuse_configuration, use[1:])
 			else:
-				configuration.iuse_configuration_add(iuse_configuration, use)
+				portage_data.iuse_configuration_add(iuse_configuration, use)
 		bash_environment.pop('USE') # reset the variable
 	if 'IUSE' in bash_environment:
 		for use in bash_environment['IUSE'].split():
 			if use[0] == '-':
-				configuration.iuse_configuration_remove(iuse_configuration, use[1:])
+				portage_data.iuse_configuration_remove(iuse_configuration, use[1:])
 			elif use[0] == "+":
-				configuration.iuse_configuration_add(iuse_configuration, use[1:])
+				portage_data.iuse_configuration_add(iuse_configuration, use[1:])
 			else:
-				configuration.iuse_configuration_update(iuse_configuration, use)
+				portage_data.iuse_configuration_update(iuse_configuration, use)
 		bash_environment.pop('IUSE') # reset the variable
-	if 'ARCH' in bash_environment: configuration.configuration_set_arch(conf, bash_environment['ARCH'])
+	if 'ARCH' in bash_environment: portage_data.configuration_set_arch(conf, bash_environment['ARCH'])
 	if 'ACCEPT_KEYWORDS' in bash_environment:
-		accept_keywords = configuration.configuration_get_pattern_accept_keywords(conf)
+		accept_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
 		for keyword in bash_environment['ACCEPT_KEYWORDS'].split():
-			configuration.pattern_accept_keywords_add(accept_keywords, configuration.wildcardpattern, keyword)
-
+			portage_data.pattern_accept_keywords_add(accept_keywords, portage_data.wildcardpattern, keyword)
 
 
 # MANAGE FILES: the other, simpler files
@@ -125,79 +131,88 @@ def extract_lines_from_file(f):
 		res.append(line)
 	return res
 
+
 # file: "packages", in profile configuration
 def analyse_packages(conf, lines):
-	package_required = configuration.configuration_get_required_package(conf)
+	package_required = portage_data.configuration_get_pattern_required(conf)
 	for line in lines:
 		if line[0] == "*":
-			configuration.required_package_add(package_required, "system", line[1:])
+			portage_data.required_pattern_add(package_required, "system", line[1:])
 		else:
-			configuration.required_package_add(package_required, "profile", line)
+			portage_data.required_pattern_add(package_required, "profile", line)
+
 
 # file: "world" and "set/*" in user configuration
 def analyse_package_set(filepath, conf, lines):
-	package_required = configuration.configuration_get_required_package(conf)
+	package_required = portage_data.configuration_get_pattern_required(conf)
 	package_set = os.path.basename(filepath)
 	for line in lines:
-		configuration.required_package_add(package_required, package_set, line)
+		portage_data.required_pattern_add(package_required, package_set, line)
+
 
 # file: "package.provided" in user configuration
 def analyse_package_provided(conf, lines):
-	package_provided = configuration.configuration_get_provided_package(conf)
+	package_provided = portage_data.configuration_get_provided_package(conf)
 	for package_name in lines:
-		configuration.provided_package_configuration_add(package_provided, package_name)
+		portage_data.provided_package_configuration_add(package_provided, package_name)
+
 
 # file: "package.accept_keywords", in user configuration
 def analyse_package_accept_keywords(conf, lines):
-	pattern_accept_keywords = configuration.configuration_get_pattern_accept_keywords(conf)
+	pattern_accept_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
 	for line in lines:
 		els = line.split()
-		configuration.pattern_accept_keywords_add(pattern_accept_keywords, els[0], els[1:])
+		portage_data.pattern_accept_keywords_add(pattern_accept_keywords, els[0], els[1:])
+
 
 # file: "package.mask", in profile and user configuration
 def analyse_package_mask(conf, lines):
-	pattern_masked = configuration.configuration_get_pattern_masked(conf)
+	pattern_masked = portage_data.configuration_get_pattern_masked(conf)
 	for line in lines:
-		configuration.pattern_masked_add(pattern_masked, line)
+		portage_data.pattern_masked_add(pattern_masked, line)
+
 
 # file: "package.unmask", in user configuration
 def analyse_package_unmask(conf, lines):
-	pattern_masked = configuration.configuration_get_pattern_masked(conf)
+	pattern_masked = portage_data.configuration_get_pattern_masked(conf)
 	for line in lines:
-		configuration.pattern_masked_remove(pattern_masked, line)
+		portage_data.pattern_masked_remove(pattern_masked, line)
+
 
 # file: "package.use*", in profile and user configuration
 def analyse_package_use(conf, lines):
-	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
+	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		uses = configuration.use_configuration_create_from_uses_list(els[1:])
-		configuration.pattern_configuration_add(pattern_configuration, els[0], uses)
+		uses = portage_data.use_configuration_create_from_uses_list(els[1:])
+		portage_data.pattern_configuration_add(pattern_configuration, els[0], uses)
+
 
 # file: "package.use.mask*", in profile configuration
 def analyse_package_use_mask(conf, lines):
-	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
+	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		uses = configuration.use_configuration_create_from_uses_list(els[1:])
-		configuration.use_configuration_invert(uses)
-		configuration.pattern_configuration_add(pattern_configuration, els[0], uses)
+		uses = portage_data.use_configuration_create_from_uses_list(els[1:])
+		portage_data.use_configuration_invert(uses)
+		portage_data.pattern_configuration_add(pattern_configuration, els[0], uses)
+
 
 # file "use.force", in profile configuration
 def analyse_use(conf, lines):
-	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
-	uses = configuration.use_configuration_create_from_uses_list(lines)
-	configuration.pattern_configuration_add(pattern_configuration, configuration.wildcardpattern, uses)
+	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
+	uses = portage_data.use_configuration_create_from_uses_list(lines)
+	portage_data.pattern_configuration_add(pattern_configuration, portage_data.wildcardpattern, uses)
+
 
 # file "use.mask", in profile configuration
 def analyse_use_mask(conf, lines):
-	pattern_configuration = configuration.configuration_get_pattern_configuration(conf)
-	uses = configuration.use_configuration_create_from_uses_list(lines)
-	configuration.use_configuration_invert(uses)
-	configuration.pattern_configuration_add(pattern_configuration, configuration.wildcardpattern, uses)
+	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
+	uses = portage_data.use_configuration_create_from_uses_list(lines)
+	portage_data.use_configuration_invert(uses)
+	portage_data.pattern_configuration_add(pattern_configuration, portage_data.wildcardpattern, uses)
 
-
-
+##
 
 configuration_analyse_mapping = {
 	"make.defaults":			analyse_make_defaults, # managed in a different manner
@@ -216,6 +231,7 @@ configuration_analyse_mapping = {
 	"use.stable.mask":			analyse_use_mask
 }
 
+
 def analyse_configuration_file(conf, parameter):
 	function, filename = parameter
 	if function != analyse_make_defaults:
@@ -227,15 +243,16 @@ def analyse_configuration_file(conf, parameter):
 
 
 def analyse_configuration_files(function_file_list):
-		conf = configuration.configuration_create()
+		conf = portage_data.configuration_create()
 		non_concurrent_map(lambda parameter: analyse_configuration_file(conf, parameter), function_file_list)
 		return conf
 
 ######################################################################
-### LOAD PROFILE
+# LOAD PROFILE FILES
 ######################################################################
 
 # https://wiki.gentoo.org/wiki/Profile_(Portage)
+
 
 def get_profile_files(path=os.path.realpath(input_file_profile), acc=None):
 	if not acc:
@@ -256,8 +273,9 @@ def get_profile_files(path=os.path.realpath(input_file_profile), acc=None):
 		acc.add(path)
 	return res
 
+
 def load_profile():
-	load  = False
+	load = False
 	last_update = None
 	input_data_files = []
 	# 1. check if we have a profile file
@@ -285,13 +303,15 @@ def load_profile():
 		conf = analyse_configuration_files(input_data_files)
 		# 3.2. write the files
 		with open(output_file_profile_configuration, 'w') as f:
-			json.dump(configuration.configuration_to_save_format(conf), f)
+			json.dump(portage_data.configuration_to_save_format(conf), f)
+
 
 ######################################################################
-### LOAD USER-DEFINED FILES
+# LOAD USER FILES
 ######################################################################
 
 # https://wiki.gentoo.org/wiki//etc/portage
+
 
 def get_user_configuration_files_in_path(path):
 	if os.path.isfile(path):
@@ -301,6 +321,7 @@ def get_user_configuration_files_in_path(path):
 		filename_list.sort()
 		return [ os.path.join(path, filename) for filename in filename_list ]
 	else: return []
+
 
 def get_user_configuration_files():
 	res = []
@@ -336,10 +357,10 @@ def get_user_configuration_files():
 	res.extend([ (lambda data, lines: analyse_package_set(filename, data, lines), filename) for filename in files_package_set])
 	return res
 
+
 def load_user_configuration():
-	load  = False
+	load = False
 	last_update = None
-	input_data_files = []
 	# 1. check if we have a profile file
 	if not os.path.exists(output_file_user_configuration):
 		load = True
@@ -348,7 +369,7 @@ def load_user_configuration():
 	# 2. check if we need to update
 	if not load:
 		input_data_files = get_user_configuration_files()
-		for function, filename in input_data_files :
+		for func, filename in input_data_files :
 			if last_update < os.path.getmtime(filename):
 				load = True
 				break;
@@ -360,11 +381,11 @@ def load_user_configuration():
 		conf = analyse_configuration_files(input_data_files)
 		# 3.2. write the files
 		with open(output_file_user_configuration, 'w') as f:
-			json.dump(configuration.configuration_to_save_format(conf), f)
+			json.dump(portage_data.configuration_to_save_format(conf), f)
 
 
 ######################################################################
-### LOAD PORTAGE
+# LOAD PORTAGE PACKAGES
 ######################################################################
 
 # this works differently from the other update functions, as the diff will be performed on the host
@@ -433,7 +454,7 @@ def load_installed_package(package_path, outfile):
 		if keywords:
 			f.write("KEYWORDS=" + keywords + "\n")
 		if slots:
-			f.write("SLOT=" + slots + "\n")
+			f.write("SLOT=" + slot + "\n")
 		if required_use:
 			f.write("DEPEND=" + required_use + "\n")
 		if depend:
@@ -444,8 +465,6 @@ def load_installed_package(package_path, outfile):
 			f.write("PDEPEND=" + pdepend + "\n")
 
 
-
-#script_load_ebuild = os.path.join(script_dir, "load_ebuild.sh")
 def load_portage():
 	if not os.path.isdir(output_file_portage_deprecated):
 		logging.error("The location  \"" + output_file_portage_deprecated + "\" does not exist or is not a folder")
@@ -455,41 +474,34 @@ def load_portage():
 	for directory in os.listdir(output_file_portage_deprecated):
 		path = os.path.join(output_file_portage_deprecated, directory)
 		for package in os.listdir(path):
-			if not os.path.exists(os.path.join(os.path.join(input_dir_portage_installed,directory),package)):
-				os.remove(os.path.join(path, package))
-				package_group = get_package_group(package)
-
-			elif os.path.exists(os.path.exists(os.path.join(os.path.join(input_dir_portage,directory),package_group)),package + ".ebuild"):
+			if not os.path.exists(os.path.join(os.path.join(input_dir_portage_installed, directory), package)):
 				os.remove(os.path.join(path, package))
 	# 2. add new files
 	for directory in os.listdir(input_dir_portage_installed):
 		path = os.path.join(input_dir_portage_installed, directory)
 		for package_dir in os.listdir(path):
 			# 2.1. check that this is indeed a deprecated package
-			package_group = get_package_group(package_dir)
-			if os.path.exists(os.path.join(os.path.join(input_dir_portage,directory),package_dir)):
+			if os.path.exists(os.path.join(os.path.join(input_dir_portage, directory), package_dir)):
 				continue
 			# 2.2. create file if does not already exist
-			new_path_dir = os.path.join(output_file_portage_deprecated,directory)
-			new_path = os.path.join(new_path_dir,package_dir)
+			new_path_dir = os.path.join(output_file_portage_deprecated, directory)
+			new_path = os.path.join(new_path_dir, package_dir)
 			if not os.path.exists(new_path):
-				#old_path = os.path.join(os.path.join(os.path.join(input_dir_portage_installed,directory),package_dir),package_dir + ".ebuild")
-				old_path = os.path.join(os.path.join(input_dir_portage_installed,directory),package_dir)
+				old_path = os.path.join(os.path.join(input_dir_portage_installed, directory), package_dir)
 				if not os.path.exists(new_path_dir):
 					os.makedirs(new_path_dir)
 				load_installed_package(old_path, new_path)
-				#subprocess.call(["bash", script_load_ebuild, old_path, new_path])
 
 
 ######################################################################
-### LOAD INSTALLED PACKAGE CONFIGURATION
+# LOAD INSTALLED PACKAGE CONFIGURATION
 ######################################################################
 
 
 def load_installed_package_uses(package_path):
 	path_iuses = os.path.join(package_path, "IUSE")
 	if not os.path.exists(path_iuses):
-		return configuration.use_configuration_create()
+		return portage_data.use_configuration_create()
 	else:
 		with open(path_iuses, 'r') as f:
 			iuses = f.read().split()
@@ -497,17 +509,17 @@ def load_installed_package_uses(package_path):
 		with open(os.path.join(package_path, "USE"), 'r') as f:
 			uses = f.read().split()
 		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
-		return configuration.use_configuration_create(uses, nuses)
+		return portage_data.use_configuration_create(uses, nuses)
 
 
 def load_installed_packages():
-	data  = configuration.package_installed_create()
+	data = portage_data.package_installed_create()
 	last_update = None
 	# 1. check if we have a profile file and load it
 	if os.path.exists(output_file_installed_packages):
 		last_update = os.path.getmtime(output_file_installed_packages)
 		with open(output_file_installed_packages, 'r') as f:
-			data = configuration.package_installed_from_save_format(json.load(f))
+			data = portage_data.package_installed_from_save_format(json.load(f))
 	# 2. update the data
 	to_keep = []
 	for directory in os.listdir(input_dir_portage_installed):
@@ -517,18 +529,49 @@ def load_installed_packages():
 			#print("looking at " + package_name)
 			to_keep.append(package_name)
 			complete_path = os.path.join(path, package)
-			out = None
 			if (package_name not in data.keys()) or (last_update < os.path.getmtime(complete_path)):
 				uses = load_installed_package_uses(complete_path)
-				configuration.package_installed_set(data, package_name, uses)
+				portage_data.package_installed_set(data, package_name, uses)
 	data = { k: data[k] for k in to_keep }
 	# 3. write the file
 	with open(output_file_installed_packages, 'w') as f:
-		json.dump(configuration.package_installed_to_save_format(data), f)
+		json.dump(portage_data.package_installed_to_save_format(data), f)
 
 
 ######################################################################
-### MAIN
+# LOAD KEYWORD LIST
+######################################################################
+
+def analyse_keyword_list_file(input_file_keyword_list):
+	with open(input_file_keyword_list, 'r') as f:
+		keyword_list = extract_lines_from_file(f)
+	keyword_list = keyword_list + [ "~" + keyword for keyword in keyword_list ]
+	return keyword_list
+
+
+def load_keyword_list():
+	load = False
+	last_update = None
+	# 1. check if we have a profile file
+	if not os.path.exists(output_file_keyword_list):
+		load = True
+	else:
+		last_update = os.path.getmtime(output_file_keyword_list)
+	# 2. check if we need to update
+	if not load:
+		load = last_update < os.path.getmtime(input_file_keyword_list)
+
+	# 3. recreate the profile files
+	if load:
+		# 3.1. load the profile
+		conf = analyse_keyword_list_file(input_file_keyword_list)
+		# 3.2. write the files
+		with open(output_file_keyword_list, 'w') as f:
+			json.dump(conf, f)
+
+
+######################################################################
+# MAIN
 ######################################################################
 
 def setup_output_files(given_output_dir):
@@ -538,13 +581,14 @@ def setup_output_files(given_output_dir):
 	global output_file_profile_configuration
 	global output_file_user_configuration
 	global output_file_installed_packages
+	global output_file_keyword_list
 	output_dir = os.path.realpath(given_output_dir)
 	output_file_portage = os.path.join(output_dir, "packages/portage-tree")
 	output_file_portage_deprecated = os.path.join(output_dir, "packages/deprecated")
 	output_file_profile_configuration = os.path.join(output_dir, "profile_configuration.json")
 	output_file_user_configuration = os.path.join(output_dir, "user_configuration.json")
 	output_file_installed_packages = os.path.join(output_dir, "installed_packages.json")
-
+	output_file_keyword_list = os.path.join(output_dir, "keywords.json")
 
 def main(given_output_dir):
 	# 1. setup the global variables
@@ -566,6 +610,8 @@ def main(given_output_dir):
 	load_user_configuration()
 	# 7. load the current set of installed packages with their configuration
 	load_installed_packages()
+	# 8. load the current keyword list
+	load_keyword_list()
 
 
 if __name__ == "__main__":

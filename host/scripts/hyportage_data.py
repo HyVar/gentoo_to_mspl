@@ -1,114 +1,71 @@
 #!/usr/bin/python
 
-import configuration
+import core_data
+import portage_data
+
 import hyportage_pattern
+import hyportage_ids
+import hyportage_constraint_ast
 
 ######################################################################
-### HYPORTAGE ANNEX CREATION
+# KEYWORDS MANIPULATION
 ######################################################################
 
-## stores:
-# - patterns in the profile configuration		: useful for pattern repository garbage collection
-# - iuses declared in the profile configuration	:
-# - patterns in the user configuration			: useful for pattern repository garbage collection
-# - (user cannot declare new uses)
-# - package list								: useful to know which packages to remove to obtain the current state
-# - last id
+keywords_create = core_data.set_configuration_create
+keywords_copy = core_data.set_configuration_copy
 
 
-def hyportage_annex_create():
-	return (set([]), set([]), set([]), set([]), [0])
+def keywords_apply_configuration_pattern(spl, keywords, conf_keywords):
+	for pattern, keyword_list in conf_keywords:
+		if hyportage_pattern.match_spl_full(pattern, spl):
+			keywords.update(keywords)
+
+keywords_to_save_format = core_data.set_configuration_to_save_format
+keywords_from_save_format = core_data.set_configuration_from_save_format
 
 
-def hyportage_annex_get_profile_pattern(hyportage_annex): return hyportage_annex[0]
-def hyportage_annex_get_profile_iuses(hyportage_annex): return hyportage_annex[1]
-def hyportage_annex_get_user_pattern(hyportage_annex): return hyportage_annex[2]
-def hyportage_annex_get_package_list(hyportage_annex): return hyportage_annex[3]
-def hyportage_annex_get_last_id(hyportage_annex): return hyportage_annex[4][0]
+######################################################################
+# IUSE MANIPULATION
+######################################################################
+
+iuses_create = core_data.set_configuration_create
+iuses_copy = core_data.set_configuration_copy
 
 
-def hyportage_annex_set_profile_configuration(hyportage_annex, profile_configuration):
-	profile_patterns = hyportage_annex[0]
-	profile_iuses = hyportage_annex[1]
-	profile_patterns.clear()
-	profile_iuses.clear()
-	# profile data with patterns
-	for pattern_set in configuration.configuration_get_required_package(profile_configuration).values():
-		profile_patterns.update(pattern_set)
-	profile_patterns.update(configuration.configuration_get_pattern_accept_keywords(profile_configuration).keys())
-	profile_patterns.update(configuration.configuration_get_pattern_masked(profile_configuration).keys())
-	profile_patterns.update(configuration.configuration_get_pattern_configuration(profile_configuration).keys())
-	# profile data with iuses
-	profile_iuses.update(configuration.configuration_get_iuse(profile_configuration)[0])
+def iuses_apply_configuration(iuses, conf_iuses): iuses.update(conf_iuses)
 
-def hyportage_annex_set_user_configuration(hyportage_annex, user_configuration):
-	user_patterns = hyportage_annex[2]
-	user_patterns.clear()
-	# user data with patterns
-	for pattern_set in configuration.configuration_get_required_package(user_configuration).values():
-		user_patterns.update(pattern_set)
-	user_patterns.update(configuration.configuration_get_pattern_accept_keywords(user_configuration).keys())
-	user_patterns.update(configuration.configuration_get_pattern_masked(user_configuration).keys())
-	user_patterns.update(configuration.configuration_get_pattern_configuration(user_configuration).keys())
 
-def hyportage_annex_update_package_list(hyportage_annex, to_add, to_remove):
-	package_list = hyportage_annex[3]
-	package_list.update(to_add)
-	package_list.difference_update(to_remove)
+iuses_to_save_format = core_data.set_configuration_to_save_format
+iuses_from_save_format = core_data.set_configuration_from_save_format
 
-def hyportage_annex_set_last_id(hyportage_annex, last_id):
-	hyportage_annex[4][0] = last_id
+
+######################################################################
+# USE SELECTION MANIPULATION
+######################################################################
+
+
+use_selection_create = core_data.set_configuration_create
+use_selection_copy = core_data.set_configuration_copy
+use_selection_add = core_data.set_configuration_add
+use_selection_addall = core_data.set_configuration_addall
+use_selection_remove = core_data.set_configuration_remove
+use_selection_removeall = core_data.set_configuration_removeall
+use_selection_to_save_format = core_data.set_configuration_to_save_format
+use_selection_from_save_format = core_data.set_configuration_from_save_format
 
 ##
 
-def hyportage_annex_to_save_format(hyportage_annex):
-	return {
-		'profile_patterns': [ configuration.pattern_to_save_format(pattern) for pattern in hyportage_annex[0] ],
-		'profile_iuses': list(hyportage_annex[1]),
-		'user_patterns': [ configuration.pattern_to_save_format(pattern) for pattern in hyportage_annex[2] ],
-		'package_list': list(hyportage_annex[3]),
-		'last_id': hyportage_annex[4][0]
-	}
 
-def hyportage_annex_from_save_format(save_format):
-	return (
-		set([ configuration.pattern_from_save_format(sf) for sf in save_format['profile_patterns'] ]),
-		set(save_format['profile_iuses']),
-		set([ configuration.pattern_from_save_format(sf) for sf in save_format['user_patterns'] ]),
-		set(save_format['package_list']),
-		[ save_format['last_id'] ]
-		)
+def use_selection_apply_configuration(use_selection, conf_use):
+	use_selection_addall(use_selection, portage_data.use_configuration_get_positive(conf_use))
+	use_selection_removeall(use_selection, portage_data.use_configuration_get_negative(conf_use))
 
-######################################################################
-### USE SELECTION AND CONFIGURATION MANIPULATION
-######################################################################
 
-def use_selection_create():
-	return set([])
+def use_selection_apply_configuration_pattern(spl, use_selection, conf_use):
+	for pattern, use_configuration in conf_use:
+		if hyportage_pattern.match_spl_full(pattern, spl):
+			use_selection_apply_configuration(use_selection, use_configuration)
 
-def use_selection_add(use_selection, use):
-	use_selection.add(use)
-
-def use_selection_addall(use_selection, uses):
-	use_selection.update(uses)
-
-def use_selection_remove(use_selection, use):
-	use_selection.discard(use)
-
-def use_selection_removeall(use_selection, uses):
-	use_selection.difference_update(uses)
-
-def use_selection_to_save_format(use_selection):
-	return list(use_selection)
-
-def use_selection_from_save_format(save_format):
-	return set(save_format)
-
-##
-
-def use_selection_apply_configuration(use_selection, use_configuration):
-	use_selection_addall(use_selection, use_configuration_get_positive(use_configuration))
-	use_configuration_removeall(use_selection, use_configuration_get_negative(use_configuration))
 
 def use_selection_from_iuse_list(iuse_list):
 	res = (set([]), use_selection_create())
@@ -126,43 +83,251 @@ def use_selection_from_iuse_list(iuse_list):
 
 ##
 
-#def use_selection_to_save_format():
-#def use_selection_from_save_format():
-
 ######################################################################
-### RAW DEPENDENCIES MANIPULATION
+# DEPENDENCIES MANIPULATION
 ######################################################################
 
-def raw_dependencies_create():
-	return (set([]), {})
 
-def raw_dependencies_add_use(raw_dependencies, use):
+def dependencies_create(): return set([]), {}
+
+
+def dependencies_add_use(raw_dependencies, use):
 	raw_dependencies[0].add(use)
 
-def raw_dependencies_add_pattern(raw_dependencies, pattern):
+
+def dependencies_add_pattern(raw_dependencies, pattern):
 	if pattern not in raw_dependencies[1]: raw_dependencies[1][pattern] = set([])
 
-def raw_dependencies_add_pattern_use(raw_dependencies, pattern, use):
+
+def dependencies_add_pattern_use(raw_dependencies, pattern, use):
 	raw_dependencies[1][pattern].add(use)
 
-def raw_dependencies_get_patterns(raw_dependencies): return raw_dependencies[1].keys()
+
+def dependencies_get_patterns(raw_dependencies): return raw_dependencies[1].keys()
 
 
 ######################################################################
-### SPL MANIPULATION
+# SPL AND MSPL MANIPULATION
 ######################################################################
 
 def spl_get_name(spl): return spl['name']
 def spl_get_group(spl): return spl['group']
 def spl_get_slot(spl): return spl['slot']
 def spl_get_subslot(spl): return spl['subslot']
-def spl_get_version_full(spl): return spl['versions_full']
-def spl_get_iuses(spl): return spl['iuses']
-def spl_get_raw_dependencies(spl): return spl['raw_dependencies']
+def spl_get_version(spl): return spl['version']
+def spl_get_version_full(spl): return spl['version_full']
+def spl_get_dependencies(spl): return spl['dependencies']
+def spl_is_deprecated(spl): return spl['deprecated']
+
+
+def spl_get_fm_local(spl): return spl['fm_local']
+def spl_get_fm_combined(spl): return spl['fm_combined']
+def spl_get_smt_constraint(spl): return spl['smt_constraint']
+
+
+def spl_get_required_iuses_local(spl): return spl['required_iuses_local']
+def spl_get_required_iuses(spl): return spl['required_iuses']
+
+
+def spl_get_keywords_default(spl): return spl['keywords_default']
+def spl_get_keywords_profile(spl): return spl['keywords_profile']
+def spl_get_keywords_user(spl): return spl['keywords_user']
+
+
+def spl_get_iuses_default(spl): return spl['iuses_default']
+def spl_get_iuses_profile(spl): return spl['iuses_profile']
+def spl_get_iuses_user(spl): return spl['iuses_user']
+
+
+def spl_get_use_selection_default(spl): return spl['use_selection_default']
+def spl_get_use_selection_profile(spl): return spl['use_selection_profile']
+def spl_get_use_selection_user(spl): return spl['use_selection_user']
+
+
+def spl_get_mask_profile(spl): return spl['mask_profile']
+def spl_get_mask_user(spl): return spl['mask_user']
+
+##
+
+
+def spl_set_keywords_profile(spl, keywords): spl['keywords_profile'] = keywords
+def spl_set_iuses_profile(spl, new_iuses): spl['iuses_profile'] = new_iuses
+def spl_set_use_selection_profile(spl, new_use_selection): spl['use_selection_profile'] = new_use_selection
+def spl_set_mask_profile(spl, new_mask): spl['mask_profile'] = new_mask
+
+
+def spl_set_keywords_user(spl, keywords): spl['keywords_user'] = keywords
+def spl_set_iuses_user(spl, new_iuses): spl['iuses_user'] = new_iuses
+def spl_set_use_selection_user(spl, new_use_selection): spl['use_selection_user'] = new_use_selection
+def spl_set_mask_user(spl, new_mask): spl['mask_user'] = new_mask
+
+
+def spl_reset_required_use(spl, pattern_repository):
+	spl['required_use'] = list(set(
+		spl['required_use_default'] +
+		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl)))
+
+
+def spl_set_smt_constraint(spl, smt_constraint): spl['smt_constraint'] = smt_constraint
+##
+
+
+def __spl_data_apply_configuration(spl, keywords, iuses, use_selection, mask, conf):
+	# 1. get relevant data from the configuration
+	conf_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
+	conf_iuse_conf = portage_data.configuration_get_iuse_configuration(conf)
+	conf_iuses = portage_data.iuse_configuration_get_iuses(conf_iuse_conf)
+	conf_use_configuration = portage_data.iuse_configuration_get_use_configuration(conf_iuse_conf)
+	conf_pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
+	conf_mask = portage_data.configuration_get_pattern_masked(conf)
+	# 2. accept keywords
+	new_keywords = keywords_copy(keywords)
+	keywords_apply_configuration_pattern(spl, new_keywords, conf_keywords)
+	# 3. iuses
+	new_iuses = set(iuses)
+	iuses_apply_configuration(new_iuses, conf_iuses)
+	# 4. use selection
+	new_use_selection = use_selection_copy(use_selection)
+	use_selection_apply_configuration(new_use_selection, conf_use_configuration)
+	use_selection_apply_configuration_pattern(spl, new_use_selection, conf_pattern_configuration)
+	# 5. mask
+	new_mask = mask
+	for pattern, sign in conf_mask:
+		if hyportage_pattern.match_spl_full(pattern, spl):
+			new_mask = sign
+	# 6. bundle up the generated data
+	return new_keywords, new_iuses, new_use_selection, new_mask
+
+
+def spl_apply_profile_configuration(spl, conf):
+	new_keywords, new_iuses, new_use_selection, new_mask = __spl_data_apply_configuration(
+		spl,
+		spl_get_keywords_default(spl),
+		spl_get_iuses_default(spl),
+		spl_get_use_selection_default(spl),
+		False,
+		conf)
+	spl_set_keywords_profile(spl, new_keywords)
+	spl_set_iuses_profile(spl, new_iuses)
+	spl_set_use_selection_profile(spl, new_use_selection)
+	spl_set_mask_profile(spl, new_mask)
+
+
+def spl_apply_user_configuration(spl, conf):
+	new_keywords, new_iuses, new_use_selection, new_mask = __spl_data_apply_configuration(
+		spl,
+		spl_get_keywords_profile(spl),
+		spl_get_iuses_profile(spl),
+		spl_get_use_selection_profile(spl),
+		spl_get_mask_profile(spl),
+		conf)
+	spl_set_keywords_user(spl, new_keywords)
+	spl_set_iuses_user(spl, new_iuses)
+	spl_set_use_selection_user(spl, new_use_selection)
+	spl_set_mask_user(spl, new_mask)
+
+##
+
+
+def spl_to_save_format(spl):
+	return {
+		'name': spl_get_name(spl),
+		'group': spl_get_group(spl),
+		'deprecated': spl_is_deprecated(spl),
+		'version_full': spl_get_version_full(spl),
+		'version': spl_get_version(spl),
+		'slot': spl_get_slot(spl),
+		'subslot': spl_get_subslot(spl),
+		'fm_local': hyportage_constraint_ast.ast_require_to_save_format(spl_get_fm_local(spl)),
+		'fm_combined': hyportage_constraint_ast.ast_depend_to_save_format(spl_get_fm_combined(spl)),
+		'dependencies': spl_get_depedencies(spl),
+		#
+		'required_iuses_local': spl_get_required_iuses_local(spl),
+		'required_iuses': spl_get_required_iuses(spl),
+		#
+		'keywords_default': spl_get_keywords_default(spl),
+		'keywords_profile': spl_get_keywords_profile(spl),
+		'keywords_user': spl_get_keywords_user(spl),
+		#
+		'iuses_default': spl_get_iuses_default(spl),
+		'iuses_profile': spl_get_iuses_profile(spl),
+		'iuses_user': spl_get_iuses_user(spl),
+		#
+		'use_selection_default': spl_get_use_selection_default(spl),
+		'use_selection_profile': spl_get_use_selection_profile(spl),
+		'use_selection_user': spl_get_use_selection_user(spl),
+		#
+		'smt_constraint': spl_get_smt_constraint(spl)
+	}
+
+
+def spl_from_save_format(save_format):
+	return {
+		'name': save_format['name'],
+		'group': save_format['group'],
+		'deprecated': save_format['deprecated'],
+		'version_full': save_format['version_full'],
+		'version': save_format['version'],
+		'slot': save_format['slot'],
+		'subslot': save_format['subslot'],
+		'fm_local': hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_local']),
+		'fm_combined': hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_combined']),
+		'dependencies': save_format['dependencies'],
+		#
+		'required_iuses_local': save_format['required_iuses_local'],
+		'required_iuses': save_format['required_iuses'],
+		#
+		'keywords_default': save_format['keywords_default'],
+		'keywords_profile': save_format['keywords_profile'],
+		'keywords_user': save_format['keywords_user'],
+		#
+		'iuses_default': save_format['iuses_default'],
+		'iuses_profile': save_format['iuses_profile'],
+		'iuses_user': save_format['iuses_user'],
+		#
+		'use_selection_default': save_format['use_selection_default'],
+		'use_selection_profile': save_format['use_selection_profile'],
+		'use_selection_user': save_format['use_selection_user'],
+		#
+		'smt_constraint': save_format['smt_constraint']
+	}
+
+##
+
+def mspl_create(): return {}
+
+
+class MSPLToSaveFormatGenerator(object):
+	def __init__(self, mspl):
+		self.items = mspl.iteritems()
+
+	def __iter__(self):
+		return self
+
+	def __next__(self):
+		return self.next()
+
+	def next(self):
+		key, value = self.items.next()
+		return spl_to_save_format(value)
+
+
+def mspl_to_save_format(mspl):
+	return MSPLToSaveFormatGenerator(mspl)
+
+
+def mspl_from_save_format(save_format):
+	mspl = {}
+	spl_group = {}
+	for el in save_format:
+		spl = spl_from_save_format(el)
+		mspl[spl_get_name(spl)] = spl
+		spl_group_add_spl(spl_group, spl)
+	return mspl, spl_group
 
 
 ######################################################################
-### SPL GROUP MANIPULATION
+# SPL GROUP MANIPULATION
 ######################################################################
 
 def spl_group_add_spl(spl_group, spl):
@@ -176,11 +341,12 @@ def spl_group_add_spl(spl_group, spl):
 		group = {'implementations': {version_full: spl_name}, 'dependencies': [spl_name], 'reference': [spl] }
 		spl_group[group_name] = group
 
+
 def spl_group_replace_spl(spl_group, old_spl, new_spl):
-	group_name = spl_get_group(spl)
 	group = spl_group.get(spl_get_group(new_spl))
 	group['reference'].remove(old_spl)
 	group['reference'].append(new_spl)
+
 
 def spl_group_remove_spl(spl_group, spl):
 	group_name = spl_get_group(spl)
@@ -193,3 +359,26 @@ def spl_group_remove_spl(spl_group, spl):
 			group['implementations'].pop(version_full)
 			group['dependencies'].remove(spl_name)
 			group['reference'].remove(spl)
+
+
+######################################################################
+# FULL SPL DATA MANIPULATION
+######################################################################
+
+
+def hyportage_to_save_format(pattern_repository, id_repository, mspl, spl_group):
+	return {
+		'pattern_repository': hyportage_pattern.pattern_repository_to_save_format(pattern_repository),
+		'id_repository': hyportage_ids.id_repository_to_save_format(id_repository),
+		'mspl': mspl_to_save_format(mspl),
+	}
+
+
+def hyportage_from_save_format(save_format):
+	mspl, spl_group = mspl_from_save_format(save_format['mspl'])
+	return (
+		hyportage_pattern.pattern_repository_from_save_format(save_format['pattern_repository'], mspl),
+		hyportage_ids.id_repository_from_save_format(save_format['id_repository']),
+		mspl,
+		spl_group
+	)

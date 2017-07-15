@@ -4,7 +4,7 @@
 ######################################################################
 
 import re
-import constraint_ast_visitor
+import hyportage_constraint_ast
 import utils
 import logging
 import z3
@@ -16,6 +16,10 @@ def toSMT2(f, status="unknown", name="benchmark", logic=""):
   return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
       "\n"," ").replace("(check-sat)","").replace("; benchmark (set-info :status unknown)","").strip()
 
+
+
+##################################
+# TO REMOVE
 
 def match_version(template, operator, p_name):
     """
@@ -183,10 +187,10 @@ def decompact_atom(ctx):
 ##############################################
 # visitor to convert the AST into SMT formulas
 ##############################################
-class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
+class visitorASTtoSMT(hyportage_constraint_ast.ASTVisitor):
 
     def __init__(self,mspl,map_name_id,package):
-        super(constraint_ast_visitor.ASTVisitor, self).__init__()
+        super(hyportage_constraint_ast.ASTVisitor, self).__init__()
         self.map_name_id = map_name_id
         self.package = package
         self.mspl = mspl
@@ -226,7 +230,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                 return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
             elif len(formulas) == 1:
                 return formulas[0]
-            return z3.BoolVal(False) # no formula to be satisified
+            return z3.BoolVal(False) # no formula to be satisfied
 
     def visitRequiredINNER(self, ctx):
         return z3.And(self.visitRequired(ctx['els']))
@@ -245,7 +249,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
         assert self.map_name_id["flag"][self.package][ctx['condition']['use']]  # flag must exists
         use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
         if 'not' in ctx['condition']:
-            return z3.Implies(z3.Not(use),z3.And(formulas))
+            return z3.Implies(z3.Not(use), z3.And(formulas))
         return z3.Implies(use,z3.And(formulas))
 
     def visitDependCHOICE(self, ctx):
@@ -262,7 +266,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                 return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
             elif len(formulas) == 1:
                 return formulas[0]
-            return z3.BoolVal(False) # no formula to be satisified
+            return z3.BoolVal(False) # no formula to be satisfied
 
     def visitDependINNER(self, ctx):
         return z3.And(self.visitDepend(ctx['els']))
@@ -295,7 +299,7 @@ class visitorASTtoSMT(constraint_ast_visitor.ASTVisitor):
                         get_smt_use(self.map_name_id, pkg, sel["use"]))
 
         def aux_visit_select(pkgs,sel):
-            return z3.Or([aux_visit_single_pkg_single_select(x,sel) for x in pkgs])
+            return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in pkgs])
 
         template = ctx["package"]
         if 'version_op' in ctx:
@@ -416,6 +420,6 @@ def convert(input_tuple):
         return (package,[toSMT2(x) for x in formulas])
 
 
-def generate_formulas(concurrent_map,mspl,map_name_id,simplify_mode):
+def generate_formulas(concurrent_map, mspl, map_name_id, simplify_mode):
     ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl]
-    return concurrent_map(convert,ls)
+    return concurrent_map(convert, ls)

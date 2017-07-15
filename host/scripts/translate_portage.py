@@ -9,15 +9,17 @@ __status__ = "Prototype"
 
 import os
 import utils
-import json
 import logging
 import multiprocessing
 import click
 import time
 import sys
 
+import core_data
 import hyportage_from_egencache
 import hyportage_data
+import hyportage_pattern
+import hyportage_ids
 #import constraint_parser
 #import extract_id_maps
 #import extract_dependencies
@@ -31,7 +33,7 @@ def usage():
 
 
 ######################################################################
-### LOADING SPL FROM EGENCACHE FILE
+# LOADING SPL FROM EGENCACHE FILE
 ######################################################################
 
 def filter_egencache_file(path_file, last_update):
@@ -47,7 +49,7 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 
 
 ######################################################################
-### USE CONFIGURATION MANIPULATION
+# USE CONFIGURATION MANIPULATION
 ######################################################################
 
 @click.command()
@@ -62,7 +64,7 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 @click.option(
 	'--input-files', '-i',
 	nargs=4,
-	default=("profile_configuration.json", "user_configuration.json", "installed_packages.json", "packages"),
+	default=("profile_configuration.json", "user_configuration.json", "keywords.json", "installed_packages.json", "packages"),
 	help='the three json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
 @click.option(
 	'--output-files', '-o',
@@ -119,7 +121,7 @@ def main(
 	"""
 
 	##########################################################################
-	### 1. OPTIONS
+	# 1. OPTIONS
 	##########################################################################
 
 	# OPTION: manage number of parallel threads
@@ -147,19 +149,19 @@ def main(
 	elif verbose == 2: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
 	elif verbose >= 3: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
-
 	##########################################################################
-	### 2. COMPUTE WHAT TO DO
+	# 2. COMPUTE WHAT TO DO
 	##########################################################################
 
 	dir_portage = os.path.abspath(dir_portage)
 	dir_hyportage = os.path.abspath(dir_hyportage)
 
-	input_files_portage_profile_configuration, input_files_portage_user_configuration, input_files_portage_installed_packages, input_files_portage_packages = input_files
-	path_portage_profile_configuration = os.path.join(dir_portage, input_files_portage_profile_configuration)
-	path_portage_user_configuration = os.path.join(dir_portage, input_files_portage_user_configuration)
-	path_portage_installed_packages = os.path.join(dir_portage, input_files_portage_installed_packages)
-	path_portage_packages = os.path.join(dir_portage, input_files_portage_packages)
+	file_profile_configuration, file_user_configuration, file_keywords, file_installed_packages, file_required_packages = input_files
+	path_profile_configuration = os.path.join(dir_portage, file_profile_configuration)
+	path_user_configuration = os.path.join(dir_portage, file_user_configuration)
+	path_keywords = os.path.join(dir_portage, file_keywords)
+	path_installed_packages = os.path.join(dir_portage, file_installed_packages)
+	path_required_packages = os.path.join(dir_portage, file_required_packages)
 
 	output_files_hyportage, output_files_annex = output_files
 	path_hyportage = os.path.join(dir_hyportage, output_files_hyportage)
@@ -173,12 +175,13 @@ def main(
 	if os.path.exists(path_hyportage_annex):
 		last_update = os.path.getmtime(path_hyportage_annex)
 		with open(path_hyportage_annex, 'r') as f:
-			hyportage_annex = hyportage_annex_from_save_format(utils.load_data_file(f, save_modality))
+			hyportage_annex = hyportage_data.hyportage_annex_from_save_format(utils.load_data_file(f, save_modality))
 	else:
 		hyportage_annex = hyportage_data.hyportage_annex_create()
 
-	must_apply_profile = ( last_update < os.path.getmtime(path_portage_profile_configuration) )
-	must_apply_user = ( last_update < os.path.getmtime(path_portage_user_configuration) )
+	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration))
+	must_apply_user = (last_update < os.path.getmtime(path_user_configuration))
+	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords))
 
 	egencache_files = hyportage_from_egencache.get_egencache_files()
 	if force:
@@ -190,9 +193,8 @@ def main(
 
 	logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
 
-
 	##########################################################################
-	### 3. UPDATE THE MSPL DATA IF NECESSARY
+	# 3. UPDATE THE MSPL DATA IF NECESSARY
 	##########################################################################
 
 	nb_egencache_files_to_load = len(egencache_files_to_load)
@@ -202,16 +204,16 @@ def main(
 		## load hyportage files
 
 		logging.info("Loading the " + str(len(egencache_files_to_load)) + "egencache files.")
-		raw_spls = concurrent_map(load_spl_from_egencache_file, egencache_files_to_load)
+		raw_spls = concurrent_map(hyportage_from_egencache.load_spl_from_egencache_file, egencache_files_to_load)
 		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
-		## load the full mspl data, and remove overwritten data
+		## load the full mspl data, remove overwritten data and update the pattern_repository
 
 		logging.info("Loading the stored mspl.")
 		with open(path_hyportage, 'r') as f:
 			pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
 
-		package_to_add	= []
+		package_to_add = []
 		package_to_update = []
 		for spl in raw_spls:
 			if hyportage_data.spl_get_name(spl) in mspl: package_to_update.append(spl)
@@ -228,20 +230,41 @@ def main(
 			else:
 				hyportage_pattern.pattern_repository_remove(pattern_repository, old_spl)
 				hyportage_data.spl_group_remove_spl(spl_groups, old_spl)
-			# remove entries from id repository: must be entierly re-generated
-			hyportage_ids.hyportage_id_repository_remove_spl(id_repository, package_name)
+				# remove entries from id repository: must be entierly re-generated
+				hyportage_ids.hyportage_id_repository_remove_spl(id_repository, old_spl)
 		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+		## update the spls required iuse list, for the new spls and the old ones, and regenerate the ids
+
+		spl_updated_iuses = set(raw_spls)
+		for spl in raw_spls:
+			for pattern, iuses in hyportage_data.spl_get_dependencies(spl).iteritems():
+				spl_updated_iuses.update(hyportage_pattern.pattern_repository_get_spl(pattern_repository, pattern))
+		for spl in spl_updated_iuses:
+			hyportage_data.spl_reset_required_use(spl, pattern_repository)
+			hyportage_ids.id_repository_add_spl(id_repository, spl)
 
 	else: # no update to perform on the content of the mspl data, do not load anything
 		mspl_loaded = False
-		#logging.info("Loading the stored mspl.")
-		#with open(path_hyportage, 'r') as f:
-		#	pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
-		#logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-
 
 	##########################################################################
-	### 4. APPLY THE CONFIGURATION IF NECESSARY, AND REGENERATE THE IDS
+	# 4. REGENERATE THE KEYWORD IDS IF NECESSARY
+	##########################################################################
+
+	if must_regenerate_keywords_ids:
+		if not mspl_loaded:
+			mspl_loaded = True
+			logging.info("Loading the stored mspl.")
+			with open(path_hyportage, 'r') as f:
+				pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(
+					utils.load_data_file(f, save_modality))
+			logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+		with open(path_keywords, 'r') as f:
+			keywords_list = core_data.keyword_set_from_save_format(utils.load_data_file(f, save_modality))
+		hyportage_ids.id_repository_set_keywords(id_repository, keywords_list)
+
+	##########################################################################
+	# 5. APPLY THE CONFIGURATION IF NECESSARY
 	##########################################################################
 
 ## DONE UNTIL HERE
@@ -254,13 +277,13 @@ def main(
 			with open(path_hyportage, 'r') as f:
 				pattern_repository, id_repository, mspl, spl_groups = hyportage_data.hyportage_from_save_format(utils.load_data_file(f, save_modality))		
 			logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-		with open(path_portage_profile_configuration, 'r') as f:
-			profile_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
+		with open(path_profile_configuration, 'r') as f:
+			profile_configuration = core_data.configuration_from_save_format(utils.load_data_file(f, save_modality))
 		# apply the configuration on all spl in the mspl
 
 	elif nb_egencache_files_to_load > 0:
-		with open(path_portage_profile_configuration, 'r') as f:
-			profile_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
+		with open(path_profile_configuration, 'r') as f:
+			profile_configuration = core_data.configuration_from_save_format(utils.load_data_file(f, save_modality))
 		# apply the configuratin on all spl in raw_spl
 
 
@@ -268,8 +291,8 @@ def main(
 
 
 	# 3.3. update the ids
-		with open(path_portage_user_configuration, 'r') as f:
-			user_configuration = configuration.configuration_from_save_format(utils.load_data_file(f, save_modality))
+		with open(path_user_configuration, 'r') as f:
+			user_configuration = core_data.configuration_from_save_format(utils.load_data_file(f, save_modality))
 
 	if os.path.exists(path_hyportage):
 		logging.info("Loading the existing file.")
@@ -294,7 +317,7 @@ def main(
 		filter_function = lambda path_file: filter_egencache_file(path_file, last_update)
 
 	# NOT WORKING: need to know also which packages are removed
-	egencache_files_to_load = utils_portage.get_egencache_files(os.path.join(dir_portage, path_portage_packages), filter_function)
+	egencache_files_to_load = utils_portage.get_egencache_files(os.path.join(dir_portage, path_required_packages), filter_function)
 
 	fully_apply_profile = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_profile_configuration)) )
 	fully_apply_user = ( last_update < os.path.getmtime(os.path.join(dir_portage, filename_portage_user_configuration)) )

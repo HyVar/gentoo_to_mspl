@@ -1,19 +1,28 @@
 #!/usr/bin/python
 
-import lrparsing
-import multiprocessing
+'''
+Module defining function to translate a egencache file into an hyportage spl
+'''
+
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
+__license__ = "ISC"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
+
 import string
 import os
+import lrparsing
 
 import hyportage_data
-import constraint_parser
-import constraint_ast_visitor
-
-
-# in portage, we only consider the egencache files (and the other ones we generate), as it is the default behavior of emerge
+import core_data
+import hyportage_constraint_ast
+import utils
 
 ######################################################################
-### GET EGENCACHE FILES FOM A MD5-CACHE REPOSITORY
+# EGENCACHE FILES FUNCTIONS
 ######################################################################
 
 
@@ -27,11 +36,6 @@ def get_egencache_files(path):
 			path_file = os.path.join(root, filename)
 			files.append(path_file)
 	return files
-
-
-######################################################################
-### EXTRACT DATA FROM PACKAGE FILE NAMES AND PATH
-######################################################################
 
 
 def structure_package_name(package_name):
@@ -53,18 +57,195 @@ def structure_package_name(package_name):
 			del filename_split[-1]
 			version_full = version
 	package_group = "-".join(filename_split)
-	return (package_group, version_full, version)
+	return package_group, version_full, version
 
 
 def get_package_name_from_path(package_path):
 	els = package_path.split(os.sep)
 	package_name = "/".join(els[:-2]) if len(els) > 1 else els[-1]
 	deprecated = (len(els) > 2) and (els[-3] == "deprecated")
-	return (package_name, deprecated)
+	return package_name, deprecated
 
 
 ######################################################################
-### GENERATE BASE SPL INFORMATION
+# TRANSLATE THE PORTAGE CONSTRAINT INTO THE HYPORTAGE AST
+######################################################################
+
+
+class T(lrparsing.TokenRegistry):
+	ID = lrparsing.Token(re="[^\s[\]()^|?!,]+")
+	# condition operators
+	OR	 = lrparsing.Token('||')
+	XOR	 = lrparsing.Token('^^')
+	ONEMAX  = lrparsing.Token('??')
+	NOT	 = lrparsing.Token('!')
+	IMPLIES = lrparsing.Token('?')
+	# special symbols
+	LPAREN  = lrparsing.Token('(')
+	RPAREN  = lrparsing.Token(')')
+	LBRACKET= lrparsing.Token('[')
+	RBRACKET= lrparsing.Token(']')
+	# punctuation
+	COMMA   = lrparsing.Token(',')
+
+
+class require(lrparsing.Grammar):
+	condition = lrparsing.Repeat(T.NOT, min=0, max=1) + T.ID + T.IMPLIES
+	choice = T.OR | T.ONEMAX | T.XOR
+	require_element = lrparsing.Choice(
+		lrparsing.Repeat(T.NOT, min=0, max=1) + T.ID,
+		lrparsing.Repeat(condition | choice, min=0, max=1) + T.LPAREN + lrparsing.Repeat(lrparsing.THIS) + T.RPAREN)
+	require = lrparsing.Repeat(require_element)
+
+	START = require
+
+
+class depend(lrparsing.Grammar):
+	condition = lrparsing.Repeat(T.NOT, min=0, max=1) + T.ID + T.IMPLIES
+	choice = T.OR | T.ONEMAX | T.XOR
+	selection = lrparsing.Repeat(T.NOT, min=0, max=1) + T.ID + lrparsing.Repeat(T.LPAREN + T.ID + T.RPAREN, min=0, max=1) + lrparsing.Repeat(T.IMPLIES | T.ID, min=0, max=1)
+	depend_element = lrparsing.Choice(
+		lrparsing.Repeat(T.NOT, min=0, max=2) + T.ID + lrparsing.Repeat(T.LBRACKET + lrparsing.List(selection, T.COMMA) + T.RBRACKET, min=0, max=1),
+		lrparsing.Repeat(condition | choice, min=0, max=1) + T.LPAREN + lrparsing.Repeat(lrparsing.THIS) + T.RPAREN)
+	depend = lrparsing.Repeat(depend_element)
+
+	START = depend
+
+lrparsing.compile_grammar(require)
+lrparsing.compile_grammar(depend)
+
+
+def visit_node_condition(parse_tree):
+	if parse_tree[1][1] == "!": return { 'type': "condition", 'not': "!", 'use': parse_tree[2][1] }
+	else: return { 'type': "condition", 'use': parse_tree[1][1] }
+
+
+def visit_node_choice(parse_tree):
+	return parse_tree[1][1]
+
+
+def visit_node_selection(parse_tree):
+	prefix = None
+	suffix = None
+	if parse_tree[1][1] == "!":
+		prefix = "!"
+		use = parse_tree[2][1]
+		i = 3
+	else:
+		use = parse_tree[1][1]
+		i = 2
+	if use[0] == "-":
+		prefix = "-"
+		use = use[1:]
+	if use[-1] == "=":
+		suffix = "="
+
+	res = { 'type': "selection", 'use': use }
+	if prefix: res['prefix'] = prefix
+	if (len(parse_tree) > i + 2) and (parse_tree[i][1] == "("):
+		res['default'] = parse_tree[i+1][1]
+		i = i+3
+	if len(parse_tree) > i: suffix = parse_tree[i][1]
+	if suffix: res['suffix'] = suffix
+	return res
+
+##
+
+
+def visit_node_require_element(parse_tree):
+	if parse_tree[1][0].name == "choice":
+		return {
+			'type': "rchoice",
+			'choice': visit_node_choice(parse_tree[1]),
+			'els': [ visit_node_require_element(el) for el in filter(lambda x: x[0].name == "require_element", parse_tree[3:])]
+			}
+	if parse_tree[1][0].name == "condition":
+		return {
+			'type': "rcondition",
+			'condition': visit_node_condition(parse_tree[1]),
+			'els': [ visit_node_require_element(el) for el in filter(lambda x: x[0].name == "require_element", parse_tree[3:])]
+			}
+	if parse_tree[1][1] == "(": # inner
+		return {
+			'type': "rinner",
+			'els': [ visit_node_require_element(el) for el in filter(lambda x: x[0].name == "require_element", parse_tree[1:])]
+			}
+	neg = None
+	if parse_tree[1][1] == "!": # not use
+		neg = "!"
+		use = parse_tree[1][2]
+		i = 3
+	else:
+		use = parse_tree[1][1]
+		i = 2
+	res = { 'type': "rsimple", 'use': use }
+	if neg: res['not'] = neg
+	#if len(parse_tree) > i:
+	#	res['selection'] = [ visit_node_selection(el) for el in filter(lambda x: x[0].name == "selection", parse_tree[i:])]
+	return res
+
+
+def visit_node_require(parse_tree):
+	return [ visit_node_require_element(el) for el in parse_tree[1:] ]
+
+##
+
+
+def visit_node_depend_element(parse_tree):
+	if parse_tree[1][0].name == "choice":
+		return {
+			'type': "dchoice",
+			'choice': visit_node_choice(parse_tree[1]),
+			'els': [ visit_node_depend_element(el) for el in filter(lambda x: x[0].name == "depend_element", parse_tree[3:])]
+			}
+	if parse_tree[1][0].name == "condition":
+		return {
+			'type': "dcondition",
+			'condition': visit_node_condition(parse_tree[1]),
+			'els': [ visit_node_depend_element(el) for el in filter(lambda x: x[0].name == "depend_element", parse_tree[3:])]
+			}
+	if parse_tree[1][1] == "(": # inner
+		return {
+			'type': "dinner",
+			'els': [ visit_node_depend_element(el) for el in filter(lambda x: x[0].name == "depend_element", parse_tree[1:])]
+			}
+	neg = None
+	if parse_tree[1][1] == "!": # not atom
+		if parse_tree[2][1] == "!":
+			neg = "!!"
+			atom = parse_tree[3][1]
+			i = 4
+		else:
+			neg = "!"
+			atom = parse_tree[2][1]
+			i = 3
+	else:
+		atom = parse_tree[1][1]
+		i = 2
+	res = { 'type': "dsimple", 'atom': core_data.pattern_create_from_atom(atom) }
+	if neg: res['not'] = neg
+	if len(parse_tree) > i:
+		res['selection'] = [ visit_node_selection(el) for el in filter(lambda x: x[0].name == "selection", parse_tree[i:])]
+	return res
+
+
+def visit_node_depend(parse_tree):
+	return [ visit_node_depend_element(el) for el in parse_tree[1:] ]
+
+
+############################
+# main functions
+
+def translate_require(require_string):
+	return visit_node_require(require.parse(require_string)[1])
+
+
+def translate_depend(depend_string):
+	return visit_node_depend(depend.parse(depend_string)[1])
+
+
+######################################################################
+# TRANSLATE A EGENCACHE FILE INTO A HYPORTAGE SPL
 ######################################################################
 
 def is_selection_required(ctx):
@@ -77,29 +258,27 @@ def is_selection_required(ctx):
 	return (ctx['default'] == "+")
 
 
-class get_dependencies(constraint_ast_visitor.ASTVisitor):
+class get_dependencies(hyportage_constraint_ast.ASTVisitor):
 	def __init__(self, package_name):
-		super(constraint_ast_visitor.ASTVisitor, self).__init__()
+		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
 		self.main_package_name = package_name
-		self.res = hyportage_data.raw_dependencies_create()
+		self.res = hyportage_data.dependencies_create()
+		self.pattern = None
 
 	def visitRequiredSIMPLE(self, ctx):
-		hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
+		hyportage_data.dependencies_add_use(self.res, ctx['use'])
+
 	def visitCondition(self, ctx):
-		hyprtage_data.raw_dependencies_add_use(sef.res, ctx['use'])
+		hyportage_data.dependencies_add_use(self.res, ctx['use'])
+
 	def visitAtom(self, ctx):
 		self.pattern = ctx['atom']
-		hyportage_data.raw_dependencies_add_pattern(self.res, self.pattern)
+		hyportage_data.dependencies_add_pattern(self.res, self.pattern)
+
 	def visitSelection(self,ctx):
 		use = ctx['use']
-		if is_selection_required(ctx): hyportage_data.raw_dependencies_add_pattern_use(self.res, self.pattern, use)
-		if 'suffix' in ctx: hyprtage_data.raw_dependencies_add_use(sef.res, use)
-
-
-######################################################################
-### LOAD A PORTAGE MD5-CACHE REPOSITORY INTO HYPORTAGE
-######################################################################
-
+		if is_selection_required(ctx): hyportage_data.dependencies_add_pattern_use(self.res, self.pattern, use)
+		if 'suffix' in ctx: hyportage_data.dependencies_add_use(self.res, use)
 
 
 def create_spl_from_egencache_file(file_path):
@@ -108,8 +287,8 @@ def create_spl_from_egencache_file(file_path):
 	"""
 	# 1. base information from the file name
 	package_name, deprecated = get_package_name_from_path(file_path)
-	package_group, version_full, version = constraint_parser.parse_package_name(package_name)
-	# 2. informations from the file content
+	package_group, version_full, version = core_data.parse_package_name(package_name)
+	# 2. information from the file content
 	data_tmp = {}
 	with open(file_path, 'r') as f:
 		for line in f:
@@ -132,10 +311,10 @@ def create_spl_from_egencache_file(file_path):
 
 	iuses, use_selection = hyportage_data.use_selection_from_iuse_list(iuses_string.split() if iuses_string else [])
 
-	fm_local = utils.compact_list(constraint_parser.translate_require(fm_local)) if fm_local else []
-	fm_external = constraint_parser.translate_depend(fm_external) if fm_external else []
-	fm_runtime = constraint_parser.translate_depend(fm_runtime) if fm_runtime else []
-	fm_unloop = constraint_parser.translate_depend(fm_unloop) if fm_unloop else []
+	fm_local = utils.compact_list(translate_require(fm_local)) if fm_local else []
+	fm_external = translate_depend(fm_external) if fm_external else []
+	fm_runtime = translate_depend(fm_runtime) if fm_runtime else []
+	fm_unloop = translate_depend(fm_unloop) if fm_unloop else []
 	fm_combined = utils.compact_list(fm_external + fm_runtime + fm_unloop)
 	# 4. extracting the more structured data
 	visitor = get_dependencies()
@@ -144,18 +323,14 @@ def create_spl_from_egencache_file(file_path):
 	# 5. return the raw spl
 	return {
 		'name': package_name, 'group': package_group, 'deprecated': deprecated,
-		'versions_full': version_full, 'version': version,
+		'version_full': version_full, 'version': version,
 		'slot': slot, 'subslot': subslot,
-		'fm_local': fm_local, 'fm_combined': fm_combined, 'raw_dependencies': visitor.res,
+		'fm_local': fm_local, 'fm_combined': fm_combined,
+		'dependencies': visitor.res[1],
 		# data that is extended by the profile_configuration and the user_configuration
-		'environment_default': keywords,
+		'required_iuses_local': visitor.res[0],
+		'keywords_default': keywords,
 		'iuses_default': iuses, 'use_selection_default': use_selection
 		}
 
-
-
-
-
-def load_files_egencache(concurrent_map, filepaths):
-	return concurrent_map(load_file_egencache, filepaths)
 
