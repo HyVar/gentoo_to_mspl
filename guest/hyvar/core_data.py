@@ -154,7 +154,7 @@ def list_configuration_from_save_format(save_format, el_from_save_format):
 def dict_configuration_create(): return {}
 
 
-def dict_configuration_add(dict_configuration, key, value, create_function, update_function):
+def dict_configuration_add_el(dict_configuration, key, value, create_function, update_function):
 	to_update = dict_configuration.get(key)
 	if not to_update:
 		to_update = create_function()
@@ -162,14 +162,18 @@ def dict_configuration_add(dict_configuration, key, value, create_function, upda
 	update_function(to_update, value)
 
 
-def dict_configuration_remove(dict_configuration, key, value, remove_function):
+def dict_configuration_remove_el(dict_configuration, key, value, remove_function):
 	to_update = dict_configuration.get(key)
 	if to_update:
 		remove_function(to_update, value)
 
 
-def dict_configuration_set(dict_configuration, key, values):
+def dict_configuration_add(dict_configuration, key, values):
 	dict_configuration[key] = values
+
+
+def dict_configuration_remove(dict_configuration, key):
+	dict_configuration.pop(key)
 
 
 def dict_configuration_to_save_format(dict_configuration, key_to_save_format, value_to_save_format):
@@ -179,3 +183,87 @@ def dict_configuration_to_save_format(dict_configuration, key_to_save_format, va
 def dict_configuration_from_save_format(save_format, key_from_save_format, value_from_save_format):
 	return { key_from_save_format(p[0]): value_from_save_format(p[1]) for p in save_format.iteritems() }
 
+
+######################################################################
+# BASE USE RELATED CONFIGURATION MANIPULATION
+# base information about which use flags are selected, and which are not
+# as this information is actually operation, we need to store both positive and negative operation
+# https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html
+# https://wiki.gentoo.org/wiki//etc/portage/package.use
+######################################################################
+
+
+def use_configuration_create(positive=[], negative=[]):
+	return set(positive), set(negative)
+
+
+def use_configuration_get_positive(use_configuration):
+	return use_configuration[0]
+
+
+def use_configuration_get_negative(use_configuration):
+	return use_configuration[1]
+
+
+def use_configuration_add(use_configuration, use):
+	use_configuration[0].add(use)
+	use_configuration[1].discard(use)
+
+
+def use_configuration_remove(use_configuration, use):
+	use_configuration[0].discard(use)
+	use_configuration[1].add(use)
+
+
+def use_configuration_apply_configuration(use_configuration, use_configuration2):
+	use_configuration[0].update(use_configuration2[0])
+	use_configuration[1].difference_update(use_configuration2[0])
+	use_configuration[0].difference_update(use_configuration2[1])
+	use_configuration[1].update(use_configuration2[1])
+
+
+def use_configuration_create_from_uses_list(uses_list):
+	res = use_configuration_create()
+	for use in uses_list:
+		if use[0] == "-":
+			use_configuration_remove(res, use[1:])
+		else:
+			use_configuration_add(res, use)
+	return res
+
+
+def use_configuration_invert(use_configuration):
+	new_positive = list(use_configuration[1])
+	new_negative = list(use_configuration[0])
+	use_configuration[0].clear()
+	use_configuration[0].update(new_positive)
+	use_configuration[1].clear()
+	use_configuration[1].update(new_negative)
+
+
+def use_configuration_to_save_format(use_configuration):
+	return { 'positive': list(use_configuration[0]), 'negative': list(use_configuration[1]) }
+
+
+def use_configuration_from_save_format(save_format):
+	return set(save_format['positive']), set(save_format['negative'])
+
+
+######################################################################
+# INSTALLED PACKAGE
+######################################################################
+
+
+package_installed_create = dict_configuration_create
+
+
+def package_installed_set(package_installed, package_name, use_configuration):
+	return dict_configuration_add(package_installed, package_name, use_configuration)
+
+
+def package_installed_to_save_format(package_installed):
+	return dict_configuration_to_save_format(package_installed, use_configuration_to_save_format)
+
+
+def package_installed_from_save_format(save_format):
+	return dict_configuration_from_save_format(save_format, use_configuration_from_save_format)

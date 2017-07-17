@@ -1,11 +1,11 @@
 #!/usr/bin/python
 
 import core_data
-import portage_data
 
-import hyportage_pattern
-import hyportage_ids
 import hyportage_constraint_ast
+import hyportage_ids
+import hyportage_pattern
+import hyportage_configuration
 
 ######################################################################
 # KEYWORDS MANIPULATION
@@ -13,12 +13,6 @@ import hyportage_constraint_ast
 
 keywords_create = core_data.set_configuration_create
 keywords_copy = core_data.set_configuration_copy
-
-
-def keywords_apply_configuration_pattern(spl, keywords, conf_keywords):
-	for pattern, keyword_list in conf_keywords:
-		if hyportage_pattern.match_spl_full(pattern, spl):
-			keywords.update(keywords)
 
 keywords_to_save_format = core_data.set_configuration_to_save_format
 keywords_from_save_format = core_data.set_configuration_from_save_format
@@ -30,10 +24,6 @@ keywords_from_save_format = core_data.set_configuration_from_save_format
 
 iuses_create = core_data.set_configuration_create
 iuses_copy = core_data.set_configuration_copy
-
-
-def iuses_apply_configuration(iuses, conf_iuses): iuses.update(conf_iuses)
-
 
 iuses_to_save_format = core_data.set_configuration_to_save_format
 iuses_from_save_format = core_data.set_configuration_from_save_format
@@ -54,17 +44,6 @@ use_selection_to_save_format = core_data.set_configuration_to_save_format
 use_selection_from_save_format = core_data.set_configuration_from_save_format
 
 ##
-
-
-def use_selection_apply_configuration(use_selection, conf_use):
-	use_selection_addall(use_selection, portage_data.use_configuration_get_positive(conf_use))
-	use_selection_removeall(use_selection, portage_data.use_configuration_get_negative(conf_use))
-
-
-def use_selection_apply_configuration_pattern(spl, use_selection, conf_use):
-	for pattern, use_configuration in conf_use:
-		if hyportage_pattern.match_spl_full(pattern, spl):
-			use_selection_apply_configuration(use_selection, use_configuration)
 
 
 def use_selection_from_iuse_list(iuse_list):
@@ -129,6 +108,7 @@ def spl_get_required_iuses_local(spl): return spl['required_iuses_local']
 def spl_get_required_iuses(spl): return spl['required_iuses']
 
 
+def spl_get_keywords_list(spl): return spl['keywords_list']
 def spl_get_keywords_default(spl): return spl['keywords_default']
 def spl_get_keywords_profile(spl): return spl['keywords_profile']
 def spl_get_keywords_user(spl): return spl['keywords_user']
@@ -150,6 +130,7 @@ def spl_get_mask_user(spl): return spl['mask_user']
 ##
 
 
+def spl_set_keywords_default(spl, keywords): spl['keywords_default'] = keywords
 def spl_set_keywords_profile(spl, keywords): spl['keywords_profile'] = keywords
 def spl_set_iuses_profile(spl, new_iuses): spl['iuses_profile'] = new_iuses
 def spl_set_use_selection_profile(spl, new_use_selection): spl['use_selection_profile'] = new_use_selection
@@ -169,62 +150,6 @@ def spl_reset_required_use(spl, pattern_repository):
 
 
 def spl_set_smt_constraint(spl, smt_constraint): spl['smt_constraint'] = smt_constraint
-##
-
-
-def __spl_data_apply_configuration(spl, keywords, iuses, use_selection, mask, conf):
-	# 1. get relevant data from the configuration
-	conf_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
-	conf_iuse_conf = portage_data.configuration_get_iuse_configuration(conf)
-	conf_iuses = portage_data.iuse_configuration_get_iuses(conf_iuse_conf)
-	conf_use_configuration = portage_data.iuse_configuration_get_use_configuration(conf_iuse_conf)
-	conf_pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
-	conf_mask = portage_data.configuration_get_pattern_masked(conf)
-	# 2. accept keywords
-	new_keywords = keywords_copy(keywords)
-	keywords_apply_configuration_pattern(spl, new_keywords, conf_keywords)
-	# 3. iuses
-	new_iuses = set(iuses)
-	iuses_apply_configuration(new_iuses, conf_iuses)
-	# 4. use selection
-	new_use_selection = use_selection_copy(use_selection)
-	use_selection_apply_configuration(new_use_selection, conf_use_configuration)
-	use_selection_apply_configuration_pattern(spl, new_use_selection, conf_pattern_configuration)
-	# 5. mask
-	new_mask = mask
-	for pattern, sign in conf_mask:
-		if hyportage_pattern.match_spl_full(pattern, spl):
-			new_mask = sign
-	# 6. bundle up the generated data
-	return new_keywords, new_iuses, new_use_selection, new_mask
-
-
-def spl_apply_profile_configuration(spl, conf):
-	new_keywords, new_iuses, new_use_selection, new_mask = __spl_data_apply_configuration(
-		spl,
-		spl_get_keywords_default(spl),
-		spl_get_iuses_default(spl),
-		spl_get_use_selection_default(spl),
-		False,
-		conf)
-	spl_set_keywords_profile(spl, new_keywords)
-	spl_set_iuses_profile(spl, new_iuses)
-	spl_set_use_selection_profile(spl, new_use_selection)
-	spl_set_mask_profile(spl, new_mask)
-
-
-def spl_apply_user_configuration(spl, conf):
-	new_keywords, new_iuses, new_use_selection, new_mask = __spl_data_apply_configuration(
-		spl,
-		spl_get_keywords_profile(spl),
-		spl_get_iuses_profile(spl),
-		spl_get_use_selection_profile(spl),
-		spl_get_mask_profile(spl),
-		conf)
-	spl_set_keywords_user(spl, new_keywords)
-	spl_set_iuses_user(spl, new_iuses)
-	spl_set_use_selection_user(spl, new_use_selection)
-	spl_set_mask_user(spl, new_mask)
 
 ##
 
@@ -240,11 +165,12 @@ def spl_to_save_format(spl):
 		'subslot': spl_get_subslot(spl),
 		'fm_local': hyportage_constraint_ast.ast_require_to_save_format(spl_get_fm_local(spl)),
 		'fm_combined': hyportage_constraint_ast.ast_depend_to_save_format(spl_get_fm_combined(spl)),
-		'dependencies': spl_get_depedencies(spl),
+		'dependencies': spl_get_dependencies(spl),
 		#
 		'required_iuses_local': spl_get_required_iuses_local(spl),
 		'required_iuses': spl_get_required_iuses(spl),
 		#
+		'keywords_list': spl_get_keywords_list(spl),
 		'keywords_default': spl_get_keywords_default(spl),
 		'keywords_profile': spl_get_keywords_profile(spl),
 		'keywords_user': spl_get_keywords_user(spl),
@@ -277,6 +203,7 @@ def spl_from_save_format(save_format):
 		'required_iuses_local': save_format['required_iuses_local'],
 		'required_iuses': save_format['required_iuses'],
 		#
+		'keywords_list': save_format['keywords_list'],
 		'keywords_default': save_format['keywords_default'],
 		'keywords_profile': save_format['keywords_profile'],
 		'keywords_user': save_format['keywords_user'],
@@ -318,42 +245,46 @@ def mspl_to_save_format(mspl):
 
 def mspl_from_save_format(save_format):
 	mspl = {}
-	spl_group = {}
+	spl_groups = {}
 	for el in save_format:
 		spl = spl_from_save_format(el)
 		mspl[spl_get_name(spl)] = spl
-		spl_group_add_spl(spl_group, spl)
-	return mspl, spl_group
+		spl_groups_add_spl(spl_groups, spl)
+	return mspl, spl_groups
 
 
 ######################################################################
 # SPL GROUP MANIPULATION
 ######################################################################
 
-def spl_group_add_spl(spl_group, spl):
+
+spl_groups_create = core_data.dict_configuration_create()
+
+
+def spl_groups_add_spl(spl_groups, spl):
 	group_name, version_full, spl_name = (spl_get_group(spl), spl_get_version_full(spl), spl_get_name(spl) )
-	group = spl_group.get(group_name)
+	group = spl_groups.get(group_name)
 	if group:
 		group['implementations'][version_full] = spl_name
 		group['dependencies'].append(spl_name)
 		group['reference'].append(spl)
 	else:
 		group = {'implementations': {version_full: spl_name}, 'dependencies': [spl_name], 'reference': [spl] }
-		spl_group[group_name] = group
+		spl_groups[group_name] = group
 
 
-def spl_group_replace_spl(spl_group, old_spl, new_spl):
-	group = spl_group.get(spl_get_group(new_spl))
+def spl_groups_replace_spl(spl_groups, old_spl, new_spl):
+	group = spl_groups.get(spl_get_group(new_spl))
 	group['reference'].remove(old_spl)
 	group['reference'].append(new_spl)
 
 
-def spl_group_remove_spl(spl_group, spl):
+def spl_groups_remove_spl(spl_groups, spl):
 	group_name = spl_get_group(spl)
-	group = spl_group.get(group_name)
+	group = spl_groups.get(group_name)
 	if group:
 		if len(group['reference']) == 1:
-			spl_group.pop(group_name)
+			spl_groups.pop(group_name)
 		else:
 			version_full, spl_name = (spl_get_version_full(spl), spl_get_name(spl) )
 			group['implementations'].pop(version_full)
@@ -365,20 +296,31 @@ def spl_group_remove_spl(spl_group, spl):
 # FULL SPL DATA MANIPULATION
 ######################################################################
 
+# hyportage data contains:
+#  - pattern repository
+#  - id repository
+#  - mspl
+#  - spl_groups
+#  - current configuration
 
-def hyportage_to_save_format(pattern_repository, id_repository, mspl, spl_group):
+
+def hyportage_data_to_save_format(pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls):
 	return {
 		'pattern_repository': hyportage_pattern.pattern_repository_to_save_format(pattern_repository),
 		'id_repository': hyportage_ids.id_repository_to_save_format(id_repository),
 		'mspl': mspl_to_save_format(mspl),
+		'core_configuration': hyportage_configuration.core_configuration_to_save_format(core_configuration),
+		'installed_spls': core_data.package_installed_to_save_format(installed_spls)
 	}
 
 
-def hyportage_from_save_format(save_format):
-	mspl, spl_group = mspl_from_save_format(save_format['mspl'])
+def hyportage_data_from_save_format(save_format):
+	mspl, spl_groups = mspl_from_save_format(save_format['mspl'])
 	return (
 		hyportage_pattern.pattern_repository_from_save_format(save_format['pattern_repository'], mspl),
 		hyportage_ids.id_repository_from_save_format(save_format['id_repository']),
 		mspl,
-		spl_group
+		spl_groups,
+		hyportage_configuration.core_configuration_from_save_format(save_format['core_configuration']),
+		core_data.package_installed_from_save_format(save_format['installed_spls'])
 	)

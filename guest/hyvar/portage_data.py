@@ -3,7 +3,6 @@
 
 import core_data
 
-
 wildcardpattern = "*/*"
 
 ######################################################################
@@ -52,11 +51,11 @@ required_pattern_create = core_data.dict_configuration_create
 
 
 def required_pattern_add(required_package, package_set, pattern):
-	return core_data.dict_configuration_add(required_package, package_set, pattern, core_data.set_configuration_create, core_data.set_configuration_add)
+	return core_data.dict_configuration_add_el(required_package, package_set, pattern, core_data.set_configuration_create, core_data.set_configuration_add)
 
 
 def required_pattern_remove(required_package, package_set, pattern):
-	return core_data.dict_configuration_remove(required_package, package_set, pattern, core_data.set_configuration_remove)
+	return core_data.dict_configuration_remove_el(required_package, package_set, pattern, core_data.set_configuration_remove)
 
 
 def required_pattern_to_save_format(required_package):
@@ -74,10 +73,10 @@ def required_pattern_from_save_format(save_format):
 # https://wiki.gentoo.org/wiki//etc/portage/package.accept_keywords
 ######################################################################
 
-def required_package_element_to_save_format(x): return { 'pattern': core_data.pattern_to_save_format(x[0]), 'keyword': x[1] }
+def pattern_accept_keywords_element_to_save_format(x): return {'pattern': core_data.pattern_to_save_format(x[0]), 'keyword': x[1]}
 
 
-def required_package_element_from_save_format(x): return core_data.pattern_from_save_format(x['pattern']), x['keyword']
+def pattern_accept_keywords_element_from_save_format(x): return core_data.pattern_from_save_format(x['pattern']), x['keyword']
 
 ##
 
@@ -89,11 +88,11 @@ def pattern_accept_keywords_add(pattern_accept_keywords, pattern, keywords):
 
 
 def pattern_accept_keywords_to_save_format(pattern_accept_keywords):
-	return core_data.list_configuration_to_save_format(pattern_accept_keywords, required_package_element_to_save_format)
+	return core_data.list_configuration_to_save_format(pattern_accept_keywords, pattern_accept_keywords_element_to_save_format)
 
 
 def pattern_accept_keywords_from_save_format(save_format):
-	return core_data.list_configuration_from_save_format(save_format, required_package_element_from_save_format)
+	return core_data.list_configuration_from_save_format(save_format, pattern_accept_keywords_element_from_save_format)
 
 
 ######################################################################
@@ -131,69 +130,6 @@ def pattern_masked_from_save_format(save_format):
 	return core_data.list_configuration_from_save_format(save_format, pattern_masked_element_from_save_format)
 
 
-######################################################################
-# BASE USE RELATED CONFIGURATION MANIPULATION
-# base information about which use flags are selected, and which are not
-# as this information is actually operation, we need to store both positive and negative operation
-# https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html
-# https://wiki.gentoo.org/wiki//etc/portage/package.use
-######################################################################
-
-
-def use_configuration_create(positive=[], negative=[]):
-	return set(positive), set(negative)
-
-
-def use_configuration_get_positive(use_configuration):
-	return use_configuration[0]
-
-
-def use_configuration_get_negative(use_configuration):
-	return use_configuration[1]
-
-
-def use_configuration_add(use_configuration, use):
-	use_configuration[0].add(use)
-	use_configuration[1].discard(use)
-
-
-def use_configuration_remove(use_configuration, use):
-	use_configuration[0].discard(use)
-	use_configuration[1].add(use)
-
-
-def use_configuration_apply_configuration(use_configuration, use_configuration2):
-	use_configuration[0].update(use_configuration2[0])
-	use_configuration[1].difference_update(use_configuration2[0])
-	use_configuration[0].difference_update(use_configuration2[1])
-	use_configuration[1].update(use_configuration2[1])
-
-
-def use_configuration_create_from_uses_list(uses_list):
-	res = use_configuration_create()
-	for use in uses_list:
-		if use[0] == "-":
-			use_configuration_remove(res, use[1:])
-		else:
-			use_configuration_add(res, use)
-	return res
-
-
-def use_configuration_invert(use_configuration):
-	new_positive = list(use_configuration[1])
-	new_negative = list(use_configuration[0])
-	use_configuration[0].clear()
-	use_configuration[0].update(new_positive)
-	use_configuration[1].clear()
-	use_configuration[1].update(new_negative)
-
-
-def use_configuration_to_save_format(use_configuration):
-	return { 'positive': list(use_configuration[0]), 'negative': list(use_configuration[1]) }
-
-
-def use_configuration_from_save_format(save_format):
-	return set(save_format['positive']), set(save_format['negative'])
 
 
 ######################################################################
@@ -203,7 +139,7 @@ def use_configuration_from_save_format(save_format):
 ######################################################################
 
 def iuse_configuration_create():
-	return core_data.set_configuration_create(), use_configuration_create()
+	return core_data.set_configuration_create(), core_data.use_configuration_create()
 
 
 def iuse_configuration_get_iuses(iuse_configuration): return iuse_configuration[0]
@@ -220,27 +156,29 @@ def iuse_configuration_update(iuse_configuration, use):
 
 def iuse_configuration_add(iuse_configuration, use):
 	core_data.set_configuration_add(iuse_configuration[0], use)
-	use_configuration_add(iuse_configuration[1], use)
+	core_data.use_configuration_add(iuse_configuration[1], use)
 
 
 def iuse_configuration_remove(iuse_configuration, use):
 	core_data.set_configuration_add(iuse_configuration[0], use)
-	use_configuration_remove(iuse_configuration[1], use)
+	core_data.use_configuration_remove(iuse_configuration[1], use)
 
 
 def iuse_configuration_apply_configuration(iuse_configuration, iuse_configuration2):
 	core_data.set_configuration_addall(iuse_configuration[0], iuse_configuration2[0])
-	use_configuration_apply_configuration(iuse_configuration[1], iuse_configuration2[1])
+	core_data.use_configuration_apply_configuration(iuse_configuration[1], iuse_configuration2[1])
 
 
 def iuse_configuration_to_save_format(iuse_configuration):
-	res = use_configuration_to_save_format(iuse_configuration[1])
+	res = core_data.use_configuration_to_save_format(iuse_configuration[1])
 	res['iuse'] = core_data.set_configuration_to_save_format(iuse_configuration[0])
 	return res
 
 
 def iuse_configuration_from_save_format(save_format):
-	return ( core_data.set_configuration_from_save_format(save_format['iuse']), use_configuration_from_save_format(save_format) )
+	return (
+		core_data.set_configuration_from_save_format(save_format['iuse']),
+		core_data.use_configuration_from_save_format(save_format))
 
 
 def iuse_configuration_create_from_iuses_list(iuses_list):
@@ -262,11 +200,11 @@ def iuse_configuration_create_from_iuses_list(iuses_list):
 ######################################################################
 
 def pattern_configuration_element_to_save_format(x):
-	return { 'pattern': core_data.pattern_to_save_format(x[0]), 'use': use_configuration_to_save_format(x[1]) }
+	return { 'pattern': core_data.pattern_to_save_format(x[0]), 'use': core_data.use_configuration_to_save_format(x[1])}
 
 
 def pattern_configuration_element_from_save_format(x):
-	return ( core_data.pattern_from_save_format(x['pattern']), use_configuration_from_save_format(x['use']) )
+	return (core_data.pattern_from_save_format(x['pattern']), core_data.use_configuration_from_save_format(x['use']))
 
 ##
 
@@ -283,30 +221,6 @@ def pattern_configuration_to_save_format(pattern_configuration):
 
 def pattern_configuration_from_save_format(save_format):
 	return core_data.list_configuration_from_save_format(save_format, pattern_configuration_element_from_save_format)
-
-
-######################################################################
-# INSTALLED PACKAGE
-######################################################################
-
-package_installed_create = core_data.dict_configuration_create
-
-
-def package_installed_add(package_installed, package_name, use_configuration):
-	return core_data.dict_configuration_add(package_installed, package_name, use_configuration, use_configuration_create, use_configuration_add)
-
-
-def package_installed_set(package_installed, package_name, use_configuration):
-	return core_data.dict_configuration_set(package_installed, package_name, use_configuration)
-
-
-def package_installed_to_save_format(package_installed):
-	return core_data.dict_configuration_to_save_format(package_installed, use_configuration_to_save_format)
-
-
-def package_installed_from_save_format(save_format):
-	return core_data.dict_configuration_from_save_format(save_format, use_configuration_from_save_format)
-
 
 ######################################################################
 # FULL CONFIGURATION MANIPULATION
@@ -336,6 +250,7 @@ def configuration_get_pattern_configuration(configuration): return configuration
 
 def configuration_set_arch(configuration, arch): configuration[0][0] = arch
 
+##
 
 
 def configuration_to_save_format(configuration):

@@ -16,7 +16,7 @@ import json
 import marshal
 import gzip
 import threading
-
+import logging
 
 ######################################################################
 ### BASE STRUCTURED DICTIONARIES AND LISTS MANIPULATION
@@ -90,23 +90,38 @@ def get_new_temp_file(extension):
 	return name
 
 
-def load_data_file(file_name, save_modality="json"):
+def load_data_file(file_name, save_modality="gzjson"):
 	if save_modality == "marshal":
 		with open(file_name, "r") as f:
 			data = marshal.load(f)
-	else:
+	elif save_modality == "gzjson":
 		with gzip.open(file_name, "r") as f:
 			data = json.load(f)
+	elif save_modality == "json":
+		with open(file_name, "r") as f:
+			data = json.load(f)
+	else:
+		logging.error(
+			"Cannot load data from file \"" + file_name + "\", because the format \""
+			+ save_modality + "\" is unknown")
+		data = None
 	return data
 
 
-def store_data_file(file_name, data, save_modality="json"):
+def store_data_file(file_name, data, save_modality="gzjson"):
 	if save_modality == "marshal": # marshal can not use gzip file directly (possible work around marshal.dumps)
 		with open(file_name, 'w') as f:
 			marshal.dump(data,f)
-	else:
+	elif save_modality == "gzjson":
 		with gzip.GzipFile(file_name, 'w') as f:
 			json.dump(data,f)
+	elif save_modality == "json":
+		with open(file_name, 'w') as f:
+			json.dump(data,f)
+	else:
+		logging.error(
+			"Cannot save data on file \"" + file_name + "\", because the format \""
+			+ save_modality + "\" is unknown")
 
 ######################################################################
 ### LIST COMPACTION
@@ -124,9 +139,9 @@ def compact_list(l):
 ### ID GENERATION
 ######################################################################
 
-
 __id_current = 0
 __id_current_lock = multiprocessing.Lock()
+
 
 def new_id():
 	global __id_current
@@ -136,6 +151,7 @@ def new_id():
 		__id_current = __id_current + 1
 	return unicode(res)
 
+
 def new_ids(nb=1):
 	global __id_current
 	global __id_current_lock
@@ -143,6 +159,12 @@ def new_ids(nb=1):
 		res = [ unicode(i) for i in xrange(__id_current, __id_current + nb - 1) ]
 		__id_current = __id_current + nb
 	return res
+
+
+def get_last_id(): return __id_current
+def set_last_id(last_id):
+	global __id_current
+	__id_current = last_id
 
 
 CONTEXT_VAR_NAME = "ccc"

@@ -72,11 +72,13 @@ def id_repository_to_save_format(id_repository):
 		'ids_spl': id_repository_get_ids(id_repository),
 		'spl_ids': { spl_name: { 'id': value[0], 'slot': value[1], 'subslot': value[2], 'iuses': value[3] } for spl_name, value in id_repository_get_spls(id_repository).iteritems() },
 		'ids_keyword': id_repository_get_keywords(id_repository)[0],
-		'keyword_ids': id_repository_get_keywords(id_repository)[1]
+		'keyword_ids': id_repository_get_keywords(id_repository)[1],
+		'last_id': utils.get_last_id()
 	}
 
 
 def id_repository_from_save_format(save_format):
+	utils.set_last_id(save_format['last_id'])
 	return (
 		save_format['ids_spl'],
 		{ spl_name: (value['id'], value['slot'], value['subslot'], value['iuses']) for spl_name, value in save_format['spl_ids'].iteritems() },

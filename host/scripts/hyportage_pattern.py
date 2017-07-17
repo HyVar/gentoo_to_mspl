@@ -196,7 +196,7 @@ def pattern_repository_local_map_remove_pattern(pattern_repository_element, patt
 	if pattern_repository_element_remove_required_use(pattern_repository_element[pattern], required_use) == 0: pattern_repository_element.pop(pattern)
 
 
-def pattern_repository_remove_pattern(pattern_repository, pattern, required_use):
+def pattern_repository_remove_pattern(pattern_repository, pattern, required_use=[]):
 	if pattern_is_package_group_specific(pattern):
 		pattern_repository_local_map_remove_pattern(pattern_repository[0][pattern_get_package_group(pattern)], pattern, required_use)
 	else:
@@ -250,7 +250,6 @@ def pattern_repository_remove(pattern_repository, spl):
 	pattern_repository_remove_spl(pattern_repository, spl)
 
 
-
 ##
 
 def pattern_repository_local_map_get(pattern_repository_element, pattern): return pattern_repository_element_get(pattern_repository_element[pattern])
@@ -264,7 +263,8 @@ def pattern_repository_get(pattern_repository, pattern):
 def pattern_repository_local_map_get_spl_required_use(pattern_repository_element, spl, match_function):
 	res = set()
 	for pattern, element in pattern_repository_element.iteritems():
-		if match_function(pattern, spl): res.update(pattern_repository_element_get_required_use(element))
+		if spl in pattern_repository_element_get_spl(element):
+			res.update(pattern_repository_element_get_required_use(element))
 	return res
 
 
