@@ -7,7 +7,7 @@ GUEST_PACKAGE_DIR="${1}/packages"
 mkdir -p "${GUEST_PACKAGE_DIR}"
 
 # the link to the portage tree (we only consider egencache generated files)
-ln -s /usr/portage/metadata/md5-cache "${GUEST_PACKAGE_DIR}/portage-tree"
+[ -e "${GUEST_PACKAGE_DIR}/portage-tree" ] || ln -s /usr/portage/metadata/md5-cache "${GUEST_PACKAGE_DIR}/portage-tree"
 
 # the folder containing the deprecated packages, necessary as some of them are installed
 mkdir -p "${GUEST_PACKAGE_DIR}/deprecated"

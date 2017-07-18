@@ -129,13 +129,13 @@ def pattern_repository_create():
 
 
 def pattern_repository_element_create(required_use):
-	return (1, { k: 1 for k in required_use }, set([]))
+	return ([1], { k: 1 for k in required_use }, set([]))
 
 
 # pattern repository element management
 
 def pattern_repository_element_add_required_use(pattern_repository_element, required_use):
-	pattern_repository_element[0] = pattern_repository_element[0] + 1
+	pattern_repository_element[0][0] = pattern_repository_element[0][0] + 1
 	uses = pattern_repository_element[1]
 	for use in required_use:
 		if use in uses: uses[use] = uses[use] + 1
@@ -144,8 +144,8 @@ def pattern_repository_element_add_required_use(pattern_repository_element, requ
 
 
 def pattern_repository_element_remove_required_use(pattern_repository_element, required_use):
-	if pattern_repository_element[0] == 1: return 0
-	pattern_repository_element[0] = pattern_repository_element[0] - 1
+	if pattern_repository_element[0][0] == 1: return 0
+	pattern_repository_element[0][0] = pattern_repository_element[0][0] - 1
 	uses = pattern_repository_element[1]
 	for use in required_use:
 		if uses[use] == 1: uses.pop(use)
@@ -163,11 +163,11 @@ def pattern_repository_element_get(pattern_repository_element): return (pattern_
 ##
 
 def pattern_repository_element_to_save_format(pattern_repository_element):
-	return { 'ref_count': pattern_repository_element[0], 'required_use': pattern_repository_element[1], 'spl_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element[2] ] }
+	return { 'ref_count': pattern_repository_element[0][0], 'required_use': pattern_repository_element[1], 'spl_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element[2] ] }
 
 
 def pattern_repository_element_from_save_format(save_format, mspl):
-	return ( save_format['ref_count'], save_format['required_use'], set([ mspl[spl_name] for spl_name in save_format['spl_names'] ]) )
+	return ( [save_format['ref_count']], save_format['required_use'], set([ mspl[spl_name] for spl_name in save_format['spl_names'] ]) )
 
 
 # pattern management

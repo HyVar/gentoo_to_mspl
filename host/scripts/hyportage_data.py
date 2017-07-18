@@ -240,7 +240,7 @@ class MSPLToSaveFormatGenerator(object):
 
 
 def mspl_to_save_format(mspl):
-	return MSPLToSaveFormatGenerator(mspl)
+	return [spl_to_save_format(value) for value in mspl.values()]
 
 
 def mspl_from_save_format(save_format):
@@ -258,7 +258,7 @@ def mspl_from_save_format(save_format):
 ######################################################################
 
 
-spl_groups_create = core_data.dict_configuration_create()
+spl_groups_create = core_data.dict_configuration_create
 
 
 def spl_groups_add_spl(spl_groups, spl):

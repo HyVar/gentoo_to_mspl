@@ -58,7 +58,7 @@ def id_repository_remove_spl(id_repository, spl):
 
 def id_repository_set_keywords(id_repository, keywords):
 	ids, names = id_repository_get_keywords(id_repository)
-	ids.clear()
+	ids[:] = []
 	ids.extend(keywords)
 	names.clear()
 	for idx, keyword in enumerate(keywords):

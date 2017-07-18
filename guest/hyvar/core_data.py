@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-
 def identity(x): x
 
 
@@ -124,8 +123,16 @@ def set_configuration_to_save_format(set_configuration, el_to_save_format):
 	return [ el_to_save_format(el) for el in set_configuration ]
 
 
+def set_configuration_to_save_format_simple(set_configuration): return list(set_configuration)
+
+
+
 def set_configuration_from_save_format(save_format, el_from_save_format):
 	return set([ el_from_save_format(el) for el in save_format ])
+
+
+def set_configuration_from_save_format_simple(save_format): return set(save_format)
+
 
 # generic list configuration
 # everything with patterns must use ordered lists
@@ -181,7 +188,7 @@ def dict_configuration_to_save_format(dict_configuration, key_to_save_format, va
 
 
 def dict_configuration_from_save_format(save_format, key_from_save_format, value_from_save_format):
-	return { key_from_save_format(p[0]): value_from_save_format(p[1]) for p in save_format.iteritems() }
+	return { key_from_save_format(p[0]): value_from_save_format(p[1]) for p in save_format }
 
 
 ######################################################################
@@ -262,8 +269,10 @@ def package_installed_set(package_installed, package_name, use_configuration):
 
 
 def package_installed_to_save_format(package_installed):
-	return dict_configuration_to_save_format(package_installed, use_configuration_to_save_format)
+	return dict_configuration_to_save_format(package_installed, identity, use_configuration_to_save_format)
 
 
 def package_installed_from_save_format(save_format):
-	return dict_configuration_from_save_format(save_format, use_configuration_from_save_format)
+	return dict_configuration_from_save_format(save_format, identity, use_configuration_from_save_format)
+
+

@@ -11,12 +11,17 @@ __status__ = "Prototype"
 
 import re
 import uuid
+
 import multiprocessing
+import threading
+
+import logging
+
+import os
+import os.path
 import json
 import marshal
 import gzip
-import threading
-import logging
 
 ######################################################################
 ### BASE STRUCTURED DICTIONARIES AND LISTS MANIPULATION
@@ -109,11 +114,17 @@ def load_data_file(file_name, save_modality="gzjson"):
 
 
 def store_data_file(file_name, data, save_modality="gzjson"):
+	# 1. create file if does not exist
+	basedir = os.path.dirname(file_name)
+	if not os.path.exists(basedir): os.makedirs(basedir)
+	with open(file_name, 'a'):
+		pass
+	# 2. write the data
 	if save_modality == "marshal": # marshal can not use gzip file directly (possible work around marshal.dumps)
 		with open(file_name, 'w') as f:
 			marshal.dump(data,f)
 	elif save_modality == "gzjson":
-		with gzip.GzipFile(file_name, 'w') as f:
+		with gzip.GzipFile(file_name, 'wb') as f:
 			json.dump(data,f)
 	elif save_modality == "json":
 		with open(file_name, 'w') as f:

@@ -22,7 +22,7 @@ GUEST_GEN_DIR="${GUEST_INSTALL_DIR}/gen/"
 
 
 HOST_SCRIPT_DIRECTORY="${SCRIPT_DIR}/host/scripts"
-HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/translate-portage.py"
+HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/translate_portage.py"
 HOST_SCRIPT_RECONFIGURE="${HOST_SCRIPT_DIRECTORY}/reconfigure.py"
 
 HOST_GUEST_INSTALL_DIR="${SCRIPT_DIR}/guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
@@ -58,8 +58,12 @@ function setup_guest {
 }
 
 function sync_guest {
-	sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no ${GUEST_USER}@${GUEST} "echo ${GUEST_PWD_ROOT} | sudo -S python ${GUEST_INSTALL_DIR}/sync.py ${GUEST_GEN_DIR}"
-	sshpass -p ${GUEST_PWD_USER} rsync -rLptgoDz -e "ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no" ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
+	if sshpass -p ${GUEST_PWD_USER} ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no ${GUEST_USER}@${GUEST} "echo ${GUEST_PWD_ROOT} | sudo -S python ${GUEST_INSTALL_DIR}/extract_portage.py ${GUEST_GEN_DIR}";
+	then
+		sshpass -p ${GUEST_PWD_USER} rsync -rLptgoDz -e "ssh -p ${GUEST_PORT} -o PubkeyAuthentication=no" ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
+	else
+		echo "extracting data from portage failed"
+	fi
 	#sshpass -p ${GUEST_PWD_USER} scp -o PubkeyAuthentication=no -P ${GUEST_PORT}  ${GUEST_USER}@${GUEST}:${GUEST_GEN_DIR} ${HOST_HOST_INSTALL_DIR}
 }
 
@@ -92,12 +96,13 @@ function clean_host {
 
 function translate {
 	shift 1
-	if [ -n "${PYTHONPATH}" ]; then
-		PYTHONPATH="${PYTHONPATH}:${HOST_GUEST_INSTALL_DIR}"
-	else
-		PYTHONPATH="${HOST_GUEST_INSTALL_DIR}"
-	fi
-	python "${HOST_SCRIPT_TRANSLATE}" $@ "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}"
+	#if [ -n "${PYTHONPATH}" ]; then
+	#	PYTHONPATH="${PYTHONPATH}:${HOST_GUEST_INSTALL_DIR}"
+	#else
+	#	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}"
+	#fi
+	#echo $PYTHONPATH
+	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}" python "${HOST_SCRIPT_TRANSLATE}" $@ "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}"
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 

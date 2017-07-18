@@ -15,6 +15,7 @@ import click
 import time
 import sys
 
+
 import core_data
 import portage_data
 import hyportage_from_egencache
@@ -27,6 +28,7 @@ import hyportage_configuration
 #import extract_dependencies
 #import extract_package_groups
 import smt_encoding
+
 
 
 def usage():
@@ -107,7 +109,7 @@ def load_hyportage(path_hyportage, save_modality):
 #	help="Only performs only the translation into SMT formulas.")
 @click.option(
 	'--save-modality',
-	type=click.Choice(["json","marshal"]), default="gzjson",
+	type=click.Choice(["json", "gzjson", "marshal"]), default="gzjson",
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(
 	dir_portage,

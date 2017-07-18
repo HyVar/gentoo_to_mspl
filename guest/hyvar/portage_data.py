@@ -3,7 +3,9 @@
 
 import core_data
 
-wildcardpattern = "*/*"
+# Note that patterns here are kept in their string format
+# However, they need to be stored in the right dictionary format
+wildcardpattern = core_data.pattern_create_from_atom("*/*")
 
 ######################################################################
 # KEYWORD SET (the list of declared keywords)
@@ -13,8 +15,8 @@ wildcardpattern = "*/*"
 keyword_set_create = core_data.set_configuration_create
 keyword_set_add = core_data.set_configuration_add
 keyword_set_remove = core_data.set_configuration_remove
-keyword_set_to_save_format = core_data.set_configuration_to_save_format
-keyword_set_from_save_format = core_data.set_configuration_from_save_format
+keyword_set_to_save_format = core_data.set_configuration_to_save_format_simple
+keyword_set_from_save_format = core_data.set_configuration_from_save_format_simple
 
 
 ######################################################################
@@ -26,8 +28,8 @@ keyword_set_from_save_format = core_data.set_configuration_from_save_format
 provided_package_configuration_create = core_data.set_configuration_create
 provided_package_configuration_add = core_data.set_configuration_add
 provided_package_configuration_remove = core_data.set_configuration_remove
-provided_package_configuration_to_save_format = core_data.set_configuration_to_save_format
-provided_package_configuration_from_save_format = core_data.set_configuration_from_save_format
+provided_package_configuration_to_save_format = core_data.set_configuration_to_save_format_simple
+provided_package_configuration_from_save_format = core_data.set_configuration_from_save_format_simple
 
 
 ######################################################################
@@ -38,8 +40,8 @@ provided_package_configuration_from_save_format = core_data.set_configuration_fr
 ######################################################################
 
 
-def required_pattern_element_to_save_format(required_pattern_element):
-	return core_data.set_configuration_to_save_format(required_pattern_element, core_data.pattern_to_save_format)
+def required_pattern_element_to_save_format(required_package_element):
+	return core_data.set_configuration_to_save_format(required_package_element, core_data.pattern_to_save_format)
 
 
 def required_pattern_element_from_save_format(save_format):
@@ -171,13 +173,13 @@ def iuse_configuration_apply_configuration(iuse_configuration, iuse_configuratio
 
 def iuse_configuration_to_save_format(iuse_configuration):
 	res = core_data.use_configuration_to_save_format(iuse_configuration[1])
-	res['iuse'] = core_data.set_configuration_to_save_format(iuse_configuration[0])
+	res['iuse'] = core_data.set_configuration_to_save_format_simple(iuse_configuration[0])
 	return res
 
 
 def iuse_configuration_from_save_format(save_format):
 	return (
-		core_data.set_configuration_from_save_format(save_format['iuse']),
+		core_data.set_configuration_from_save_format_simple(save_format['iuse']),
 		core_data.use_configuration_from_save_format(save_format))
 
 

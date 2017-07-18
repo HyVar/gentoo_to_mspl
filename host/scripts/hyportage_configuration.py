@@ -167,7 +167,7 @@ def get_configuration_pattern(conf):
 	conf_pattern_accept_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
 	conf_pattern_masked = portage_data.configuration_get_pattern_masked(conf)
 	conf_pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
-	res = set(conf_pattern_required.values())
+	res = set.union(*conf_pattern_required.values())
 	res.update(extract_pattern_from_list(conf_pattern_accept_keywords))
 	res.update(extract_pattern_from_list(conf_pattern_masked))
 	res.update(extract_pattern_from_list(conf_pattern_configuration))

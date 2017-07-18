@@ -147,7 +147,7 @@ def analyse_package_set(filepath, conf, lines):
 	package_required = portage_data.configuration_get_pattern_required(conf)
 	package_set = os.path.basename(filepath)
 	for line in lines:
-		portage_data.required_pattern_add(package_required, package_set, line)
+		portage_data.required_pattern_add(package_required, package_set, core_data.pattern_create_from_atom(line))
 
 
 # file: "package.provided" in user configuration
@@ -162,21 +162,21 @@ def analyse_package_accept_keywords(conf, lines):
 	pattern_accept_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
 	for line in lines:
 		els = line.split()
-		portage_data.pattern_accept_keywords_add(pattern_accept_keywords, els[0], els[1:])
+		portage_data.pattern_accept_keywords_add(pattern_accept_keywords, core_data.pattern_create_from_atom(els[0]), els[1:])
 
 
 # file: "package.mask", in profile and user configuration
 def analyse_package_mask(conf, lines):
 	pattern_masked = portage_data.configuration_get_pattern_masked(conf)
 	for line in lines:
-		portage_data.pattern_masked_add(pattern_masked, line)
+		portage_data.pattern_masked_add(pattern_masked, core_data.pattern_create_from_atom(line))
 
 
 # file: "package.unmask", in user configuration
 def analyse_package_unmask(conf, lines):
 	pattern_masked = portage_data.configuration_get_pattern_masked(conf)
 	for line in lines:
-		portage_data.pattern_masked_remove(pattern_masked, line)
+		portage_data.pattern_masked_remove(pattern_masked, core_data.pattern_create_from_atom(line))
 
 
 # file: "package.use*", in profile and user configuration
@@ -185,7 +185,7 @@ def analyse_package_use(conf, lines):
 	for line in lines:
 		els = line.split()
 		uses = core_data.use_configuration_create_from_uses_list(els[1:])
-		portage_data.pattern_configuration_add(pattern_configuration, els[0], uses)
+		portage_data.pattern_configuration_add(pattern_configuration, core_data.pattern_create_from_atom(els[0]), uses)
 
 
 # file: "package.use.mask*", in profile configuration
@@ -195,7 +195,7 @@ def analyse_package_use_mask(conf, lines):
 		els = line.split()
 		uses = core_data.use_configuration_create_from_uses_list(els[1:])
 		core_data.use_configuration_invert(uses)
-		portage_data.pattern_configuration_add(pattern_configuration, els[0], uses)
+		portage_data.pattern_configuration_add(pattern_configuration, core_data.pattern_create_from_atom(els[0]), uses)
 
 
 # file "use.force", in profile configuration
