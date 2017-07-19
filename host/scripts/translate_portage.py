@@ -314,17 +314,8 @@ def main(
 	# 8. WRITE THE FILES
 	##########################################################################
 
-	import json
-
-	#json.dumps(hyportage_pattern.pattern_repository_to_save_format(pattern_repository))
-	#json.dumps(hyportage_ids.id_repository_to_save_format(id_repository))
-	#json.dumps(hyportage_configuration.core_configuration_to_save_format(core_configuration))
-	#json.dumps(core_data.package_installed_to_save_format(installed_spls))
-
-	json.dumps(hyportage_data.mspl_to_save_format(mspl))
-
-	#utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
-	#	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
+	utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
+		pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
 
 
 """
