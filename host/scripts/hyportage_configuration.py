@@ -71,7 +71,7 @@ def core_configuration_from_save_format(save_format):
 
 def keywords_initialize(spl, arch):
 	keyword_default = arch in hyportage_data.spl_get_keywords_list(spl)
-	hyportage_data.spl_set_keywords_default(keyword_default)
+	hyportage_data.spl_set_keywords_default(spl, keyword_default)
 
 
 def keywords_apply_configuration_pattern(spl, pattern_repository, conf_keywords):
@@ -174,13 +174,13 @@ def get_configuration_pattern(conf):
 	return res
 
 
-def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_profile_new, is_conf_user_new, new_spls, mspl, pattern_repository):
+def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_profile_new, is_conf_user_new, new_spls, mspl, spl_groups, pattern_repository):
 	# 1. update the pattern repository
 	if is_conf_profile_new:
 		conf_patterns = get_configuration_pattern(conf_profile)
 		core_conf_patterns = core_configuration_get_profile_patterns(core_configuration)
 		for pattern in conf_patterns - core_conf_patterns:
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, pattern)
+			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern)
 		for pattern in core_conf_patterns - conf_patterns:
 			hyportage_pattern.pattern_repository_remove_pattern(pattern_repository, pattern)
 		core_conf_patterns.clear()
@@ -189,7 +189,7 @@ def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_pr
 		conf_patterns = get_configuration_pattern(conf_user)
 		core_conf_patterns = core_configuration_get_user_patterns(core_configuration)
 		for pattern in conf_patterns - core_conf_patterns:
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, pattern)
+			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern)
 		for pattern in core_conf_patterns - conf_patterns:
 			hyportage_pattern.pattern_repository_remove_pattern(pattern_repository, pattern)
 		core_conf_patterns.clear()
@@ -199,14 +199,13 @@ def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_pr
 		core_configuration_set_arch(core_configuration, portage_data.configuration_get_arch(conf_profile))
 	arch = core_configuration_get_arch(core_configuration)
 	# 3. update the spls
-	for spl in new_spls:
+	for spl in new_spls:  # initialize the new spl keyword information
 		keywords_initialize(spl, arch)
-		spl_apply_profile_configuration(spl, pattern_repository, conf_profile)
-		spl_apply_user_configuration(spl, pattern_repository, conf_user)
-	if (not is_conf_profile_new) and (not is_conf_user_new):  # the configuration was not updated, and only the new_spls must be managed then.
-		return new_spls, new_spls  # return the set of modified spls, and the set of spls with a modified keyword set/mask
 	if is_conf_profile_new:
 		for spl in mspl.values():
+			spl_apply_profile_configuration(spl, pattern_repository, conf_profile)
+	else:
+		for spl in new_spls:  # apply the configurations only on the new spls
 			spl_apply_profile_configuration(spl, pattern_repository, conf_profile)
 	spl_modified_data = set(new_spls)
 	spl_modified_visibility = set(new_spls)
@@ -215,6 +214,9 @@ def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_pr
 			updated_data, updated_visibility = spl_apply_user_configuration(spl, pattern_repository, conf_user)
 			if updated_data: spl_modified_data.add(spl)
 			if updated_visibility: spl_modified_visibility.add(spl)
+	else:
+		for spl in new_spls:  # apply the configurations only on the new spls
+			spl_apply_user_configuration(spl, pattern_repository, conf_user)
 	return spl_modified_data, spl_modified_visibility
 
 

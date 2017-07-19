@@ -167,7 +167,7 @@ def new_ids(nb=1):
 	global __id_current
 	global __id_current_lock
 	with __id_current_lock:
-		res = [ unicode(i) for i in xrange(__id_current, __id_current + nb - 1) ]
+		res = [ unicode(i) for i in xrange(__id_current, __id_current + nb) ]
 		__id_current = __id_current + nb
 	return res
 

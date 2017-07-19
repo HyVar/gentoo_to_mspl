@@ -40,8 +40,8 @@ use_selection_add = core_data.set_configuration_add
 use_selection_addall = core_data.set_configuration_addall
 use_selection_remove = core_data.set_configuration_remove
 use_selection_removeall = core_data.set_configuration_removeall
-use_selection_to_save_format = core_data.set_configuration_to_save_format
-use_selection_from_save_format = core_data.set_configuration_from_save_format
+use_selection_to_save_format = core_data.set_configuration_to_save_format_simple
+use_selection_from_save_format = core_data.set_configuration_from_save_format_simple
 
 ##
 
@@ -67,89 +67,140 @@ def use_selection_from_iuse_list(iuse_list):
 ######################################################################
 
 
-def dependencies_create(): return set([]), {}
-
-
-def dependencies_add_use(raw_dependencies, use):
-	raw_dependencies[0].add(use)
+dependencies_create = core_data.dict_configuration_create
 
 
 def dependencies_add_pattern(raw_dependencies, pattern):
-	if pattern not in raw_dependencies[1]: raw_dependencies[1][pattern] = set([])
+	if pattern not in raw_dependencies: raw_dependencies[pattern] = set([])
 
 
 def dependencies_add_pattern_use(raw_dependencies, pattern, use):
-	raw_dependencies[1][pattern].add(use)
+	raw_dependencies[pattern].add(use)
 
 
-def dependencies_get_patterns(raw_dependencies): return raw_dependencies[1].keys()
+def dependencies_get_patterns(raw_dependencies): return raw_dependencies.keys()
+
+
+##
+
+def dependencies_to_save_format(dependencies):
+	return core_data.dict_configuration_to_save_format(
+		dependencies, hyportage_pattern.pattern_to_save_format, core_data.set_configuration_to_save_format_simple)
+
+
+def dependencies_from_save_format(save_format):
+	return core_data.dict_configuration_from_save_format(
+		save_format, hyportage_pattern.pattern_from_save_format, core_data.set_configuration_from_save_format_simple)
 
 
 ######################################################################
 # SPL AND MSPL MANIPULATION
 ######################################################################
 
-def spl_get_name(spl): return spl['name']
-def spl_get_group(spl): return spl['group']
-def spl_get_slot(spl): return spl['slot']
-def spl_get_subslot(spl): return spl['subslot']
-def spl_get_version(spl): return spl['version']
-def spl_get_version_full(spl): return spl['version_full']
-def spl_get_dependencies(spl): return spl['dependencies']
-def spl_is_deprecated(spl): return spl['deprecated']
+class spl(object):
+	def __init__(
+			self,
+			name, group, deprecated,
+			version_full, version,
+			slot, subslot,
+			fm_local, fm_combined,
+			dependencies, required_iuses_local, keywords_list,
+			iuses_default, use_selection_default):
+		self.name                  = name
+		self.group                 = group
+		self.deprecated            = deprecated
+		self.version_full          = version_full
+		self.version               = version
+		self.slot                  = slot
+		self.subslot               = subslot
+		self.fm_local              = fm_local
+		self.fm_combined           = fm_combined
+		self.smt_constraint        = None
+		self.dependencies          = dependencies
+		self.required_iuses_local  = required_iuses_local
+		self.required_iuses        = None
+		self.iuses_default         = iuses_default
+		self.iuses_profile         = None
+		self.iuses_user            = None
+		self.keywords_list         = keywords_list
+		self.keywords_default      = None
+		self.keywords_profile      = None
+		self.keywords_user         = None
+		self.iuses_default         = iuses_default
+		self.iuses_profile         = None
+		self.iuses_user            = None
+		self.use_selection_default = use_selection_default
+		self.use_selection_profile = None
+		self.use_selection_user    = None
+		self.mask_profile          = None
+		self.mask_user             = None
+
+	def __hash__(self): return hash(self.name)
+
+	def __eq__(self, other): return self.name == other.name
 
 
-def spl_get_fm_local(spl): return spl['fm_local']
-def spl_get_fm_combined(spl): return spl['fm_combined']
-def spl_get_smt_constraint(spl): return spl['smt_constraint']
+def spl_get_name(spl): return spl.name
+def spl_get_group(spl): return spl.group
+def spl_get_slot(spl): return spl.slot
+def spl_get_subslot(spl): return spl.subslot
+def spl_get_version(spl): return spl.version
+def spl_get_version_full(spl): return spl.version_full
+def spl_get_dependencies(spl): return spl.dependencies
+def spl_is_deprecated(spl): return spl.deprecated
 
 
-def spl_get_required_iuses_local(spl): return spl['required_iuses_local']
-def spl_get_required_iuses(spl): return spl['required_iuses']
+def spl_get_fm_local(spl): return spl.fm_local
+def spl_get_fm_combined(spl): return spl.fm_combined
+def spl_get_smt_constraint(spl): return spl.smt_constraint
 
 
-def spl_get_keywords_list(spl): return spl['keywords_list']
-def spl_get_keywords_default(spl): return spl['keywords_default']
-def spl_get_keywords_profile(spl): return spl['keywords_profile']
-def spl_get_keywords_user(spl): return spl['keywords_user']
+def spl_get_required_iuses_local(spl): return spl.required_iuses_local
+def spl_get_required_iuses(spl): return spl.required_iuses
 
 
-def spl_get_iuses_default(spl): return spl['iuses_default']
-def spl_get_iuses_profile(spl): return spl['iuses_profile']
-def spl_get_iuses_user(spl): return spl['iuses_user']
+def spl_get_keywords_list(spl): return spl.keywords_list
+def spl_get_keywords_default(spl): return spl.keywords_default
+def spl_get_keywords_profile(spl): return spl.keywords_profile
+def spl_get_keywords_user(spl): return spl.keywords_user
 
 
-def spl_get_use_selection_default(spl): return spl['use_selection_default']
-def spl_get_use_selection_profile(spl): return spl['use_selection_profile']
-def spl_get_use_selection_user(spl): return spl['use_selection_user']
+def spl_get_iuses_default(spl): return spl.iuses_default
+def spl_get_iuses_profile(spl): return spl.iuses_profile
+def spl_get_iuses_user(spl): return spl.iuses_user
 
 
-def spl_get_mask_profile(spl): return spl['mask_profile']
-def spl_get_mask_user(spl): return spl['mask_user']
+def spl_get_use_selection_default(spl): return spl.use_selection_default
+def spl_get_use_selection_profile(spl): return spl.use_selection_profile
+def spl_get_use_selection_user(spl): return spl.use_selection_user
+
+
+def spl_get_mask_profile(spl): return spl.mask_profile
+def spl_get_mask_user(spl): return spl.mask_user
 
 ##
 
 
-def spl_set_keywords_default(spl, keywords): spl['keywords_default'] = keywords
-def spl_set_keywords_profile(spl, keywords): spl['keywords_profile'] = keywords
-def spl_set_iuses_profile(spl, new_iuses): spl['iuses_profile'] = new_iuses
-def spl_set_use_selection_profile(spl, new_use_selection): spl['use_selection_profile'] = new_use_selection
-def spl_set_mask_profile(spl, new_mask): spl['mask_profile'] = new_mask
+def spl_set_keywords_default(spl, keywords): spl.keywords_default = keywords
+def spl_set_keywords_profile(spl, keywords): spl.keywords_profile = keywords
+def spl_set_iuses_profile(spl, new_iuses): spl.iuses_profile = new_iuses
+def spl_set_use_selection_profile(spl, new_use_selection): spl.use_selection_profile = new_use_selection
+def spl_set_mask_profile(spl, new_mask): spl.mask_profile = new_mask
 
 
-def spl_set_keywords_user(spl, keywords): spl['keywords_user'] = keywords
-def spl_set_iuses_user(spl, new_iuses): spl['iuses_user'] = new_iuses
-def spl_set_use_selection_user(spl, new_use_selection): spl['use_selection_user'] = new_use_selection
-def spl_set_mask_user(spl, new_mask): spl['mask_user'] = new_mask
+def spl_set_keywords_user(spl, keywords): spl.keywords_user = keywords
+def spl_set_iuses_user(spl, new_iuses): spl.iuses_user = new_iuses
+def spl_set_use_selection_user(spl, new_use_selection): spl.use_selection_user = new_use_selection
+def spl_set_mask_user(spl, new_mask): spl.mask_user = new_mask
 
 
-def spl_reset_required_use(spl, pattern_repository):
-	spl['required_use'] = list(set(
-		spl['required_use_default'] +
-		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl)))
+def spl_reset_required_iuses(spl, pattern_repository):
+	spl.required_iuses = list(set.union(*[
+		spl.required_iuses_local,
+		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl)]))
 
 
-def spl_set_smt_constraint(spl, smt_constraint): spl['smt_constraint'] = smt_constraint
+def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constraint
 
 ##
 
@@ -165,64 +216,65 @@ def spl_to_save_format(spl):
 		'subslot': spl_get_subslot(spl),
 		'fm_local': hyportage_constraint_ast.ast_require_to_save_format(spl_get_fm_local(spl)),
 		'fm_combined': hyportage_constraint_ast.ast_depend_to_save_format(spl_get_fm_combined(spl)),
-		'dependencies': spl_get_dependencies(spl),
+		'dependencies': dependencies_to_save_format(spl_get_dependencies(spl)),
 		#
-		'required_iuses_local': spl_get_required_iuses_local(spl),
-		'required_iuses': spl_get_required_iuses(spl),
+		'required_iuses_local': list(spl_get_required_iuses_local(spl)),
+		'required_iuses': list(spl_get_required_iuses(spl)),
 		#
-		'keywords_list': spl_get_keywords_list(spl),
+		'keywords_list': list(spl_get_keywords_list(spl)),
 		'keywords_default': spl_get_keywords_default(spl),
 		'keywords_profile': spl_get_keywords_profile(spl),
 		'keywords_user': spl_get_keywords_user(spl),
 		#
-		'iuses_default': spl_get_iuses_default(spl),
-		'iuses_profile': spl_get_iuses_profile(spl),
-		'iuses_user': spl_get_iuses_user(spl),
+		'iuses_default': list(spl_get_iuses_default(spl)),
+		'iuses_profile': list(spl_get_iuses_profile(spl)),
+		'iuses_user': list(spl_get_iuses_user(spl)),
 		#
-		'use_selection_default': spl_get_use_selection_default(spl),
-		'use_selection_profile': spl_get_use_selection_profile(spl),
-		'use_selection_user': spl_get_use_selection_user(spl),
+		'use_selection_default': use_selection_to_save_format(spl_get_use_selection_default(spl)),
+		'use_selection_profile': use_selection_to_save_format(spl_get_use_selection_profile(spl)),
+		'use_selection_user': use_selection_to_save_format(spl_get_use_selection_user(spl)),
+		#
+		'mask_profile': spl_get_mask_profile(spl),
+		'mask_user': spl_get_mask_user(spl),
 		#
 		'smt_constraint': spl_get_smt_constraint(spl)
 	}
 
 
 def spl_from_save_format(save_format):
-	return {
-		'name': save_format['name'],
-		'group': save_format['group'],
-		'deprecated': save_format['deprecated'],
-		'version_full': save_format['version_full'],
-		'version': save_format['version'],
-		'slot': save_format['slot'],
-		'subslot': save_format['subslot'],
-		'fm_local': hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_local']),
-		'fm_combined': hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_combined']),
-		'dependencies': save_format['dependencies'],
-		#
-		'required_iuses_local': save_format['required_iuses_local'],
-		'required_iuses': save_format['required_iuses'],
-		#
-		'keywords_list': save_format['keywords_list'],
-		'keywords_default': save_format['keywords_default'],
-		'keywords_profile': save_format['keywords_profile'],
-		'keywords_user': save_format['keywords_user'],
-		#
-		'iuses_default': save_format['iuses_default'],
-		'iuses_profile': save_format['iuses_profile'],
-		'iuses_user': save_format['iuses_user'],
-		#
-		'use_selection_default': save_format['use_selection_default'],
-		'use_selection_profile': save_format['use_selection_profile'],
-		'use_selection_user': save_format['use_selection_user'],
-		#
-		'smt_constraint': save_format['smt_constraint']
-	}
+	res = spl(
+			save_format['name'], save_format['group'], save_format['deprecated'],
+			save_format['version_full'], save_format['version'],
+			save_format['slot'], save_format['subslot'],
+			hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_local']), hyportage_constraint_ast.ast_require_from_save_format(save_format['fm_combined']),
+			dependencies_from_save_format(save_format['dependencies']), set(save_format['required_iuses_local']), set(save_format['keywords_list']),
+			set(save_format['iuses_default']), use_selection_from_save_format(save_format['use_selection_default'])
+		)
+	spl_set_keywords_default(spl, save_format['keywords_default'])
+	spl_set_keywords_profile(spl, save_format['keywords_profile'])
+	spl_set_keywords_user(spl, save_format['keywords_user'])
+
+	spl_set_iuses_profile(spl, save_format['iuses_profile'])
+	spl_set_iuses_user(spl, save_format['iuses_user'])
+
+	spl_set_use_selection_profile(spl, use_selection_from_save_format(save_format['use_selection_profile']))
+	spl_set_use_selection_user(spl, use_selection_from_save_format(save_format['use_selection_user']))
+
+	spl_set_mask_profile(spl, save_format['mask_profile'])
+	spl_set_mask_user(spl, save_format['mask_user'])
+
+	spl.required_use = set(save_format['required_iuses'])
+	spl_set_smt_constraint(spl, save_format['smt_constraint'])
+
+	return spl
 
 ##
 
 def mspl_create(): return {}
 
+
+def mspl_add_spl(mspl, spl):
+	mspl[spl_get_name(spl)] = spl
 
 class MSPLToSaveFormatGenerator(object):
 	def __init__(self, mspl):
@@ -290,6 +342,9 @@ def spl_groups_remove_spl(spl_groups, spl):
 			group['implementations'].pop(version_full)
 			group['dependencies'].remove(spl_name)
 			group['reference'].remove(spl)
+
+def spl_group_get_references(spl_group):
+	return spl_group['reference']
 
 
 ######################################################################

@@ -77,7 +77,7 @@ def match_only_package_version(pattern, version_full, version):
 			return False
 	elif pattern_vop == "=":
 		if pattern_has_star:
-			if not version_full.startwith(pattern_version_full):
+			if not version_full.startswith(pattern_version_full):
 				return False
 		else:
 			if compare != 0:
@@ -157,7 +157,6 @@ def pattern_repository_element_remove_spl(pattern_repository_element, spl): patt
 
 def pattern_repository_element_get_required_use(pattern_repository_element): return pattern_repository_element[1].keys()
 def pattern_repository_element_get_spl(pattern_repository_element): return pattern_repository_element[2]
-def pattern_repository_element_get(pattern_repository_element): return (pattern_repository_element[1].keys(), pattern_repository_element[2])
 
 
 ##
@@ -179,17 +178,24 @@ def pattern_repository_local_map_add_pattern(pattern_repository_element, pattern
 		pattern_repository_element[pattern] = pattern_repository_element_create(required_use)
 
 
-def pattern_repository_add_pattern(pattern_repository, pattern, required_use=[]):
+def pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern, required_use=[]):
 	if pattern_is_package_group_specific(pattern):
-		package_group = pattern_get_package_group(pattern)
-		if package_group in pattern_repository[0]:
-			pattern_repository_local_map_add_pattern(pattern_repository[0][package_group], pattern, required_use)
+		spl_group_name = pattern_get_package_group(pattern)
+		if spl_group_name in pattern_repository[0]:
+			pattern_repository_local_map_add_pattern(pattern_repository[0][spl_group_name], pattern, required_use)
 		else:
 			res = {}
 			pattern_repository_local_map_add_pattern(res, pattern, required_use)
-			pattern_repository[0][package_group] = res
+			pattern_repository[0][spl_group_name] = res
+		if spl_group_name in spl_groups:
+			#print("test   " + str(spl_groups[spl_group_name]))
+			for spl in hyportage_data.spl_group_get_references(spl_groups[spl_group_name]):
+				pattern_repository_local_map_add_spl(pattern_repository[0][spl_group_name], spl, match_spl_simple)
+			
 	else:
 		pattern_repository_local_map_add_pattern(pattern_repository[1], pattern, required_use)
+		for spl in mspl.values():
+			pattern_repository_local_map_add_spl(pattern_repository[1], spl, match_spl_full)
 
 
 def pattern_repository_local_map_remove_pattern(pattern_repository_element, pattern, required_use):
@@ -229,13 +235,7 @@ def pattern_repository_remove_spl(pattern_repository, spl):
 	pattern_repository_local_map_remove_spl(pattern_repository[1], spl, match_spl_full)
 
 
-# main functionalities
-
-def pattern_repository_add(pattern_repository, spl):
-	for pattern, required_use in hyportage_data.spl_get_dependencies(spl):
-		pattern_repository_add_pattern(pattern_repository, pattern, required_use)
-	pattern_repository_add_spl(pattern_repository, spl)
-
+##
 
 def pattern_repository_update(pattern_repository, old_spl, new_spl):
 	for pattern, required_use in hyportage_data.spl_get_dependencies(old_spl):
@@ -252,7 +252,7 @@ def pattern_repository_remove(pattern_repository, spl):
 
 ##
 
-def pattern_repository_local_map_get(pattern_repository_element, pattern): return pattern_repository_element_get(pattern_repository_element[pattern])
+def pattern_repository_local_map_get(pattern_repository_element, pattern): return pattern_repository_element[pattern]
 
 
 def pattern_repository_get(pattern_repository, pattern):
@@ -260,7 +260,7 @@ def pattern_repository_get(pattern_repository, pattern):
 	else: return pattern_repository_local_map_get(pattern_repository[1], pattern)
 
 
-def pattern_repository_local_map_get_spl_required_use(pattern_repository_element, spl, match_function):
+def pattern_repository_local_map_get_spl_required_use(pattern_repository_element, spl):
 	res = set()
 	for pattern, element in pattern_repository_element.iteritems():
 		if spl in pattern_repository_element_get_spl(element):
@@ -271,9 +271,9 @@ def pattern_repository_local_map_get_spl_required_use(pattern_repository_element
 def pattern_repository_get_spl_required_use(pattern_repository, spl):
 	package_group = hyportage_data.spl_get_group(spl)
 	if package_group in pattern_repository[0]:
-		res = pattern_repository_local_map_get_spl_required_use(pattern_repository[0][package_group], spl, match_spl_simple)
+		res = pattern_repository_local_map_get_spl_required_use(pattern_repository[0][package_group], spl)
 	else: res = set()
-	res.update(pattern_repository_local_map_get_spl_required_use(pattern_repository[1], spl, match_spl_full))
+	res.update(pattern_repository_local_map_get_spl_required_use(pattern_repository[1], spl))
 	return res
 
 

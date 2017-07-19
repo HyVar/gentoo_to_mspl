@@ -62,7 +62,7 @@ def structure_package_name(package_name):
 
 def get_package_name_from_path(package_path):
 	els = package_path.split(os.sep)
-	package_name = "/".join(els[:-2]) if len(els) > 1 else els[-1]
+	package_name = "/".join(els[-2:]) if len(els) > 1 else els[-1]
 	deprecated = (len(els) > 2) and (els[-3] == "deprecated")
 	return package_name, deprecated
 
@@ -262,23 +262,23 @@ class get_dependencies(hyportage_constraint_ast.ASTVisitor):
 	def __init__(self, package_name):
 		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
 		self.main_package_name = package_name
-		self.res = hyportage_data.dependencies_create()
+		self.res = set([]), hyportage_data.dependencies_create()
 		self.pattern = None
 
 	def visitRequiredSIMPLE(self, ctx):
-		hyportage_data.dependencies_add_use(self.res, ctx['use'])
+		self.res[0].add(ctx['use'])
 
 	def visitCondition(self, ctx):
-		hyportage_data.dependencies_add_use(self.res, ctx['use'])
+		self.res[0].add(ctx['use'])
 
-	def visitAtom(self, ctx):
+	def visitDependSIMPLE(self, ctx):
 		self.pattern = ctx['atom']
-		hyportage_data.dependencies_add_pattern(self.res, self.pattern)
+		hyportage_data.dependencies_add_pattern(self.res[1], self.pattern)
 
 	def visitSelection(self,ctx):
 		use = ctx['use']
-		if is_selection_required(ctx): hyportage_data.dependencies_add_pattern_use(self.res, self.pattern, use)
-		if 'suffix' in ctx: hyportage_data.dependencies_add_use(self.res, use)
+		if is_selection_required(ctx): hyportage_data.dependencies_add_pattern_use(self.res[1], self.pattern, use)
+		if 'suffix' in ctx: self.res[0].add(use)
 
 
 def create_spl_from_egencache_file(file_path):
@@ -317,20 +317,20 @@ def create_spl_from_egencache_file(file_path):
 	fm_unloop = translate_depend(fm_unloop) if fm_unloop else []
 	fm_combined = utils.compact_list(fm_external + fm_runtime + fm_unloop)
 	# 4. extracting the more structured data
-	visitor = get_dependencies()
+	visitor = get_dependencies(package_name)
 	visitor.visitRequired(fm_local)
 	visitor.visitDepend(fm_combined)
 	# 5. return the raw spl
-	return {
-		'name': package_name, 'group': package_group, 'deprecated': deprecated,
-		'version_full': version_full, 'version': version,
-		'slot': slot, 'subslot': subslot,
-		'fm_local': fm_local, 'fm_combined': fm_combined,
-		'dependencies': visitor.res[1],
-		# data that is extended by the profile_configuration and the user_configuration
-		'required_iuses_local': visitor.res[0],
-		'keywords_default': keywords,
-		'iuses_default': iuses, 'use_selection_default': use_selection
-		}
+	return hyportage_data.spl(
+			package_name, package_group, deprecated,
+			version_full, version,
+			slot, subslot,
+			fm_local, fm_combined,
+			visitor.res[1],
+			# data that is extended by the profile_configuration and the user_configuration
+			visitor.res[0],
+			keywords,
+			iuses, use_selection
+		)
 
 
