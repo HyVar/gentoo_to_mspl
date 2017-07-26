@@ -126,9 +126,6 @@ class spl(object):
 		self.keywords_default      = None
 		self.keywords_profile      = None
 		self.keywords_user         = None
-		self.iuses_default         = iuses_default
-		self.iuses_profile         = None
-		self.iuses_user            = None
 		self.use_selection_default = use_selection_default
 		self.use_selection_profile = None
 		self.use_selection_user    = None

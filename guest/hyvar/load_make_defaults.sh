@@ -9,11 +9,12 @@ if [ -n "${1}" ]; then
 fi
 
 # seems to me that the make.defaults must be loaded in sequence, together...
+# I have to check that the iuse and use list are generated correctly
 
 ######################################################################
 ### FUNCTIONS TO MANAGE THE VARIABLE EXPANSION
 ######################################################################
-
+	
 
 manage_variable_list() {
 	FUNCTION=$1
@@ -32,17 +33,21 @@ manage_variable_list() {
 manage_use() {
 	if [ "${1:0:1}" == "-" ]; then
 		TMP_PREFIX="-"
-		[ "${PREFIX}" == "-" ] && TMP_PREFIX="+"
+		[ "${PREFIX}" == "-" ] && TMP_PREFIX=""
 		PREFIX="${TMP_PREFIX}"
 		RESULT="${1:1}"
 	elif [ "${1:0:1}" == "+" ]; then
-		TMP_PREFIX="+"
+		TMP_PREFIX=""
 		[ "${PREFIX}" == "-" ] && TMP_PREFIX="-"
 		PREFIX="${TMP_PREFIX}"
 		RESULT="${1:1}"
 	else
 		RESULT="${1}"
 	fi
+}
+
+prefix_clean() {
+	[ "${PREFIX:1:1}" == "+" ] && PREFIX=""
 }
 
 EXPANDED_USE=""

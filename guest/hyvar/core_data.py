@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-def identity(x): x
+def identity(x): return x
 
 
 ######################################################################
