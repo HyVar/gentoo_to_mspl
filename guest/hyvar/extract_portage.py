@@ -137,9 +137,9 @@ def analyse_packages(conf, lines):
 	package_required = portage_data.configuration_get_pattern_required(conf)
 	for line in lines:
 		if line[0] == "*":
-			portage_data.required_pattern_add(package_required, "system", line[1:])
+			portage_data.required_pattern_add(package_required, "system", core_data.pattern_create_from_atom(line[1:]))
 		else:
-			portage_data.required_pattern_add(package_required, "profile", line)
+			portage_data.required_pattern_add(package_required, "profile", core_data.pattern_create_from_atom(line))
 
 
 # file: "world" and "set/*" in user configuration

@@ -55,7 +55,10 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 
 def load_hyportage(path_hyportage, save_modality):
 	if os.path.exists(path_hyportage):
-		return hyportage_data.hyportage_data_from_save_format(utils.load_data_file(path_hyportage, save_modality))
+		if save_modality.endswith("json"):
+			return hyportage_data.hyportage_data_from_save_format(utils.load_data_file(path_hyportage, save_modality))
+		else:
+			return utils.load_data_file(path_hyportage, save_modality)
 	else:
 		pattern_repository = hyportage_pattern.pattern_repository_create()
 		id_repository = hyportage_ids.id_repository_create()
@@ -64,6 +67,16 @@ def load_hyportage(path_hyportage, save_modality):
 		core_configuration = hyportage_configuration.core_configuration_create()
 		installed_spls = core_data.package_installed_create()
 		return pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+
+
+def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls, save_modality):
+	if save_modality.endswith("json"):
+		utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
+			pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
+	else:
+		data = pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+		utils.store_data_file(path_hyportage, data, save_modality)
+
 
 
 ######################################################################
@@ -109,7 +122,7 @@ def load_hyportage(path_hyportage, save_modality):
 #	help="Only performs only the translation into SMT formulas.")
 @click.option(
 	'--save-modality',
-	type=click.Choice(["json", "gzjson", "marshal"]), default="gzjson",
+	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="gzjson",
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(
 	dir_portage,
@@ -140,6 +153,9 @@ def main(
 	##########################################################################
 	# 1. OPTIONS
 	##########################################################################
+
+	print(save_modality)
+	#return
 
 	logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
@@ -229,13 +245,16 @@ def main(
 	t = time.time()
 	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls =\
 		load_hyportage(path_hyportage, save_modality)
+	logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
+	logging.info("Updating the core hyportage data (pattern_repository, spl_groups, id_repository).")
+	t = time.time()
 	package_to_add = []
 	package_to_update = []
 	for spl in raw_spls:
 		if hyportage_data.spl_get_name(spl) in mspl: package_to_update.append(spl)
 		else: package_to_add.append(spl)
-	package_name_to_remove = [ spl_name for spl_name in mspl.keys() if spl_name not in egencache_files ]
+	package_name_to_remove = [ spl_name for spl_name in mspl.keys() if spl_name not in set([hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files]) ]
 	package_update_info =\
 		[ (hyportage_data.spl_get_name(spl), spl) for spl in package_to_update ]\
 		+ [ (el, None) for el in package_name_to_remove ]
@@ -260,8 +279,6 @@ def main(
 		for pattern, required_use in hyportage_data.spl_get_dependencies(new_spl).iteritems():
 			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern, required_use)
 
-	logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-
 	# update the spls required iuse list, for the new spls and the old ones, and regenerate the ids
 
 	spl_updated_iuses = set(raw_spls)
@@ -273,18 +290,25 @@ def main(
 		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
 		hyportage_ids.id_repository_add_spl(id_repository, spl)
 
+	logging.info("Update completed in " + unicode(time.time() - t) + " seconds.")
+
 	##########################################################################
 	# 4. REGENERATE THE KEYWORD IDS IF NECESSARY
 	##########################################################################
 
 	if must_regenerate_keywords_ids:
+		logging.info("Regenerating the keyword list")
+		t = time.time()
 		keywords_list = portage_data.keyword_set_from_save_format(utils.load_data_file(path_keywords, "json"))
 		hyportage_ids.id_repository_set_keywords(id_repository, keywords_list)
+		logging.info("Regeneration completed in " + unicode(time.time() - t) + " seconds.")
 
 	##########################################################################
 	# 5. APPLY THE CONFIGURATION IF NECESSARY
 	##########################################################################
 
+	logging.info("Applying the configuration if necessary")
+	t = time.time()
 	new_spls_loaded = len(raw_spls) > 0
 	if new_spls_loaded or must_apply_profile:
 		conf_profile = portage_data.configuration_from_save_format(utils.load_data_file(path_profile_configuration, "json"))
@@ -296,6 +320,7 @@ def main(
 		spl_modified_data, spl_modified_visibility = hyportage_configuration.apply_configurations(
 			core_configuration, conf_profile, conf_user, must_apply_profile, must_apply_user,
 			raw_spls, mspl, spl_groups, pattern_repository)
+	logging.info("Application completed in " + unicode(time.time() - t) + " seconds.")
 
 	##########################################################################
 	# 6. GENERATE THE SMT CONSTRAINTS
@@ -314,8 +339,12 @@ def main(
 	# 8. WRITE THE FILES
 	##########################################################################
 
-	utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
-		pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
+	logging.info("Saving the hyportage data")
+	t = time.time()
+	save_hyportage(
+		path_hyportage, pattern_repository, id_repository, mspl, spl_groups,
+		core_configuration, installed_spls, save_modality)
+	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")
 
 
 """

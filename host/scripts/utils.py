@@ -22,6 +22,7 @@ import os.path
 import json
 import marshal
 import gzip
+import cPickle
 
 ######################################################################
 ### BASE STRUCTURED DICTIONARIES AND LISTS MANIPULATION
@@ -99,6 +100,9 @@ def load_data_file(file_name, save_modality="gzjson"):
 	if save_modality == "marshal":
 		with open(file_name, "r") as f:
 			data = marshal.load(f)
+	if save_modality == "pickle":
+		with open(file_name, "r") as f:
+			data = cPickle.load(f)
 	elif save_modality == "gzjson":
 		with gzip.open(file_name, "r") as f:
 			data = json.load(f)
@@ -123,6 +127,9 @@ def store_data_file(file_name, data, save_modality="gzjson"):
 	if save_modality == "marshal": # marshal can not use gzip file directly (possible work around marshal.dumps)
 		with open(file_name, 'w') as f:
 			marshal.dump(data,f)
+	if save_modality == "pickle": # marshal can not use gzip file directly (possible work around marshal.dumps)
+		with open(file_name, 'w') as f:
+			cPickle.dump(data,f)
 	elif save_modality == "gzjson":
 		with gzip.GzipFile(file_name, 'wb') as f:
 			json.dump(data,f)

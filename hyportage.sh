@@ -133,7 +133,7 @@ if [ -n "${1}" ]; then
 			clean_host
 			;;
 		translate)
-			translate
+			translate "$@"
 			;;
 		*)
 			echo "unknown action \"${1}\""

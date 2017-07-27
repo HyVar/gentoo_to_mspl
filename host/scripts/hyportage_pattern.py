@@ -245,7 +245,7 @@ def pattern_repository_update(pattern_repository, old_spl, new_spl):
 
 
 def pattern_repository_remove(pattern_repository, spl):
-	for pattern, required_use in hyportage_data.spl_get_dependencies(spl):
+	for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems():
 		pattern_repository_remove_pattern(pattern_repository, pattern, required_use)
 	pattern_repository_remove_spl(pattern_repository, spl)
 
