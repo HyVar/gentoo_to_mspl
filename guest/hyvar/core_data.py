@@ -61,9 +61,11 @@ def pattern_create_from_atom(atom):
 			slot = slot[:-1]
 		elif len(slots) > 1:
 			subslot = slots[1]
+	else:
+		atom = atom[begin:]
 
 	# 3. version
-	package_group, version_full, version = parse_package_name(atom[begin:])
+	package_group, version_full, version = parse_package_name(atom)
 	has_star = False
 	if (version_full is not None) and (version_full[-1] == "*"):
 		has_star = True
