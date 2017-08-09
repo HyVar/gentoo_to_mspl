@@ -13,7 +13,6 @@ import logging
 import multiprocessing
 import click
 import time
-import sys
 
 
 import core_data
@@ -23,10 +22,6 @@ import hyportage_data
 import hyportage_pattern
 import hyportage_ids
 import hyportage_configuration
-#import constraint_parser
-#import extract_id_maps
-#import extract_dependencies
-#import extract_package_groups
 import smt_encoding
 
 
@@ -254,11 +249,25 @@ def main(
 	for spl in raw_spls:
 		if hyportage_data.spl_get_name(spl) in mspl: package_to_update.append(spl)
 		else: package_to_add.append(spl)
-	package_name_to_remove = [ spl_name for spl_name in mspl.keys() if spl_name not in set([hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files]) ]
-	package_update_info =\
-		[ (hyportage_data.spl_get_name(spl), spl) for spl in package_to_update ]\
-		+ [ (el, None) for el in package_name_to_remove ]
+	package_name_to_remove = [
+		spl_name for spl_name in mspl.keys()
+		if spl_name not in set([hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files])]
+	package_update_info = (
+		[ (hyportage_data.spl_get_name(spl), spl) for spl in package_to_update ]
+		+ [ (el, None) for el in package_name_to_remove ])
 
+	spl_groups_removed = []
+	spl_groups_added = []
+	# add the added spls
+	for new_spl in package_to_add:
+		hyportage_data.mspl_add_spl(mspl, new_spl)
+		added_group = hyportage_data.spl_groups_add_spl(spl_groups, new_spl)
+		if added_group is not None: spl_groups_added.append(added_group)
+		hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl)
+	for new_spl in package_to_add:
+		for pattern, required_use in hyportage_data.spl_get_dependencies(new_spl).iteritems():
+			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern, required_use)
+	# update or removed the updated spls
 	for package_name, new_spl in package_update_info:  # remove the removed spls, and update the updated ones
 		old_spl = mspl.pop(package_name)
 		# update pattern repository
@@ -267,28 +276,25 @@ def main(
 			hyportage_data.spl_groups_replace_spl(spl_groups, old_spl, new_spl)
 		else:
 			hyportage_pattern.pattern_repository_remove(pattern_repository, old_spl)
-			hyportage_data.spl_groups_remove_spl(spl_groups, old_spl)
+			removed_group = hyportage_data.spl_groups_remove_spl(spl_groups, old_spl)
+			if removed_group is not None: spl_groups_removed.append(removed_group)
 			# remove entries from id repository: must be entierly re-generated
-			hyportage_ids.id_repository_add_spl(id_repository, old_spl)
-	# add the added spls
-	for new_spl in package_to_add:
-		hyportage_data.mspl_add_spl(mspl, new_spl)
-		hyportage_data.spl_groups_add_spl(spl_groups, new_spl)
-		hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl)
-	for new_spl in package_to_add:
-		for pattern, required_use in hyportage_data.spl_get_dependencies(new_spl).iteritems():
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern, required_use)
+			hyportage_ids.id_repository_remove_spl(id_repository, old_spl)
 
 	# update the spls required iuse list, for the new spls and the old ones, and regenerate the ids
-
 	spl_updated_iuses = set(raw_spls)
 	for spl in raw_spls:
 		for pattern, iuses in hyportage_data.spl_get_dependencies(spl).iteritems():
 			el = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)  # hmm, did I forget to update the pattern repository at that point?
-			spl_updated_iuses.update(hyportage_pattern.pattern_repository_element_get_spl(el))
+			spl_updated_iuses.update(hyportage_pattern.pattern_repository_element_get_spls(el))
 	for spl in spl_updated_iuses:
 		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
 		hyportage_ids.id_repository_add_spl(id_repository, spl)
+
+	for spl_group in spl_groups_removed:
+		hyportage_ids.id_repository_remove_spl_group(id_repository, spl_group)
+	for spl_group in spl_groups_added:
+		hyportage_ids.id_repository_add_spl_group(id_repository, spl_group)
 
 	logging.info("Update completed in " + unicode(time.time() - t) + " seconds.")
 
@@ -326,7 +332,19 @@ def main(
 	# 6. GENERATE THE SMT CONSTRAINTS
 	##########################################################################
 
+	"""
+	logging.info("Generating the SMT Constraints")
+	t = time.time()
+	# generate everything for now: laziness for the win
+	spl_smts = map(
+		lambda spl: smt_encoding.convert_spl(pattern_repository, id_repository, spl, simplify_mode), mspl.values())
+	spl_group_smts = map(
+		lambda spl_group: smt_encoding.convert_spl_group(id_repository, spl_group, simplify_mode), spl_groups.values())
 
+	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
+	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
+	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
+	"""
 
 	##########################################################################
 	# 7. REGENERATE THE INSTALLED PACKAGE INFORMATION IF NECESSARY

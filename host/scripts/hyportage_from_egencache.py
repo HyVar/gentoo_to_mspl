@@ -321,7 +321,7 @@ def create_spl_from_egencache_file(file_path):
 	visitor.visitRequired(fm_local)
 	visitor.visitDepend(fm_combined)
 	# 5. return the raw spl
-	return hyportage_data.spl(
+	return hyportage_data.SPL(
 			package_name, package_group, deprecated,
 			version_full, version,
 			slot, subslot,

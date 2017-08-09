@@ -74,7 +74,7 @@ def load_request_file(file_name,concurrent_map,mspl, map_name_id):
     dependencies = concurrent_map(visitor.visitDepend,asts)
     dependencies = [x for sublist in dependencies for x in set(sublist) if x in mspl]
     # get constraints
-    visitor = smt_encoding.visitorASTtoSMT(mspl, map_name_id, "")
+    visitor = smt_encoding.ASTtoSMTVisitor(mspl, map_name_id, "")
     constraints = [smt_encoding.toSMT2(visitor.visitDepend(ast)) for ast in asts]
 
     return dependencies,constraints
@@ -208,8 +208,8 @@ def create_hyvarrec_spls(package_request,
 
         # add preferences: do not remove packages already installed
         data["preferences"].append( " + ".join(
-            [ smt_encoding.get_hyvar_pakcage(map_name_id,pkg) for pkg in initial_configuration
-              if pkg in spls[i]]))
+            [smt_encoding.get_hyvar_spl_name(map_name_id, pkg) for pkg in initial_configuration
+			 if pkg in spls[i]]))
 
         logging.debug("SPL created : constraints " + unicode(len(data["constraints"])) +
                       ", smt formulas " + unicode(len(data["smt_constraints"]["formulas"])))

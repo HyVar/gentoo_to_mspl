@@ -115,8 +115,7 @@ def analyse_make_defaults(conf, filename):
 	if 'ARCH' in bash_environment: portage_data.configuration_set_arch(conf, bash_environment['ARCH'])
 	if 'ACCEPT_KEYWORDS' in bash_environment:
 		accept_keywords = portage_data.configuration_get_pattern_accept_keywords(conf)
-		for keyword in bash_environment['ACCEPT_KEYWORDS'].split():
-			portage_data.pattern_accept_keywords_add(accept_keywords, portage_data.wildcardpattern, keyword)
+		portage_data.pattern_accept_keywords_add(accept_keywords, portage_data.wildcardpattern, bash_environment['ACCEPT_KEYWORDS'].split())
 
 
 # MANAGE FILES: the other, simpler files

@@ -108,7 +108,7 @@ def match_package_path(pattern, package_name):
 
 
 def match_spl_full(pattern, spl):
-	return match_only_package_group(pattern, hyportage_data.spl_get_group(spl)) and match_spl_simple(pattern, spl)
+	return match_only_package_group(pattern, hyportage_data.spl_get_group_name(spl)) and match_spl_simple(pattern, spl)
 
 
 def match_spl_simple(pattern, spl):
@@ -124,49 +124,97 @@ def match_spl_simple(pattern, spl):
 # pattern_repository_element: { pattern: (ref_count, set_of_spl) }
 # pattern_repository: ( { package_group: pattern_repository_element } , pattern_repository_element )
 
+class PatternElement(object):
+	def __init__(self, ref_count, use_mapping, spls):
+		self.ref_count = ref_count
+		self.use_mapping = use_mapping
+		self.spls = spls
+		self.spls_visible = None
+
+	def add_required_uses(self, required_use):
+		self.ref_count = self.ref_count + 1
+		for use in required_use:
+			if use in self.use_mapping:
+				self.use_mapping[use] = self.use_mapping[use] + 1
+			else:
+				self.use_mapping[use] = 1
+		return self.ref_count
+
+	def remove_required_uses(self, required_use):
+		if self.ref_count == 0: return 0
+		self.ref_count = self.ref_count - 1
+		for use in required_use:
+			if self.use_mapping[use] == 1: self.use_mapping.pop(use)
+			else: self.use_mapping[use] = self.use_mapping[use] - 1
+		return self.ref_count
+
+	def add_spl(self, spl): self.spls.add(spl)
+
+	def remove_spl(self, spl): self.spls.discard(spl)
+
+	def get_required_uses(self): return self.use_mapping.keys()
+
+	def get_spls(self): return self.spls
+
+	def get_spls_visible(self):
+		if self.spls_visible is None:
+			self.spls_visible = filter(hyportage_data.spl_is_visible, self.spls)
+		return self.spls_visible
+
+
+##
+
 def pattern_repository_create():
 	return ({}, {}) # group specific: map group => pattern => list of matched spls, group non specific
 
 
 def pattern_repository_element_create(required_use):
-	return ([1], { k: 1 for k in required_use }, set([]))
+	return PatternElement(1, { k: 1 for k in required_use }, set())
 
 
 # pattern repository element management
 
 def pattern_repository_element_add_required_use(pattern_repository_element, required_use):
-	pattern_repository_element[0][0] = pattern_repository_element[0][0] + 1
-	uses = pattern_repository_element[1]
-	for use in required_use:
-		if use in uses: uses[use] = uses[use] + 1
-		else: uses[use] = 1
-	return pattern_repository_element[0]
+	return pattern_repository_element.add_required_uses(required_use)
 
 
 def pattern_repository_element_remove_required_use(pattern_repository_element, required_use):
-	if pattern_repository_element[0][0] == 1: return 0
-	pattern_repository_element[0][0] = pattern_repository_element[0][0] - 1
-	uses = pattern_repository_element[1]
-	for use in required_use:
-		if uses[use] == 1: uses.pop(use)
-		else: uses[use] = uses[use] - 1
-	return pattern_repository_element[0]
+	return pattern_repository_element.remove_required_uses(required_use)
 
-def pattern_repository_element_add_spl(pattern_repository_element, spl): pattern_repository_element[2].add(spl)
-def pattern_repository_element_remove_spl(pattern_repository_element, spl): pattern_repository_element[2].discard(spl)
 
-def pattern_repository_element_get_required_use(pattern_repository_element): return pattern_repository_element[1].keys()
-def pattern_repository_element_get_spl(pattern_repository_element): return pattern_repository_element[2]
+def pattern_repository_element_add_spl(pattern_repository_element, spl): pattern_repository_element.add_spl(spl)
+
+
+def pattern_repository_element_remove_spl(pattern_repository_element, spl): pattern_repository_element.remove_spl(spl)
+
+
+def pattern_repository_element_get_required_use(pattern_repository_element):
+	return pattern_repository_element.get_required_uses()
+
+
+def pattern_repository_element_get_spls(pattern_repository_element): return pattern_repository_element.get_spls()
+
+
+def pattern_repository_element_get_spls_visible(pattern_repository_element):
+	return pattern_repository_element.get_spls_visible()
 
 
 ##
 
 def pattern_repository_element_to_save_format(pattern_repository_element):
-	return { 'ref_count': pattern_repository_element[0][0], 'required_use': pattern_repository_element[1], 'spl_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element[2] ] }
+	return {
+		'ref_count': pattern_repository_element.ref_count,
+		'required_use': pattern_repository_element.use_mapping,
+		'spl_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element.spls ]
+	}
 
 
 def pattern_repository_element_from_save_format(save_format, mspl):
-	return ( [save_format['ref_count']], save_format['required_use'], set([ mspl[spl_name] for spl_name in save_format['spl_names'] ]) )
+	return PatternElement(
+		save_format['ref_count'],
+		save_format['required_use'],
+		set([ mspl[spl_name] for spl_name in save_format['spl_names'] ])
+	)
 
 
 # pattern management
@@ -217,7 +265,7 @@ def pattern_repository_local_map_add_spl(pattern_repository_element, spl, match_
 
 
 def pattern_repository_add_spl(pattern_repository, spl):
-	package_group = hyportage_data.spl_get_group(spl)
+	package_group = hyportage_data.spl_get_group_name(spl)
 	if package_group in pattern_repository[0]:
 		pattern_repository_local_map_add_spl(pattern_repository[0][package_group], spl, match_spl_simple)
 	pattern_repository_local_map_add_spl(pattern_repository[1], spl, match_spl_full)
@@ -229,7 +277,7 @@ def pattern_repository_local_map_remove_spl(pattern_repository_element, spl, mat
 
 
 def pattern_repository_remove_spl(pattern_repository, spl):
-	package_group = hyportage_data.spl_get_group(spl)
+	package_group = hyportage_data.spl_get_group_name(spl)
 	if package_group in pattern_repository[0]:
 		pattern_repository_local_map_remove_spl(pattern_repository[0][package_group], spl, match_spl_simple)
 	pattern_repository_local_map_remove_spl(pattern_repository[1], spl, match_spl_full)
@@ -263,13 +311,13 @@ def pattern_repository_get(pattern_repository, pattern):
 def pattern_repository_local_map_get_spl_required_use(pattern_repository_element, spl):
 	res = set()
 	for pattern, element in pattern_repository_element.iteritems():
-		if spl in pattern_repository_element_get_spl(element):
+		if spl in pattern_repository_element_get_spls(element):
 			res.update(pattern_repository_element_get_required_use(element))
 	return res
 
 
 def pattern_repository_get_spl_required_use(pattern_repository, spl):
-	package_group = hyportage_data.spl_get_group(spl)
+	package_group = hyportage_data.spl_get_group_name(spl)
 	if package_group in pattern_repository[0]:
 		res = pattern_repository_local_map_get_spl_required_use(pattern_repository[0][package_group], spl)
 	else: res = set()

@@ -4,422 +4,406 @@
 ######################################################################
 
 import re
-import hyportage_constraint_ast
-import utils
 import logging
 import z3
 
 
+import hyportage_constraint_ast
+import hyportage_data
+import hyportage_ids
+import hyportage_pattern
+
+
 # function to encode SMT expression into SMTLIB
 def toSMT2(f, status="unknown", name="benchmark", logic=""):
-  v = (z3.Ast * 0)()
-  return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
-      "\n"," ").replace("(check-sat)","").replace("; benchmark (set-info :status unknown)","").strip()
+	v = (z3.Ast * 0)()
+	return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
+		"\n", " ").replace("(check-sat)", "").replace("; benchmark (set-info :status unknown)", "").strip()
 
-
-
-##################################
-# TO REMOVE
-
-def match_version(template, operator, p_name):
-    """
-    Check if a version package s (a string) matches a template
-    Note that s and template need to have the same base package
-    """
-    if operator == "~":
-        return match_version(template + "-r*", "=", p_name) or match_version(template, "=", p_name)
-    if operator == "=":
-        # update re special chars in the template
-        template = re.sub('\+', '\\\+', template)
-        template = re.sub('\.', '\\\.', template)
-        template = re.sub('\*', '.*', template) + "$"
-        if re.match(template,p_name):
-            return True
-        else:
-            return False
-
-    # operators different from = and ~
-    p = re.compile("(?P<nums>[0-9]+(?:\.[0-9]+)*)(?:_|-)?.*")
-    t_match = p.search(template)
-    t_nums = map(lambda x: int(x), t_match.group("nums").split("."))
-    s_match = p.search(p_name)
-    s_nums = map(lambda x: int(x), s_match.group("nums").split("."))
-
-    if operator == '<=':
-        return s_nums <= t_nums
-    elif operator == '>=':
-        return s_nums >= t_nums
-    elif operator == '>':
-        return s_nums > t_nums
-    elif operator == '<':
-        return s_nums < t_nums
-    else:
-        raise Exception("Operator " + unicode(operator) + " not supported for package version comparison")
-
-
-def match_slot(data,slot,p_name):
-    """
-    Checks if the package p_name has slot slot
-    """
-    return "slot" in data[p_name] and data[p_name]["slot"] == slot
-
-
-def match_subslot(data,subslot,p_name):
-    """
-    Checks if the package p_name has subslot subslot
-    """
-    return "subslot" in data[p_name] and data[p_name]["subslot"] == subslot
-
-
-def get_packages(data,template,operator,slot="",subslot=""):
-    """
-    :param data: the mspl data file
-    :param template: string representing the template to match
-    :param operator: comparison operator
-    :param slot: if required which slot
-    :param subslot: if required which subslot
-    :return: list of versioned packages that match with the given paramters
-    """
-
-    no_star_template = re.sub('\*','',template) # star messes up with get_base_package regular expression
-    base_pkg = utils.get_base_package(data,no_star_template)
-    if base_pkg and base_pkg in data:
-        ls = [x for x in data[base_pkg]["implementations"].values() if match_version(template,operator,x)]
-        if slot:
-            ls = [x for x in ls if match_slot(data,slot,x)]
-        if subslot:
-            ls = [x for x in ls if match_subslot(data,subslot,x)]
-        return ls
-    else:
-        logging.warning("A dependency is looking for " + operator + template + " but no package " +
-                        base_pkg + " has been found.")
-    return []
 
 ##############################################
 # auxiliary functions
 ##############################################
 
-def get_smt_package(map_name_id,p_name):
-    return z3.Bool("p" + map_name_id["package"][p_name])
 
-def get_hyvar_pakcage(map_name_id,p_name):
-    return "feature[p" + map_name_id["package"][p_name] + "]"
+def get_smt_spl_name(id_repository, spl_name):
+	return z3.Bool("p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name)))
 
-def get_smt_packages(map_name_id,pkgs):
-    return map(lambda x: get_smt_package(map_name_id,x),pkgs)
 
-def get_smt_use(map_name_id,p_name,u_name):
-    return z3.Bool("u" + map_name_id["flag"][p_name][u_name])
+def get_hyvar_spl_name(id_repository, spl_name):
+	return "feature[p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name)) + "]"
 
-def get_hyvar_use(map_name_id,p_name,u_name):
-    return "feature[u" + map_name_id["flag"][p_name][u_name]+ "]"
 
-def get_smt_context():
-    return z3.Int(utils.CONTEXT_VAR_NAME)
+def get_smt_spl_names(id_repository, spl_names):
+	return map(lambda spl_name: get_smt_spl_name(id_repository, spl_name), spl_names)
+
+
+def get_smt_use(id_repository, spl_name, use_flag):
+	return z3.Bool("u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag)))
+
+
+def get_smt_uses(id_repository, spl_name, use_flags):
+	return map(lambda use_flag: get_smt_use(id_repository, spl_name, use_flag), use_flags)
+
+
+def get_hyvar_use(id_repository, spl_name, use_flag):
+	return "feature[u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag)) + "]"
+
+
+#def get_smt_context():
+#    return z3.Int(utils.CONTEXT_VAR_NAME)
+
+
+#def get_no_two_true_expressions(fs):
+#	return z3.And([z3.Not(z3.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
 
 def get_no_two_true_expressions(fs):
-    return z3.And([z3.Not(z3.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
+	return z3.Sum(fs) <= 1
+
+
+def get_extactly_one_true_expressions(fs):
+	return z3.Sum(fs) == 1
 
 
 def decompact_atom(ctx):
+	"""Expands the compact forms in uses dependencies"""
 
-    def get_use(ctx,prefix=""):
-        use = {"use": ctx["use"]}
-        if prefix:
-            use['prefix'] = prefix
-        if "preference" in ctx:
-            use["preference"] = ctx["preference"]
-        return use
+	def get_use(ctx, prefix=""): # replace the prefix of the context with a default one. What for?
+		use = {"use": ctx["use"]}
+		if prefix:
+			use['prefix'] = prefix
+		if "preference" in ctx:
+			use["preference"] = ctx["preference"]
+		return use
 
-    def get_dcondition(ctx,use):
-        new_ctx = {
-            'type': "dcondition",
-            'condition': get_use(use),
-            'els': [{'type': "dsimple", 'atom': {x: ctx[x] for x in ctx if x != "selection"}}]}
-        new_ctx['els'][0]['atom']['decompacted'] = ""
-        return new_ctx
+	def get_dcondition(ctx, use):
+		new_ctx = {
+			'type': "dcondition",
+			'condition': get_use(use),
+			'els': [{'type': "dsimple", 'atom': {x: ctx[x] for x in ctx if x != "selection"}}]}
+		new_ctx['els'][0]['atom']['decompacted'] = ""
+		return new_ctx
 
-    # decompact the comapct atoms
-    assert "selection" in ctx
-    condELs = []
-    normal_sels = []
-    for i in ctx["selection"]:
-        if "prefix" in i and i["prefix"] == "!":
-            if "suffix" in i:
-                if i["suffix"] == "?":
-                    # app - misc / foo[!bar?]    bar? (app - misc / foo) !bar? (app - misc / foo[-bar])
-                    first = get_dcondition(ctx,i)
-                    second = get_dcondition(ctx,i)
-                    second["condition"]["not"] = ""
-                    second["els"][0]["atom"]["selection"] = [get_use(i,"-")]
-                    condELs.extend([first,second])
-                elif i["suffix"] == "=":
-                    # app - misc / foo[!bar =]    bar? (app - misc / foo[-bar]) !bar? (app - misc / foo[bar])
-                    first = get_dcondition(ctx,i)
-                    second = get_dcondition(ctx,i)
-                    first["els"][0]["atom"]["selection"] = [get_use(i,"-")]
-                    second["els"][0]["atom"]["selection"] = [get_use(i)]
-                    second["condition"]["not"] = ""
-                    condELs.extend([first,second])
-            else:
-                raise Exception("Find prefix ! but not suffix ? or = for use " + i["use"])
-        elif "suffix" in i:
-            if i["suffix"] == "?":
-                # app - misc / foo[bar?]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo)
-                first = get_dcondition(ctx,i)
-                second = get_dcondition(ctx,i)
-                first["els"][0]["atom"]["selection"] = [get_use(i)]
-                second["condition"]["not"] = ""
-                condELs.extend([first, second])
-            elif i["suffix"] == "=":
-                # app - misc / foo[bar =]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo[-bar])
-                first = get_dcondition(ctx,i)
-                second = get_dcondition(ctx,i)
-                first["els"][0]["atom"]["selection"] = [get_use(i)]
-                second["els"][0]["atom"]["selection"] = [get_use(i,"-")]
-                second["condition"]["not"] = ""
-                condELs.extend([first, second])
-        else:
-            normal_sels.append(i)
-    return condELs,normal_sels
+	# decompact the comapct atoms
+	assert "selection" in ctx
+	condELs = []
+	normal_sels = []
+	for i in ctx["selection"]:
+		if "prefix" in i and i["prefix"] == "!":
+			if "suffix" in i:
+				if i["suffix"] == "?":
+					# app - misc / foo[!bar?]    bar? (app - misc / foo) !bar? (app - misc / foo[-bar])
+					first = get_dcondition(ctx, i)
+					second = get_dcondition(ctx ,i)
+					second["condition"]["not"] = ""
+					second["els"][0]["atom"]["selection"] = [get_use(i, "-")]
+					condELs.extend([first, second])
+				elif i["suffix"] == "=":
+					# app - misc / foo[!bar =]    bar? (app - misc / foo[-bar]) !bar? (app - misc / foo[bar])
+					first = get_dcondition(ctx, i)
+					second = get_dcondition(ctx, i)
+					first["els"][0]["atom"]["selection"] = [get_use(i, "-")]
+					second["els"][0]["atom"]["selection"] = [get_use(i)]
+					second["condition"]["not"] = ""
+					condELs.extend([first, second])
+			else:
+				raise Exception("Find prefix ! but not suffix ? or = for use " + i["use"])
+		elif "suffix" in i:
+			if i["suffix"] == "?":
+				# app - misc / foo[bar?]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo)
+				first = get_dcondition(ctx,i)
+				second = get_dcondition(ctx,i)
+				first["els"][0]["atom"]["selection"] = [get_use(i)]
+				second["condition"]["not"] = ""
+				condELs.extend([first, second])
+			elif i["suffix"] == "=":
+				# app - misc / foo[bar =]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo[-bar])
+				first = get_dcondition(ctx,i)
+				second = get_dcondition(ctx,i)
+				first["els"][0]["atom"]["selection"] = [get_use(i)]
+				second["els"][0]["atom"]["selection"] = [get_use(i, "-")]
+				second["condition"]["not"] = ""
+				condELs.extend([first, second])
+		else:
+			normal_sels.append(i)
+	return condELs, normal_sels
 
 
 ##############################################
 # visitor to convert the AST into SMT formulas
 ##############################################
-class visitorASTtoSMT(hyportage_constraint_ast.ASTVisitor):
 
-    def __init__(self,mspl,map_name_id,package):
-        super(hyportage_constraint_ast.ASTVisitor, self).__init__()
-        self.map_name_id = map_name_id
-        self.package = package
-        self.mspl = mspl
+class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
-    # def CombineValue(self, value1, value2):
-    #     return value1
+	def __init__(self, pattern_repository, id_repository, spl_name):
+		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
+		self.id_repository = id_repository
+		self.spl_name = spl_name
+		self.pattern_repository = pattern_repository
 
-    def visitRequired(self, ctx):
-        return z3.And(map(self.visitRequiredEL, ctx))
+	# def CombineValue(self, value1, value2):
+	#     return value1
 
-    def visitRequiredSIMPLE(self, ctx):
-        assert ctx["use"] in self.map_name_id["flag"][self.package]
-        if "not" in ctx:
-            return z3.Not(get_smt_use(self.map_name_id,self.package,ctx["use"]))
-        else:
-            return get_smt_use(self.map_name_id, self.package, ctx["use"])
+	def visitRequired(self, ctx):
+		return z3.And(map(self.visitRequiredEL, ctx))
 
-    def visitRequiredCONDITION(self, ctx):
-        formulas = self.visitRequired(ctx['els'])
-        assert (self.map_name_id["flag"][self.package][ctx['condition']['use']])  # flag must exists
-        use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
-        if 'not' in ctx['condition']:
-            return z3.Implies(z3.Not(use),z3.And(formulas))
-        return z3.Implies(use,z3.And(formulas))
+	def visitRequiredSIMPLE(self, ctx):
+		# assert ctx["use"] in self.id_repository["flag"][self.spl_name]
+		res = get_smt_use(self.id_repository, self.spl_name, ctx["use"])
+		if "not" in ctx:
+			res = z3.Not(res)
+		return res
 
-    def visitRequiredCHOICE(self, ctx):
-        formulas = map(self.visitRequiredEL, ctx['els'])
-        if ctx["choice"] == "or":
-            return z3.Or(formulas)
-        elif ctx["choice"] == "one-max":
-            if len(formulas) > 2:
-                return get_no_two_true_expressions(formulas)
-            else:
-                return z3.BoolVal(True)
-        elif ctx["choice"] == "xor":
-            if len(formulas) > 1:
-                return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
-            elif len(formulas) == 1:
-                return formulas[0]
-            return z3.BoolVal(False) # no formula to be satisfied
+	def visitRequiredCONDITION(self, ctx):
+		formulas = self.visitRequired(ctx['els'])
+		# assert (self.id_repository["flag"][self.spl_name][ctx['condition']['use']])  # flag must exists
+		use = get_smt_use(self.id_repository, self.spl_name, ctx['condition']['use'])
+		if 'not' in ctx['condition']:
+			use = z3.Not(use)
+		return z3.Implies(use, z3.And(formulas))
 
-    def visitRequiredINNER(self, ctx):
-        return z3.And(self.visitRequired(ctx['els']))
+	def visitRequiredCHOICE(self, ctx):
+		formulas = map(self.visitRequiredEL, ctx['els'])
+		if ctx["choice"] == "or":
+			return z3.Or(formulas)
+		elif ctx["choice"] == "one-max":
+			if len(formulas) > 2:
+				return get_no_two_true_expressions(formulas)
+			else:
+				return z3.BoolVal(True)
+		elif ctx["choice"] == "xor":
+			if len(formulas) > 1:
+				return get_extactly_one_true_expressions(formulas)
+			elif len(formulas) == 1:
+				return formulas[0]
+			return z3.BoolVal(False)  # no formula to be satisfied
 
-    def visitDepend(self, ctx):
-        return z3.And(map(self.visitDependEL, ctx))
+	def visitRequiredINNER(self, ctx):
+		return z3.And(self.visitRequired(ctx['els']))
 
-    def visitDependSIMPLE(self, ctx):
-        formula = self.visitAtom(ctx['atom'])
-        if "not" in ctx:
-            return z3.Not(formula)
-        return formula
+	def visitDepend(self, ctx):
+		return z3.And(map(self.visitDependEL, ctx))
 
-    def visitDependCONDITION(self, ctx):
-        formulas = self.visitDepend(ctx['els'])
-        assert self.map_name_id["flag"][self.package][ctx['condition']['use']]  # flag must exists
-        use = get_smt_use(self.map_name_id, self.package, ctx['condition']['use'])
-        if 'not' in ctx['condition']:
-            return z3.Implies(z3.Not(use), z3.And(formulas))
-        return z3.Implies(use,z3.And(formulas))
+	def visitDependSIMPLE(self, ctx):
+		def aux_visit_single_pkg_single_select(spl_name, sel):
+			if hyportage_ids.id_repository_exists_use_flag(self.id_repository, spl_name, sel["use"]):
+				# the package considered did not declared the use
+				if "prefix" in sel and sel["prefix"] == "-":
+					if "preference" in sel:
+						if sel["preference"] == "+":
+							return z3.BoolVal(False)
+					# preference - or absent
+					return get_smt_spl_name(self.id_repository, spl_name)
+				else: # prefix + or absent
+					if "preference" in sel:
+						if sel["preference"] == "+":
+							return get_smt_spl_name(self.id_repository, spl_name)
+					# preference - or absent
+					return z3.BoolVal(False)
+			else:  # package declared the use
+				if "prefix" in sel and sel["prefix"] == "-":
+					return z3.And(
+						get_smt_spl_name(self.id_repository, spl_name),
+						z3.Not(get_smt_use(self.id_repository, spl_name, sel["use"])))
+				else: # prefix + or absent
+					return z3.And(
+						get_smt_spl_name(self.id_repository, spl_name),
+						get_smt_use(self.id_repository, spl_name, sel["use"]))
 
-    def visitDependCHOICE(self, ctx):
-        formulas = map(self.visitDependEL, ctx['els'])
-        if ctx["choice"] == "or":
-            return z3.Or(formulas)
-        elif ctx["choice"] == "one-max":
-            if len(formulas) > 2:
-                return get_no_two_true_expressions(formulas)
-            else:
-                return z3.BoolVal(True)
-        elif ctx["choice"] == "xor":
-            if len(formulas) > 1:
-                return z3.And(z3.Or(formulas),get_no_two_true_expressions(formulas))
-            elif len(formulas) == 1:
-                return formulas[0]
-            return z3.BoolVal(False) # no formula to be satisfied
+		def aux_visit_select(spl_names, sel):
+			return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in spl_names])
 
-    def visitDependINNER(self, ctx):
-        return z3.And(self.visitDepend(ctx['els']))
+		print(str(ctx['atom']))
+		spls = hyportage_pattern.pattern_repository_element_get_spls_visible(
+			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']))
+		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
+		if spls:
+			# decompact compact forms
+			if "selection" in ctx:
+				if not "decompacted" in ctx: # decompact procedure has not been run yet
+					condELs, normal_sels = decompact_atom(ctx)
+				else:
+					normal_sels = ctx["selection"]
+					condELs = []
+				formulas = [aux_visit_select(spl_names, x) for x in normal_sels]
+				formulas.append(self.visitDepend(condELs))
+				formula = z3.And(formulas)
+			else:
+				formula = z3.Or(get_smt_spl_names(self.id_repository, spl_names))
+		else:
+			formula = z3.BoolVal(False)
 
-    def visitAtom(self, ctx):
+		if "not" in ctx:
+			return z3.Not(formula)
+		return formula
 
-        def aux_visit_single_pkg_single_select(pkg,sel):
-            if sel["use"] not in self.map_name_id["flag"][pkg]:
-                # the package considered did not declared the use
-                if "prefix" in sel and sel["prefix"] == "-":
-                    if "preference" in sel:
-                        if sel["preference"] == "+":
-                            return z3.BoolVal(False)
-                    # preference - or absent
-                    return get_smt_package(self.map_name_id,pkg)
-                else: # prefix + or absent
-                    if "preference" in sel:
-                        if sel["preference"] == "+":
-                            return get_smt_package(self.map_name_id,pkg)
-                    # preference - or absent
-                    return z3.BoolVal(False)
-            else: # package declared the use
-                if "prefix" in sel and sel["prefix"] == "-":
-                    return z3.And(
-                        get_smt_package(self.map_name_id, pkg),
-                        z3.Not(get_smt_use(self.map_name_id,pkg,sel["use"])))
-                else: # prefix + or absent
-                    return z3.And(
-                        get_smt_package(self.map_name_id, pkg),
-                        get_smt_use(self.map_name_id, pkg, sel["use"]))
+	def visitDependCONDITION(self, ctx):
+		formulas = self.visitDepend(ctx['els'])
+		# assert self.id_repository["flag"][self.spl_name][ctx['condition']['use']]  # flag must exists
+		use = get_smt_use(self.id_repository, self.spl_name, ctx['condition']['use'])
+		if 'not' in ctx['condition']:
+			use = z3.Not(use)
+		return z3.Implies(use, z3.And(formulas))
 
-        def aux_visit_select(pkgs,sel):
-            return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in pkgs])
+	def visitDependCHOICE(self, ctx):
+		formulas = map(self.visitDependEL, ctx['els'])
+		if ctx["choice"] == "||":  # or
+			return z3.Or(formulas)
+		elif ctx["choice"] == "??":  # one-max
+			if len(formulas) > 2:
+				return get_no_two_true_expressions(formulas)
+			else:
+				return z3.BoolVal(True)
+		elif ctx["choice"] == "^^":  # xor
+			if len(formulas) > 1:
+				return get_extactly_one_true_expressions(formulas)
+			elif len(formulas) == 1:
+				return formulas[0]
+			return z3.BoolVal(False) # no formula to be satisfied
 
-        template = ctx["package"]
-        if 'version_op' in ctx:
-            operator = ctx['version_op']
-            if "times"in ctx:
-                template += "*"
-        else:
-            operator = "="
-            template += "*"
+	def visitDependINNER(self, ctx):
+		return z3.And(self.visitDepend(ctx['els']))
 
-        slot = ""
-        subslot = ""
-        if "slots" in ctx:
-            if "slot" in ctx["slots"]:
-                slot = ctx["slots"]["slot"]
-            if "subslot" in ctx["slots"]:
-                subslot = ctx["slots"]["subslot"]
+	"""def visitAtom(self, ctx):
 
-        pkgs = get_packages(self.mspl,template, operator, slot, subslot)
+		def aux_visit_single_pkg_single_select(pkg, sel):
+			if sel["use"] not in self.id_repository["flag"][pkg]:
+				# the package considered did not declared the use
+				if "prefix" in sel and sel["prefix"] == "-":
+					if "preference" in sel:
+						if sel["preference"] == "+":
+							return z3.BoolVal(False)
+					# preference - or absent
+					return get_smt_spl_name(self.id_repository, pkg)
+				else: # prefix + or absent
+					if "preference" in sel:
+						if sel["preference"] == "+":
+							return get_smt_spl_name(self.id_repository, pkg)
+					# preference - or absent
+					return z3.BoolVal(False)
+			else:  # package declared the use
+				if "prefix" in sel and sel["prefix"] == "-":
+					return z3.And(
+						get_smt_spl_name(self.id_repository, pkg),
+						z3.Not(get_smt_use(self.id_repository, pkg, sel["use"])))
+				else: # prefix + or absent
+					return z3.And(
+						get_smt_spl_name(self.id_repository, pkg),
+						get_smt_use(self.id_repository, pkg, sel["use"]))
 
-        if pkgs:
-            # decompact compact forms
-            if "selection" in ctx:
-                if not "decompacted" in ctx: # decompact procedure has not been run yet
-                    condELs, normal_sels = decompact_atom(ctx)
-                else:
-                    normal_sels = ctx["selection"]
-                    condELs = []
-                formulas = [aux_visit_select(pkgs, x) for x in normal_sels]
-                formulas.append(self.visitDepend(condELs))
-                return z3.And(formulas)
-            else:
-                return z3.Or(get_smt_packages(self.map_name_id,pkgs))
-        else:
-            return z3.BoolVal(False)
+		def aux_visit_select(pkgs, sel):
+			return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in pkgs])
 
+		template = ctx["package"]
+		if 'version_op' in ctx:
+			operator = ctx['version_op']
+			if "times"in ctx:
+				template += "*"
+		else:
+			operator = "="
+			template += "*"
 
-def convert(input_tuple):
-    mspl, map_name_id, simplify_mode, package = input_tuple
+		slot = ""
+		subslot = ""
+		if "slots" in ctx:
+			if "slot" in ctx["slots"]:
+				slot = ctx["slots"]["slot"]
+			if "subslot" in ctx["slots"]:
+				subslot = ctx["slots"]["subslot"]
 
-    logging.debug("Processing package " + package)
+		pkgs = get_packages(self.mspl,template, operator, slot, subslot)
 
-    constraints = []
-
-    if utils.is_base_package(mspl,package):
-        versions = mspl[package]["implementations"].values()
-        # if installed then one of its version should be installed as well
-        constraints.append(z3.Implies(
-            get_smt_package(map_name_id,package),
-            z3.Or(get_smt_packages(map_name_id,versions))))
-        # two versions should have different slots or subslots
-        possible_slot_matches = [(i,j) for i in versions for j in versions if i < j
-                                 and mspl[i]["slot"] == mspl[i]["slot"]
-                                 and mspl[i]["subslot"] == mspl[i]["subslot"]]
-
-        for i,j in possible_slot_matches:
-            constraints.append(z3.Not(z3.And(get_smt_package(map_name_id,i),get_smt_package(map_name_id,j))))
-    else:
-        # add local and combined constraints
-        visitor = visitorASTtoSMT(mspl,map_name_id,package)
-        for i in map(visitor.visitRequiredEL,mspl[package]["fm"]["local"]):
-            constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
-        for i in map(visitor.visitDependEL, mspl[package]["fm"]["combined"]):
-            # print "--------"
-            # print mspl[package]["fm"]["combined"][counter]
-            # counter += 1
-            # print toSMT2(z3.Implies(get_smt_package(map_name_id, package),i))
-            constraints.append(z3.Implies(get_smt_package(map_name_id, package),i))
+		if pkgs:
+			# decompact compact forms
+			if "selection" in ctx:
+				if not "decompacted" in ctx: # decompact procedure has not been run yet
+					condELs, normal_sels = decompact_atom(ctx)
+				else:
+					normal_sels = ctx["selection"]
+					condELs = []
+				formulas = [aux_visit_select(pkgs, x) for x in normal_sels]
+				formulas.append(self.visitDepend(condELs))
+				return z3.And(formulas)
+			else:
+				return z3.Or(get_smt_spl_names(self.id_repository, pkgs))
+		else:
+			return z3.BoolVal(False)"""
 
 
+def simplify_constraints(name, constraints, simplify_mode):
+	if simplify_mode == "default":
+		formula = z3.simplify(z3.And(constraints))
+		if z3.is_false(formula):
+			logging.warning("Dependencies in package " + name + " make it uninstallable.")
+		return (name,[toSMT2(formula)])
+	elif simplify_mode == "individual":
+		formulas = []
+		for i in constraints:
+			formula = z3.simplify(i)
+			if z3.is_false(formula):
+				logging.warning("Dependency " + unicode(i) + " in package " + name + " is false." +
+								"Package can not be installed")
+			formulas.append(formula)
+		return (name,[toSMT2(x) for x in formulas])
 
-        # package with version needs its base package to be selected
-        constraints.append(z3.Implies(
-            get_smt_package(map_name_id, package),
-            get_smt_package(map_name_id,mspl[package]['group_name'])))
 
-        # if package is not selected then its flags are not selected neither
-        constraints.append(z3.Implies(
-            z3.Not(get_smt_package(map_name_id, package)),
-            z3.And([z3.Not(get_smt_use(map_name_id,package,x)) for x in map_name_id["flag"][package]])))
+def convert_spl(pattern_repository, id_repository, spl, simplify_mode):
+	spl_name = hyportage_data.spl_get_name(spl)
+	spl_id = get_smt_spl_name(id_repository, spl_name)
+	logging.debug("Processing spl " + spl_name)
+	constraints = []
+	print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
+	# 1. convert feature model
+	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, spl_name)
+	for constraint in map(visitor.visitRequiredEL, hyportage_data.spl_get_fm_local(spl)):
+		constraints.append(z3.Implies(spl_id, constraint))
+	for constraint in map(visitor.visitDependEL, hyportage_data.spl_get_fm_combined(spl)):
+		# print "--------"
+		# print mspl[package]["fm"]["combined"][counter]
+		# counter += 1
+		# print toSMT2(z3.Implies(get_smt_package(map_name_id, package),i))
+		constraints.append(z3.Implies(spl_id, constraint))
 
-        # if flag is selected then its package is selected too
-        constraints.extend([z3.Implies(
-            get_smt_use(map_name_id,package,x),
-            get_smt_package(map_name_id, package)) for x in map_name_id["flag"][package]])
+	# 2. constraint stating that selecting an spl also selects its group
+	spl_group_name = hyportage_data.spl_get_group_name(spl)
+	constraints.append(z3.Implies(spl_id, get_smt_spl_name(id_repository, spl_group_name)))
 
-        # add validity formulas. Context must be one of the possible env
-        envs = [utils.process_keyword(x) for x in mspl[package]["environment"]]
-        envs = [x for x in envs if not x.startswith("-")]
-        if envs:
-            if "*" not in envs:
-                validity_formula = z3.Implies(
-                    get_smt_package(map_name_id, package),
-                    z3.Or([get_smt_context().__eq__(z3.IntVal(map_name_id["context_int"][x])) for x in envs]))
-            else:
-                validity_formula = z3.BoolVal(True)
-        else:
-            logging.warning("Environment empty for package " + package +
-                            ". This package will be treated as not installable.")
-            validity_formula = z3.BoolVal(False)
+	spl_uses_id = get_smt_uses(
+		id_repository, spl_name, hyportage_ids.id_repository_get_use_flag_from_spl_name(id_repository, spl_name))
 
-        # validity formula added at the end of constraints
-        constraints.append(validity_formula)
+	# 3. if package is not selected then its flags are not selected either
+	constraints.append(z3.Implies(z3.Not(spl_id), z3.And([z3.Not(use_id) for use_id in spl_uses_id])))
 
-    if simplify_mode == "default":
-        formula = z3.simplify(z3.And(constraints))
-        if z3.is_false(formula):
-            logging.warning("Dependencies in package " + package + " make it uninstallable.")
-        return (package,[toSMT2(formula)])
-    elif simplify_mode == "individual":
-        formulas = []
-        for i in constraints:
-            formula = z3.simplify(i)
-            if z3.is_false(formula):
-                logging.warning("Dependency " + unicode(i) + " in package " + package + " is false." +
-                                "Package can not be installed")
-            formulas.append(formula)
-        return (package,[toSMT2(x) for x in formulas])
+	# 4. if flag is selected then its package is selected too
+	constraints.append(z3.Implies(z3.Or(spl_uses_id), spl_id))
+
+	return spl_name, simplify_constraints(spl_name, constraints, simplify_mode)
+
+
+def convert_spl_group(id_repository, spl_group, simplify_mode):
+	spl_group_name = hyportage_data.spl_group_get_name(spl_group)
+	spl_group_id = get_smt_spl_name(id_repository, spl_group_name)
+	spls = filter(hyportage_data.spl_is_visible, hyportage_data.spl_group_get_references(spl_group))
+	spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
+
+	logging.debug("Processing spl group " + spl_group_name)
+	constraints = []
+
+	# 1. if installed then one of its version should be installed as well
+	constraints.append(z3.Implies(spl_group_id, z3.Or(spls_id)))
+
+	# 2. two installed spl should have different slots or subslots
+	for spls in hyportage_data.spl_group_get_slot_mapping(spl_group).values():
+		spls = filter(hyportage_data.spl_is_visible, spls)
+		if len(spls) > 1:
+			spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
+			constraints.append(z3.Sum(spls_id) <= 1)
+
+	return spl_group_name, simplify_constraints(spl_group_name, constraints, simplify_mode)
+
+
 
 
 def generate_formulas(concurrent_map, mspl, map_name_id, simplify_mode):
-    ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl]
-    return concurrent_map(convert, ls)
+	ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl]
+	return concurrent_map(convert, ls)

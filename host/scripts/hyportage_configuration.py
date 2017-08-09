@@ -77,8 +77,9 @@ def keywords_initialize(spl, arch):
 def keywords_apply_configuration_pattern(spl, pattern_repository, conf_keywords):
 	res = False
 	for pattern, keyword_list in conf_keywords:
-		if spl in hyportage_pattern.pattern_repository_get(pattern_repository, pattern)[1]:
-			res = res or bool(keyword_list & hyportage_data.spl_get_keywords_list(spl))
+		if spl in hyportage_pattern.pattern_repository_element_get_spls(
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern)):
+			res = res or any(keyword in set(hyportage_data.spl_get_keywords_list(spl)) for keyword in keyword_list)
 	return res
 
 
@@ -93,7 +94,8 @@ def use_selection_apply_configuration(use_selection, conf_use):
 
 def use_selection_apply_configuration_pattern(spl, pattern_repository, use_selection, conf_use):
 	for pattern, use_configuration in conf_use:
-		if spl in hyportage_pattern.pattern_repository_get(pattern_repository, pattern)[1]:
+		if spl in hyportage_pattern.pattern_repository_element_get_spls(
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern)):
 			use_selection_apply_configuration(use_selection, use_configuration)
 
 

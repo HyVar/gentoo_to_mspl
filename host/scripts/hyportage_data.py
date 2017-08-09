@@ -97,7 +97,7 @@ def dependencies_from_save_format(save_format):
 # SPL AND MSPL MANIPULATION
 ######################################################################
 
-class spl(object):
+class SPL(object):
 	def __init__(
 			self,
 			name, group, deprecated,
@@ -113,6 +113,7 @@ class spl(object):
 		self.version               = version
 		self.slot                  = slot
 		self.subslot               = subslot
+		self.slots                 = (slot, subslot)
 		self.fm_local              = fm_local
 		self.fm_combined           = fm_combined
 		self.smt_constraint        = None
@@ -138,9 +139,10 @@ class spl(object):
 
 
 def spl_get_name(spl): return spl.name
-def spl_get_group(spl): return spl.group
+def spl_get_group_name(spl): return spl.group
 def spl_get_slot(spl): return spl.slot
 def spl_get_subslot(spl): return spl.subslot
+def spl_get_slots(spl): return spl.slots
 def spl_get_version(spl): return spl.version
 def spl_get_version_full(spl): return spl.version_full
 def spl_get_dependencies(spl): return spl.dependencies
@@ -175,6 +177,9 @@ def spl_get_use_selection_user(spl): return spl.use_selection_user
 def spl_get_mask_profile(spl): return spl.mask_profile
 def spl_get_mask_user(spl): return spl.mask_user
 
+
+def spl_is_visible(spl): return spl_get_keywords_user(spl) and (not spl_get_mask_user(spl))
+
 ##
 
 
@@ -205,7 +210,7 @@ def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constr
 def spl_to_save_format(spl):
 	return {
 		'name': spl_get_name(spl),
-		'group': spl_get_group(spl),
+		'group': spl_get_group_name(spl),
 		'deprecated': spl_is_deprecated(spl),
 		'version_full': spl_get_version_full(spl),
 		'version': spl_get_version(spl),
@@ -239,7 +244,7 @@ def spl_to_save_format(spl):
 
 
 def spl_from_save_format(save_format):
-	res = spl(
+	res = SPL(
 			save_format['name'], save_format['group'], save_format['deprecated'],
 			save_format['version_full'], save_format['version'],
 			save_format['slot'], save_format['subslot'],
@@ -247,27 +252,27 @@ def spl_from_save_format(save_format):
 			dependencies_from_save_format(save_format['dependencies']), set(save_format['required_iuses_local']), set(save_format['keywords_list']),
 			set(save_format['iuses_default']), use_selection_from_save_format(save_format['use_selection_default'])
 		)
-	spl_set_keywords_default(spl, save_format['keywords_default'])
-	spl_set_keywords_profile(spl, save_format['keywords_profile'])
-	spl_set_keywords_user(spl, save_format['keywords_user'])
+	spl_set_keywords_default(SPL, save_format['keywords_default'])
+	spl_set_keywords_profile(SPL, save_format['keywords_profile'])
+	spl_set_keywords_user(SPL, save_format['keywords_user'])
 
-	spl_set_iuses_profile(spl, save_format['iuses_profile'])
-	spl_set_iuses_user(spl, save_format['iuses_user'])
+	spl_set_iuses_profile(SPL, save_format['iuses_profile'])
+	spl_set_iuses_user(SPL, save_format['iuses_user'])
 
-	spl_set_use_selection_profile(spl, use_selection_from_save_format(save_format['use_selection_profile']))
-	spl_set_use_selection_user(spl, use_selection_from_save_format(save_format['use_selection_user']))
+	spl_set_use_selection_profile(SPL, use_selection_from_save_format(save_format['use_selection_profile']))
+	spl_set_use_selection_user(SPL, use_selection_from_save_format(save_format['use_selection_user']))
 
-	spl_set_mask_profile(spl, save_format['mask_profile'])
-	spl_set_mask_user(spl, save_format['mask_user'])
+	spl_set_mask_profile(SPL, save_format['mask_profile'])
+	spl_set_mask_user(SPL, save_format['mask_user'])
 
-	spl.required_use = set(save_format['required_iuses'])
-	spl_set_smt_constraint(spl, save_format['smt_constraint'])
+	SPL.required_use = set(save_format['required_iuses'])
+	spl_set_smt_constraint(SPL, save_format['smt_constraint'])
 
-	return spl
+	return SPL
 
 ##
 
-def mspl_create(): return {}
+mspl_create = core_data.dict_configuration_create
 
 
 def mspl_add_spl(mspl, spl):
@@ -307,42 +312,78 @@ def mspl_from_save_format(save_format):
 ######################################################################
 
 
+class SPLGroup(object):
+	def __init__(self, group_name, spl):
+		self.name = group_name
+		self.references = [spl]
+		self.slots_mapping = {spl_get_slots(spl): [spl]}
+		self.smt_constraint = None
+
+	def add_spl(self, spl):
+		self.references.append(spl)
+		slots = spl_get_slots(spl)
+		if slots in self.slots_mapping:
+			self.slots_mapping[slots].append(spl)
+		else:
+			self.slots_mapping[slots] = [spl]
+
+	def replace_spl(self, old_spl, new_spl):
+		self.add_spl(new_spl)
+		self.remove_spl(old_spl)
+
+	def remove_spl(self, spl):
+		self.references.remove(spl)
+		slots = spl_get_slots(spl)
+		if len(self.slots_mapping[slots]) == 1:
+			self.slots_mapping.pop(slots)
+		else:
+			self.slots_mapping[slots].remove(spl)
+
+
 spl_groups_create = core_data.dict_configuration_create
 
 
 def spl_groups_add_spl(spl_groups, spl):
-	group_name, version_full, spl_name = (spl_get_group(spl), spl_get_version_full(spl), spl_get_name(spl) )
+	group_name, version_full, spl_name = (spl_get_group_name(spl), spl_get_version_full(spl), spl_get_name(spl))
 	group = spl_groups.get(group_name)
 	if group:
-		group['implementations'][version_full] = spl_name
-		group['dependencies'].append(spl_name)
-		group['reference'].append(spl)
+		group.add_spl(spl)
+		return None
 	else:
-		group = {'implementations': {version_full: spl_name}, 'dependencies': [spl_name], 'reference': [spl] }
+		group = SPLGroup(group_name, spl)
 		spl_groups[group_name] = group
+		return group
 
 
 def spl_groups_replace_spl(spl_groups, old_spl, new_spl):
-	group = spl_groups.get(spl_get_group(new_spl))
-	group['reference'].remove(old_spl)
-	group['reference'].append(new_spl)
+	group = spl_groups.get(spl_get_group_name(new_spl))
+	group.replace_spl(old_spl, new_spl)
 
 
 def spl_groups_remove_spl(spl_groups, spl):
-	group_name = spl_get_group(spl)
+	group_name = spl_get_group_name(spl)
 	group = spl_groups.get(group_name)
 	if group:
 		if len(group['reference']) == 1:
-			spl_groups.pop(group_name)
+			return spl_groups.pop(group_name)
 		else:
-			version_full, spl_name = (spl_get_version_full(spl), spl_get_name(spl) )
-			group['implementations'].pop(version_full)
-			group['dependencies'].remove(spl_name)
-			group['reference'].remove(spl)
+			group.remove_spl(spl)
+			return None
 
-def spl_group_get_references(spl_group):
-	return spl_group['reference']
 
+def spl_group_get_references(spl_group): return spl_group.references
+
+
+def spl_group_get_name(spl_group): return spl_group.name
+
+
+def spl_group_get_slot_mapping(spl_group): return spl_group.slots_mapping
+
+
+def spl_group_set_smt_constraint(spl_group, smt_constraint): spl_group.smt_constraint = smt_constraint
+
+
+def spl_group_get_smt_constraint(spl_group): return spl_group.smt_constraint
 
 ######################################################################
 # FULL SPL DATA MANIPULATION
@@ -361,6 +402,7 @@ def hyportage_data_to_save_format(pattern_repository, id_repository, mspl, spl_g
 		'pattern_repository': hyportage_pattern.pattern_repository_to_save_format(pattern_repository),
 		'id_repository': hyportage_ids.id_repository_to_save_format(id_repository),
 		'mspl': mspl_to_save_format(mspl),
+		'spl_groups': { k: spl_group_get_smt_constraint(v) for k, v in spl_groups.iteritems()},
 		'core_configuration': hyportage_configuration.core_configuration_to_save_format(core_configuration),
 		'installed_spls': core_data.package_installed_to_save_format(installed_spls)
 	}
@@ -368,6 +410,8 @@ def hyportage_data_to_save_format(pattern_repository, id_repository, mspl, spl_g
 
 def hyportage_data_from_save_format(save_format):
 	mspl, spl_groups = mspl_from_save_format(save_format['mspl'])
+	for spl_group_name, spl_group in spl_groups.iteritems():
+		spl_group_set_smt_constraint(spl_group, save_format['spl_groups'][spl_group_name])
 	return (
 		hyportage_pattern.pattern_repository_from_save_format(save_format['pattern_repository'], mspl),
 		hyportage_ids.id_repository_from_save_format(save_format['id_repository']),
