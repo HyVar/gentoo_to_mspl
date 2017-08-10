@@ -20,6 +20,7 @@ import hyportage_data
 import core_data
 import hyportage_constraint_ast
 import utils
+import logging
 
 ######################################################################
 # EGENCACHE FILES FUNCTIONS
@@ -259,7 +260,7 @@ def is_selection_required(ctx):
 	return (ctx['default'] == "+")
 
 
-class get_dependencies(hyportage_constraint_ast.ASTVisitor):
+class GETDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
 	def __init__(self, package_name):
 		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
 		self.main_package_name = package_name
@@ -275,9 +276,11 @@ class get_dependencies(hyportage_constraint_ast.ASTVisitor):
 	def visitDependSIMPLE(self, ctx):
 		self.pattern = ctx['atom']
 		hyportage_data.dependencies_add_pattern(self.res[1], self.pattern)
+		if "selection" in ctx: map(self.visitSelection, ctx['selection'])
 
 	def visitSelection(self,ctx):
 		use = ctx['use']
+		#print("CHECK ERROR: main = " + str(self.main_package_name) + ", local = " + str(self.pattern) + ", use = " + str(use) + "  ==> " + str('suffix' in ctx))
 		if is_selection_required(ctx): hyportage_data.dependencies_add_pattern_use(self.res[1], self.pattern, use)
 		if 'suffix' in ctx: self.res[0].add(use)
 
@@ -318,7 +321,7 @@ def create_spl_from_egencache_file(file_path):
 	fm_unloop = translate_depend(fm_unloop) if fm_unloop else []
 	fm_combined = utils.compact_list(fm_external + fm_runtime + fm_unloop)
 	# 4. extracting the more structured data
-	visitor = get_dependencies(package_name)
+	visitor = GETDependenciesVisitor(package_name)
 	visitor.visitRequired(fm_local)
 	visitor.visitDepend(fm_combined)
 	# 5. return the raw spl

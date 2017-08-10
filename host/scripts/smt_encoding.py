@@ -57,12 +57,16 @@ def get_hyvar_use(id_repository, spl_name, use_flag):
 #def get_no_two_true_expressions(fs):
 #	return z3.And([z3.Not(z3.And(fs[i], fs[j])) for i in range(len(fs)) for j in range(len(fs)) if i < j])
 
+
+def get_int_from_boo_list(fs): return z3.Sum([z3.If(b, 1, 0) for b in fs])
+
+
 def get_no_two_true_expressions(fs):
-	return z3.Sum(fs) <= 1
+	return get_int_from_boo_list(fs) <= 1
 
 
 def get_extactly_one_true_expressions(fs):
-	return z3.Xor(fs)
+	return get_int_from_boo_list(fs) == 1
 
 
 def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_list):
@@ -157,6 +161,7 @@ def decompact_atom(ctx):
 	return condELs, normal_sels
 """
 
+
 ##############################################
 # visitor to convert the AST into SMT formulas
 ##############################################
@@ -192,14 +197,14 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
 	def visitRequiredCHOICE(self, ctx):
 		formulas = map(self.visitRequiredEL, ctx['els'])
-		if ctx["choice"] == "or":
+		if ctx["choice"] == "||":  # or
 			return z3.Or(formulas)
-		elif ctx["choice"] == "one-max":
+		elif ctx["choice"] == "??":  # one-max
 			if len(formulas) > 2:
 				return get_no_two_true_expressions(formulas)
 			else:
 				return z3.BoolVal(True)
-		elif ctx["choice"] == "xor":
+		elif ctx["choice"] == "^^":  # xor
 			if len(formulas) > 1:
 				return get_extactly_one_true_expressions(formulas)
 			elif len(formulas) == 1:
@@ -241,7 +246,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		def aux_visit_select(spl_names, sel):
 			return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in spl_names])
 
-		print(str(ctx['atom']))
+		#print(str(ctx['atom']))
 		spls = hyportage_pattern.pattern_repository_element_get_spls_visible(
 			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']))
 		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
@@ -250,7 +255,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			if "selection" in ctx:
 				formulas = [
 					(get_smt_spl_name(self.id_repository, spl_name),
-					decompact_selection_list(id_repository, self.spl_name, spl_name, ctx['selection']))
+					decompact_selection_list(self.id_repository, self.spl_name, spl_name, ctx['selection']))
 					for spl_name in spl_names ]
 				formula = z3.Or([z3.And(formula + [spl_id]) for spl_id, formula in formulas])
 			else:
@@ -377,7 +382,7 @@ def convert_spl(pattern_repository, id_repository, spl, simplify_mode):
 	spl_id = get_smt_spl_name(id_repository, spl_name)
 	logging.debug("Processing spl " + spl_name)
 	constraints = []
-	print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
+	#print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
 	# 1. convert feature model
 	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, spl_name)
 	for constraint in map(visitor.visitRequiredEL, hyportage_data.spl_get_fm_local(spl)):
@@ -422,7 +427,7 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 		spls = filter(hyportage_data.spl_is_visible, spls)
 		if len(spls) > 1:
 			spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
-			constraints.append(z3.Sum(spls_id) <= 1)
+			constraints.append(get_no_two_true_expressions(spls_id))
 
 	return spl_group_name, simplify_constraints(spl_group_name, constraints, simplify_mode)
 

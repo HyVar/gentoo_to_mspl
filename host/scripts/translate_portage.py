@@ -332,7 +332,7 @@ def main(
 	# 6. GENERATE THE SMT CONSTRAINTS
 	##########################################################################
 
-	"""
+	#"""
 	logging.info("Generating the SMT Constraints")
 	t = time.time()
 	# generate everything for now: laziness for the win
@@ -344,7 +344,7 @@ def main(
 	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
 	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
 	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-	"""
+	#"""
 
 	##########################################################################
 	# 7. REGENERATE THE INSTALLED PACKAGE INFORMATION IF NECESSARY
