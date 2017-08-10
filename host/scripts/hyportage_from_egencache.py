@@ -139,6 +139,7 @@ def visit_node_selection(parse_tree):
 		use = use[1:]
 	if use[-1] == "=":
 		suffix = "="
+		use = use[:-1]
 
 	res = { 'type': "selection", 'use': use }
 	if prefix: res['prefix'] = prefix

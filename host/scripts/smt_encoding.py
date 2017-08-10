@@ -62,11 +62,39 @@ def get_no_two_true_expressions(fs):
 
 
 def get_extactly_one_true_expressions(fs):
-	return z3.Sum(fs) == 1
+	return z3.Xor(fs)
 
 
-def decompact_atom(ctx):
+def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_list):
 	"""Expands the compact forms in uses dependencies"""
+	res = []
+	for selection in selection_list:
+		use_flag = selection['use']
+		if hyportage_ids.id_repository_exists_use_flag(id_repository, spl_name, use_flag):
+			use_id = get_smt_use(id_repository, spl_name, use_flag)
+			if "prefix" in selection:
+				if selection['prefix'] == "-":
+					res.append(z3.Not(use_id))
+				else:  # selection['prefix'] == "!"
+					local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+					if selection['suffix'] == "=":
+						res.append(local_use_id == z3.Not(use_id))
+					else:  # selection['suffix'] == "?"
+						res.append(z3.Implies(z3.Not(local_use_id), use_id))
+			elif "suffix" in selection:
+				local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+				if selection['suffix'] == "=":
+					res.append(local_use_id == use_id)
+				else:  # selection['suffix'] == "?"
+					res.append(z3.Implies(local_use_id, use_id))
+			else:
+				res.append(use_id)
+	return res
+	# I don't deal with default value in this first approximation
+
+
+"""
+def decompact_atom(ctx):
 
 	def get_use(ctx, prefix=""): # replace the prefix of the context with a default one. What for?
 		use = {"use": ctx["use"]}
@@ -127,7 +155,7 @@ def decompact_atom(ctx):
 		else:
 			normal_sels.append(i)
 	return condELs, normal_sels
-
+"""
 
 ##############################################
 # visitor to convert the AST into SMT formulas
@@ -217,17 +245,14 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		spls = hyportage_pattern.pattern_repository_element_get_spls_visible(
 			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']))
 		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
-		if spls:
+		if spl_names:
 			# decompact compact forms
 			if "selection" in ctx:
-				if not "decompacted" in ctx: # decompact procedure has not been run yet
-					condELs, normal_sels = decompact_atom(ctx)
-				else:
-					normal_sels = ctx["selection"]
-					condELs = []
-				formulas = [aux_visit_select(spl_names, x) for x in normal_sels]
-				formulas.append(self.visitDepend(condELs))
-				formula = z3.And(formulas)
+				formulas = [
+					(get_smt_spl_name(self.id_repository, spl_name),
+					decompact_selection_list(id_repository, self.spl_name, spl_name, ctx['selection']))
+					for spl_name in spl_names ]
+				formula = z3.Or([z3.And(formula + [spl_id]) for spl_id, formula in formulas])
 			else:
 				formula = z3.Or(get_smt_spl_names(self.id_repository, spl_names))
 		else:
