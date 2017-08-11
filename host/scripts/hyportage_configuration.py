@@ -3,14 +3,30 @@ import portage_data
 import hyportage_data
 import hyportage_pattern
 
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
+__license__ = "ISC"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
 
-"""Used for incremental creation of the database"""
+
+"""
+This file contains the data structure declaration, and the related getter/setters and manipulation functions,
+for the annex data necessary for a correct incremental update of the mspl database.
+The data structure is called "core_configuration"
+"""
+
+######################################################################
+# DATA STRUCTURE
+######################################################################
 
 def core_configuration_create():
 	return (
-		set(),  # the set of patterns used in the profile configuration
-		set(),  # the set of patterns used in the user configuration
-		set(),  # implicit iuse list
+		set(),       # the set of patterns used in the profile configuration
+		set(),       # the set of patterns used in the user configuration
+		set(),       # implicit iuse list
 		["no-arch"]  # the architecture of the system
 	)
 
@@ -86,12 +102,11 @@ def keywords_apply_configuration_pattern(spl, pattern_repository, conf_keywords)
 
 
 def iuses_apply_configuration(iuses, conf_iuses):
-	pass  # non need to update the iuse list
+	hyportage_data.iuses_addall(iuses, conf_iuses)
 
 
 def use_selection_apply_configuration(use_selection, conf_use):
-	hyportage_data.use_selection_addall(use_selection, core_data.use_configuration_get_positive(conf_use))
-	hyportage_data.use_selection_removeall(use_selection, core_data.use_configuration_get_negative(conf_use))
+	hyportage_data.use_selection_apply_configuration(use_selection, conf_use)
 
 
 def use_selection_apply_configuration_pattern(spl, pattern_repository, use_selection, conf_use):
@@ -222,82 +237,5 @@ def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_pr
 		for spl in new_spls:  # apply the configurations only on the new spls
 			spl_apply_user_configuration(spl, pattern_repository, conf_user)
 	return spl_modified_data, spl_modified_visibility
-
-
-
-
-######################################################################
-# HYPORTAGE ANNEX CREATION
-######################################################################
-
-# wouldn't it be possible to simply store the two configurations here, and compute diff?
-# we need to know for each element if it is different
-# well, ok, for each elements,
-
-## stores:
-# - patterns in the profile configuration		: useful for pattern repository garbage collection
-# - iuses declared in the profile configuration	: useful to update the iuse list of the packages
-# - patterns in the user configuration			: useful for pattern repository garbage collection
-# - (user cannot declare new uses)
-# - package list								: useful to know which packages to remove to obtain the current state
-# - last id
-
-
-def hyportage_annex_create():
-	return set([]), set([]), set([]), set([]), [0]
-
-
-def hyportage_annex_get_profile_pattern(hyportage_annex): return hyportage_annex[0]
-
-
-def hyportage_annex_get_profile_iuses(hyportage_annex): return hyportage_annex[1]
-
-
-def hyportage_annex_get_user_pattern(hyportage_annex): return hyportage_annex[2]
-
-
-def hyportage_annex_get_package_list(hyportage_annex): return hyportage_annex[3]
-
-
-def hyportage_annex_get_last_id(hyportage_annex): return hyportage_annex[4][0]
-
-
-def hyportage_annex_set_profile_configuration(hyportage_annex, profile_configuration):
-	profile_patterns = hyportage_annex[0]
-	profile_iuses = hyportage_annex[1]
-	profile_patterns.clear()
-	profile_iuses.clear()
-	# profile data with patterns
-	for pattern_set in portage_data.configuration_get_pattern_required(profile_configuration).values():
-		profile_patterns.update(pattern_set)
-	profile_patterns.update(portage_data.configuration_get_pattern_accept_keywords(profile_configuration).keys())
-	profile_patterns.update(portage_data.configuration_get_pattern_masked(profile_configuration).keys())
-	profile_patterns.update(portage_data.configuration_get_pattern_configuration(profile_configuration).keys())
-	# profile data with iuses
-	profile_iuses.update(portage_data.configuration_get_iuse(profile_configuration)[0])
-
-
-def hyportage_annex_set_user_configuration(hyportage_annex, user_configuration):
-	user_patterns = hyportage_annex[2]
-	user_patterns.clear()
-	# user data with patterns
-	for pattern_set in portage_data.configuration_get_required_package(user_configuration).values():
-		user_patterns.update(pattern_set)
-	user_patterns.update(portage_data.configuration_get_pattern_accept_keywords(user_configuration).keys())
-	user_patterns.update(portage_data.configuration_get_pattern_masked(user_configuration).keys())
-	user_patterns.update(portage_data.configuration_get_pattern_configuration(user_configuration).keys())
-
-
-def hyportage_annex_update_package_list(hyportage_annex, to_add, to_remove):
-	package_list = hyportage_annex[3]
-	package_list.update(to_add)
-	package_list.difference_update(to_remove)
-
-
-def hyportage_annex_set_last_id(hyportage_annex, last_id):
-	hyportage_annex[4][0] = last_id
-
-##
-
 
 

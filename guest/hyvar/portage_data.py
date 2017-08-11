@@ -141,7 +141,7 @@ def pattern_masked_from_save_format(save_format):
 ######################################################################
 
 def iuse_configuration_create():
-	return core_data.set_configuration_create(), core_data.use_configuration_create()
+	return core_data.set_configuration_create(), core_data.use_selection_create()
 
 
 def iuse_configuration_get_iuses(iuse_configuration): return iuse_configuration[0]
@@ -158,21 +158,21 @@ def iuse_configuration_update(iuse_configuration, use):
 
 def iuse_configuration_add(iuse_configuration, use):
 	core_data.set_configuration_add(iuse_configuration[0], use)
-	core_data.use_configuration_add(iuse_configuration[1], use)
+	core_data.use_selection_add(iuse_configuration[1], use)
 
 
 def iuse_configuration_remove(iuse_configuration, use):
 	core_data.set_configuration_add(iuse_configuration[0], use)
-	core_data.use_configuration_remove(iuse_configuration[1], use)
+	core_data.use_selection_remove(iuse_configuration[1], use)
 
 
 def iuse_configuration_apply_configuration(iuse_configuration, iuse_configuration2):
 	core_data.set_configuration_addall(iuse_configuration[0], iuse_configuration2[0])
-	core_data.use_configuration_apply_configuration(iuse_configuration[1], iuse_configuration2[1])
+	core_data.use_selection_apply_configuration(iuse_configuration[1], iuse_configuration2[1])
 
 
 def iuse_configuration_to_save_format(iuse_configuration):
-	res = core_data.use_configuration_to_save_format(iuse_configuration[1])
+	res = core_data.use_selection_to_save_format(iuse_configuration[1])
 	res['iuse'] = core_data.set_configuration_to_save_format_simple(iuse_configuration[0])
 	return res
 
@@ -180,7 +180,7 @@ def iuse_configuration_to_save_format(iuse_configuration):
 def iuse_configuration_from_save_format(save_format):
 	return (
 		core_data.set_configuration_from_save_format_simple(save_format['iuse']),
-		core_data.use_configuration_from_save_format(save_format))
+		core_data.use_selection_from_save_format(save_format))
 
 
 def iuse_configuration_create_from_iuses_list(iuses_list):
@@ -202,11 +202,11 @@ def iuse_configuration_create_from_iuses_list(iuses_list):
 ######################################################################
 
 def pattern_configuration_element_to_save_format(x):
-	return { 'pattern': core_data.pattern_to_save_format(x[0]), 'use': core_data.use_configuration_to_save_format(x[1])}
+	return { 'pattern': core_data.pattern_to_save_format(x[0]), 'use': core_data.use_selection_to_save_format(x[1])}
 
 
 def pattern_configuration_element_from_save_format(x):
-	return (core_data.pattern_from_save_format(x['pattern']), core_data.use_configuration_from_save_format(x['use']))
+	return (core_data.pattern_from_save_format(x['pattern']), core_data.use_selection_from_save_format(x['use']))
 
 ##
 

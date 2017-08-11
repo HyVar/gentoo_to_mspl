@@ -202,59 +202,80 @@ def dict_configuration_from_save_format(save_format, key_from_save_format, value
 ######################################################################
 
 
-def use_configuration_create(positive=[], negative=[]):
+def use_selection_create(positive=[], negative=[]):
 	return set(positive), set(negative)
 
 
-def use_configuration_get_positive(use_configuration):
-	return use_configuration[0]
+def use_selection_copy(use_selection):
+	return set(use_selection[0]), set(use_selection[1])
 
 
-def use_configuration_get_negative(use_configuration):
-	return use_configuration[1]
+def use_selection_get_positive(use_selection):
+	return use_selection[0]
 
 
-def use_configuration_add(use_configuration, use):
-	use_configuration[0].add(use)
-	use_configuration[1].discard(use)
+def use_selection_get_negative(use_selection):
+	return use_selection[1]
 
 
-def use_configuration_remove(use_configuration, use):
-	use_configuration[0].discard(use)
-	use_configuration[1].add(use)
+def use_selection_add(use_selection, use):
+	use_selection[0].add(use)
+	use_selection[1].discard(use)
 
 
-def use_configuration_apply_configuration(use_configuration, use_configuration2):
-	use_configuration[0].update(use_configuration2[0])
-	use_configuration[1].difference_update(use_configuration2[0])
-	use_configuration[0].difference_update(use_configuration2[1])
-	use_configuration[1].update(use_configuration2[1])
+def use_selection_remove(use_selection, use):
+	use_selection[0].discard(use)
+	use_selection[1].add(use)
 
 
-def use_configuration_create_from_uses_list(uses_list):
-	res = use_configuration_create()
+def use_selection_apply_configuration(use_selection, use_configuration):
+	use_selection[0].update(use_configuration[0])
+	use_selection[1].difference_update(use_configuration[0])
+	use_selection[0].difference_update(use_configuration[1])
+	use_selection[1].update(use_configuration[1])
+
+
+def use_selection_create_from_uses_list(uses_list):
+	res = use_selection_create()
 	for use in uses_list:
 		if use[0] == "-":
-			use_configuration_remove(res, use[1:])
+			use_selection_remove(res, use[1:])
 		else:
-			use_configuration_add(res, use)
+			use_selection_add(res, use)
 	return res
 
 
-def use_configuration_invert(use_configuration):
-	new_positive = list(use_configuration[1])
-	new_negative = list(use_configuration[0])
-	use_configuration[0].clear()
-	use_configuration[0].update(new_positive)
-	use_configuration[1].clear()
-	use_configuration[1].update(new_negative)
+def use_selection_create_from_iuses_list(iuses_list):
+	iuse_list = set([])
+	use_selection = use_selection_create()
+	for iuse in iuses_list:
+		if iuse[0] == "+":
+			iuse = iuse[1:]
+			iuse_list.add(iuse)
+			use_selection_add(use_selection, iuse)
+		elif iuse[0] == "-":
+			iuse = iuse[1:]
+			iuse_list.add(iuse)
+			use_selection_remove(use_selection, iuse)
+		else:
+			iuse_list.add(iuse)
+	return iuse_list, use_selection
 
 
-def use_configuration_to_save_format(use_configuration):
-	return { 'positive': list(use_configuration[0]), 'negative': list(use_configuration[1]) }
+def use_selection_invert(use_selection):
+	new_positive = list(use_selection[1])
+	new_negative = list(use_selection[0])
+	use_selection[0].clear()
+	use_selection[0].update(new_positive)
+	use_selection[1].clear()
+	use_selection[1].update(new_negative)
 
 
-def use_configuration_from_save_format(save_format):
+def use_selection_to_save_format(use_selection):
+	return { 'positive': list(use_selection[0]), 'negative': list(use_selection[1])}
+
+
+def use_selection_from_save_format(save_format):
 	return set(save_format['positive']), set(save_format['negative'])
 
 
@@ -271,10 +292,10 @@ def package_installed_set(package_installed, package_name, use_configuration):
 
 
 def package_installed_to_save_format(package_installed):
-	return dict_configuration_to_save_format(package_installed, identity, use_configuration_to_save_format)
+	return dict_configuration_to_save_format(package_installed, identity, use_selection_to_save_format)
 
 
 def package_installed_from_save_format(save_format):
-	return dict_configuration_from_save_format(save_format, identity, use_configuration_from_save_format)
+	return dict_configuration_from_save_format(save_format, identity, use_selection_from_save_format)
 
 

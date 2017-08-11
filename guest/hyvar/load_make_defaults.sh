@@ -8,6 +8,9 @@ if [ -n "${1}" ]; then
 	source ${1}
 fi
 
+echo "managing file \"${1}\"" >> log.txt
+echo " variable USE_EXPAND_VALUES_ARCH = ${USE_EXPAND_VALUES_ARCH}" >> log.txt
+
 # seems to me that the make.defaults must be loaded in sequence, together...
 # I have to check that the iuse and use list are generated correctly
 
@@ -87,19 +90,18 @@ function_use_expand_unprefixed() {
 function_use_expand_values_arch() {
 	PREFIX=$1
 	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
+	for i in ${VARIABLE}; do
 		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}arch_${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} arch_${RESULT}"
+		echo "    ${PREFIX} ${RESULT}" >> log.txt
+		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${RESULT}"
+		EXPANDED_IUSE="${EXPANDED_IUSE} ${RESULT}"
 	done
 }
 
 function_use_expand_values_elibc() {
 	PREFIX=$1
 	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
+	for i in ${VARIABLE}; do
 		manage_use "$i"
 		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}elibc_${RESULT}"
 		EXPANDED_IUSE="${EXPANDED_IUSE} elibc_${RESULT}"
@@ -109,8 +111,7 @@ function_use_expand_values_elibc() {
 function_use_expand_values_kernel() {
 	PREFIX=$1
 	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
+	for i in ${VARIABLE}; do
 		manage_use "$i"
 		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}kernel_${RESULT}"
 		EXPANDED_IUSE="${EXPANDED_IUSE} kernel_${RESULT}"
@@ -120,8 +121,7 @@ function_use_expand_values_kernel() {
 function_use_expand_values_userland() {
 	PREFIX=$1
 	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
+	for i in ${VARIABLE}; do
 		manage_use "$i"
 		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}userland_${RESULT}"
 		EXPANDED_IUSE="${EXPANDED_IUSE} userland_${RESULT}"

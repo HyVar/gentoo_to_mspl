@@ -59,7 +59,7 @@ def parse_use(use):
 
 
 def parse_use_list(uses):
-	res = core_data.use_configuration_create()
+	res = core_data.use_selection_create()
 	for use in uses:
 		use, sign = parse_use(use)
 
@@ -183,7 +183,7 @@ def analyse_package_use(conf, lines):
 	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		uses = core_data.use_configuration_create_from_uses_list(els[1:])
+		uses = core_data.use_selection_create_from_uses_list(els[1:])
 		portage_data.pattern_configuration_add(pattern_configuration, core_data.pattern_create_from_atom(els[0]), uses)
 
 
@@ -192,23 +192,23 @@ def analyse_package_use_mask(conf, lines):
 	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
 	for line in lines:
 		els = line.split()
-		uses = core_data.use_configuration_create_from_uses_list(els[1:])
-		core_data.use_configuration_invert(uses)
+		uses = core_data.use_selection_create_from_uses_list(els[1:])
+		core_data.use_selection_invert(uses)
 		portage_data.pattern_configuration_add(pattern_configuration, core_data.pattern_create_from_atom(els[0]), uses)
 
 
 # file "use.force", in profile configuration
 def analyse_use(conf, lines):
 	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
-	uses = core_data.use_configuration_create_from_uses_list(lines)
+	uses = core_data.use_selection_create_from_uses_list(lines)
 	portage_data.pattern_configuration_add(pattern_configuration, portage_data.wildcardpattern, uses)
 
 
 # file "use.mask", in profile configuration
 def analyse_use_mask(conf, lines):
 	pattern_configuration = portage_data.configuration_get_pattern_configuration(conf)
-	uses = core_data.use_configuration_create_from_uses_list(lines)
-	core_data.use_configuration_invert(uses)
+	uses = core_data.use_selection_create_from_uses_list(lines)
+	core_data.use_selection_invert(uses)
 	portage_data.pattern_configuration_add(pattern_configuration, portage_data.wildcardpattern, uses)
 
 ##
@@ -500,7 +500,7 @@ def load_portage():
 def load_installed_package_uses(package_path):
 	path_iuses = os.path.join(package_path, "IUSE")
 	if not os.path.exists(path_iuses):
-		return core_data.use_configuration_create()
+		return core_data.use_selection_create()
 	else:
 		with open(path_iuses, 'r') as f:
 			iuses = f.read().split()
@@ -508,7 +508,7 @@ def load_installed_package_uses(package_path):
 		with open(os.path.join(package_path, "USE"), 'r') as f:
 			uses = f.read().split()
 		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
-		return core_data.use_configuration_create(uses, nuses)
+		return core_data.use_selection_create(uses, nuses)
 
 
 def load_installed_packages():

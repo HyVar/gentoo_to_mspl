@@ -25,8 +25,11 @@ keywords_from_save_format = core_data.set_configuration_from_save_format
 iuses_create = core_data.set_configuration_create
 iuses_copy = core_data.set_configuration_copy
 
-iuses_to_save_format = core_data.set_configuration_to_save_format
-iuses_from_save_format = core_data.set_configuration_from_save_format
+iuses_add = core_data.set_configuration_add
+iuses_addall = core_data.set_configuration_addall
+
+iuses_to_save_format = core_data.set_configuration_to_save_format_simple
+iuses_from_save_format = core_data.set_configuration_from_save_format_simple
 
 
 ######################################################################
@@ -34,31 +37,15 @@ iuses_from_save_format = core_data.set_configuration_from_save_format
 ######################################################################
 
 
-use_selection_create = core_data.set_configuration_create
-use_selection_copy = core_data.set_configuration_copy
-use_selection_add = core_data.set_configuration_add
-use_selection_addall = core_data.set_configuration_addall
-use_selection_remove = core_data.set_configuration_remove
-use_selection_removeall = core_data.set_configuration_removeall
-use_selection_to_save_format = core_data.set_configuration_to_save_format_simple
-use_selection_from_save_format = core_data.set_configuration_from_save_format_simple
+use_selection_create = core_data.use_selection_create
+use_selection_copy = core_data.use_selection_copy
+use_selection_create_from_iuses_list = core_data.use_selection_create_from_iuses_list
+use_selection_add = core_data.use_selection_add
+use_selection_remove = core_data.use_selection_remove
+use_selection_apply_configuration = core_data.use_selection_apply_configuration
+use_selection_to_save_format = core_data.use_selection_to_save_format
+use_selection_from_save_format = core_data.use_selection_from_save_format
 
-##
-
-
-def use_selection_from_iuse_list(iuse_list):
-	res = (set([]), use_selection_create())
-	for iuse in iuse_list:
-		if iuse[0] == "+":
-			iuse = iuse[1:]
-			res[0].add(iuse)
-			res[1].add(iuse)
-		elif iuse[0] == "-":
-			iuse = iuse[1:]
-			res[0].add(iuse)
-		else:
-			res[0].add(iuse)
-	return res
 
 ##
 
@@ -197,9 +184,9 @@ def spl_set_mask_user(spl, new_mask): spl.mask_user = new_mask
 
 
 def spl_reset_required_iuses(spl, pattern_repository):
-	spl.required_iuses = list(set.union(*[
+	spl.required_iuses = list(set.intersection(spl_get_iuses_user(spl), set.union(
 		spl.required_iuses_local,
-		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl)]))
+		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl))))
 
 
 def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constraint
@@ -252,23 +239,23 @@ def spl_from_save_format(save_format):
 			dependencies_from_save_format(save_format['dependencies']), set(save_format['required_iuses_local']), set(save_format['keywords_list']),
 			set(save_format['iuses_default']), use_selection_from_save_format(save_format['use_selection_default'])
 		)
-	spl_set_keywords_default(SPL, save_format['keywords_default'])
-	spl_set_keywords_profile(SPL, save_format['keywords_profile'])
-	spl_set_keywords_user(SPL, save_format['keywords_user'])
+	spl_set_keywords_default(res, save_format['keywords_default'])
+	spl_set_keywords_profile(res, save_format['keywords_profile'])
+	spl_set_keywords_user(res, save_format['keywords_user'])
 
-	spl_set_iuses_profile(SPL, save_format['iuses_profile'])
-	spl_set_iuses_user(SPL, save_format['iuses_user'])
+	spl_set_iuses_profile(res, save_format['iuses_profile'])
+	spl_set_iuses_user(res, save_format['iuses_user'])
 
-	spl_set_use_selection_profile(SPL, use_selection_from_save_format(save_format['use_selection_profile']))
-	spl_set_use_selection_user(SPL, use_selection_from_save_format(save_format['use_selection_user']))
+	spl_set_use_selection_profile(res, use_selection_from_save_format(save_format['use_selection_profile']))
+	spl_set_use_selection_user(res, use_selection_from_save_format(save_format['use_selection_user']))
 
-	spl_set_mask_profile(SPL, save_format['mask_profile'])
-	spl_set_mask_user(SPL, save_format['mask_user'])
+	spl_set_mask_profile(res, save_format['mask_profile'])
+	spl_set_mask_user(res, save_format['mask_user'])
 
-	SPL.required_use = set(save_format['required_iuses'])
-	spl_set_smt_constraint(SPL, save_format['smt_constraint'])
+	res.required_use = set(save_format['required_iuses'])
+	spl_set_smt_constraint(res, save_format['smt_constraint'])
 
-	return SPL
+	return res
 
 ##
 

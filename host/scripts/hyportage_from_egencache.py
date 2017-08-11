@@ -175,7 +175,7 @@ def visit_node_require_element(parse_tree):
 	neg = None
 	if parse_tree[1][1] == "!": # not use
 		neg = "!"
-		use = parse_tree[1][2]
+		use = parse_tree[2][1]
 		i = 3
 	else:
 		use = parse_tree[1][1]
@@ -313,7 +313,7 @@ def create_spl_from_egencache_file(file_path):
 	slot = slots[0]
 	subslot = slots[1] if len(slots) == 2 else "0"
 
-	iuses, use_selection = hyportage_data.use_selection_from_iuse_list(iuses_string.split() if iuses_string else [])
+	iuses, use_selection = hyportage_data.use_selection_create_from_iuses_list(iuses_string.split() if iuses_string else [])
 
 	fm_local = utils.compact_list(translate_require(fm_local)) if fm_local else []
 	fm_external = translate_depend(fm_external) if fm_external else []

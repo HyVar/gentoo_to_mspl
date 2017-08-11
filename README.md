@@ -1,7 +1,5 @@
 # hyvar for reconfiguring gentoo
 
-**IMPORTANT: THE TRANSLATOR BRANCH IS BROKEN FOR NOW**
-
 **TODO:**
 * apply the profile to the data (need to define the functions, and call them)
 * generate modularily the ids
@@ -147,24 +145,12 @@ Slot Operators
 TODO:
 ------------------------ 
  sys-apps/kbd-2.0.3 can not be disinstalled
- 
- makefile that will clean and all operations
- 
- amd64 as default in script sh setup-guest.sh
- 
+
  Both: change world structure file to allow user to disinstall packages + extend capabilities (version,slots)
  
  Michael: correct generation of world from gentoo also translating the profile in hyvarrec
 
  Both: find a way to deal with necessary packages (should be easy), and global use flags preference (more complex)
- 
- Michael:  (packages are not separted by space for jacopo)
- The constraint in md5-cache are well translated (new lines and commas)
- 
- Michael: refactor of the translation
- Note that here some dependencies are duplicated
-   (e.g., dev-lang/perl:=[-build(-)] in app-text/po4a-0.45-r3)
- To minimize the work these repetitions should be removed
 
  Michael: handle the deprecated packages after an update
  
@@ -178,14 +164,58 @@ TODO:
  
  Michael: contact gentoo community
  
- Password in scripts
+
+Known Bugs
+----------
+
+ - the list of use flags of a package is not well computed
+ -
 
 Python Requirements
 -------------------
 
-click
+click, z3
  
 Task:
 ------------------------ 
 Find configuration from which installing something can not be done in portage easily
+
+
+Table of Selection Semantics
+----------------------------
+
+The semantics of selection is not entirely clear from the full [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
+Hence, we list here how selections in portage can be translated in unambiguous constraint.
+We consider the following:
+ - the use flag in the selection is called `my-feature`
+ - the predicate corresponding to this feature in the local package, if it exists, is `feature-local`
+ - the predicate corresponding to this feature in the external package, if it exists,  is `feature-external`
+
+
+**1. If use flag is present in the external package**
+
+| Selection | Constraint |
+|-----------|------------|
+| `my-feature` , `my-feature(+)` , `my-feature(-)` | `feature-external`|
+| `-my-feature` , `-my-feature(+)` , `-my-feature(-)` | `not feature-external` |
+| `my-feature?` , `my-feature(+)?` , `my-feature)(-)?` | `feature-local => feature-external` |
+| `!my-feature?` , `!my-feature(+)?` , `!my-feature)(-)?` | `(not feature-local) => (not feature-external)` |
+| `my-feature=` , `my-feature(+)=` , `my-feature)(-)=` | `feature-local <=> feature-external` |
+| `!my-feature=` , `!my-feature(+)=` , `!my-feature)(-)=` | `feature-local <=> (not feature-external)` |
+
+
+**2. If use flag is NOT present in the external package**
+
+| Selection | Constraint |
+|-----------|------------|
+| `my-feature` , `-my-feature` , `my-feature(-)` , `-my-feature(+)` | `FALSE`|
+| `my-feature(+)` , `-my-feature(-)` | `TRUE` |
+| `my-feature?` , `!my-feature?` , `my-feature=` , `!my-feature=` | `FALSE` |
+| `my-feature(+)?` | `TRUE` |
+| `my-feature(-)?` | `not feature-local` |
+| `!my-feature(+)?` | `feature-local` |
+| `!my-feature(-)?` | `TRUE` |
+| `my-feature(+)=` , `!my-feature)(-)=`| `feature-local` |
+| `my-feature)(-)=` , `!my-feature(+)=` | `not feature-local` |
+
 

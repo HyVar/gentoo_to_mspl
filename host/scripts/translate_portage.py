@@ -1,12 +1,4 @@
 
-__author__ = "Michael Lienhardt & Jacopo Mauro"
-__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
-__license__ = "ISC"
-__version__ = "0.5"
-__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
-__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
-__status__ = "Prototype"
-
 import os
 import utils
 import logging
@@ -23,6 +15,15 @@ import hyportage_pattern
 import hyportage_ids
 import hyportage_configuration
 import smt_encoding
+
+
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
+__license__ = "ISC"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
 
 
 
@@ -287,14 +288,6 @@ def main(
 		for pattern, iuses in hyportage_data.spl_get_dependencies(spl).iteritems():
 			el = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)  # hmm, did I forget to update the pattern repository at that point?
 			spl_updated_iuses.update(hyportage_pattern.pattern_repository_element_get_spls(el))
-	for spl in spl_updated_iuses:
-		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
-		hyportage_ids.id_repository_add_spl(id_repository, spl)
-
-	for spl_group in spl_groups_removed:
-		hyportage_ids.id_repository_remove_spl_group(id_repository, spl_group)
-	for spl_group in spl_groups_added:
-		hyportage_ids.id_repository_add_spl_group(id_repository, spl_group)
 
 	logging.info("Update completed in " + unicode(time.time() - t) + " seconds.")
 
@@ -329,7 +322,23 @@ def main(
 	logging.info("Application completed in " + unicode(time.time() - t) + " seconds.")
 
 	##########################################################################
-	# 6. GENERATE THE SMT CONSTRAINTS
+	# 6. REGENERATE THE IDS IF NECESSARY
+	##########################################################################
+
+	logging.info("Generating the ids if necessary")
+	t = time.time()
+	for spl in spl_updated_iuses:
+		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
+		hyportage_ids.id_repository_add_spl(id_repository, spl)
+
+	for spl_group in spl_groups_removed:
+		hyportage_ids.id_repository_remove_spl_group(id_repository, spl_group)
+	for spl_group in spl_groups_added:
+		hyportage_ids.id_repository_add_spl_group(id_repository, spl_group)
+	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
+
+	##########################################################################
+	# 7. GENERATE THE SMT CONSTRAINTS
 	##########################################################################
 
 	#"""

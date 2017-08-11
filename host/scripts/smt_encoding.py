@@ -25,6 +25,9 @@ def toSMT2(f, status="unknown", name="benchmark", logic=""):
 # auxiliary functions
 ##############################################
 
+smt_false = z3.BoolVal(False)
+smt_true  = z3.BoolVal(True)
+
 
 def get_smt_spl_name(id_repository, spl_name):
 	return z3.Bool("p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name)))
@@ -71,12 +74,13 @@ def get_extactly_one_true_expressions(fs):
 
 def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_list):
 	"""Expands the compact forms in uses dependencies"""
-	res = []
+	res = [get_smt_spl_name(id_repository, spl_name)]
 	for selection in selection_list:
 		use_flag = selection['use']
+		#print("Analyzing selection: " + str(local_spl_name) + "," + str(spl_name) + ": " + str(selection) )
 		if hyportage_ids.id_repository_exists_use_flag(id_repository, spl_name, use_flag):
 			use_id = get_smt_use(id_repository, spl_name, use_flag)
-			if "prefix" in selection:
+			if "prefix" in selection:  # two cases: "-" (not selected), or "!" (compact form)
 				if selection['prefix'] == "-":
 					res.append(z3.Not(use_id))
 				else:  # selection['prefix'] == "!"
@@ -93,6 +97,23 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 					res.append(z3.Implies(local_use_id, use_id))
 			else:
 				res.append(use_id)
+		elif "default" in selection:
+			prefix = "prefix" in selection
+			default = selection['default']
+			if "suffix" in selection:
+				local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+				suffix = selection['suffix']
+				if (((suffix == "?") and (not prefix) and (default == "-"))
+						or ((suffix == "=") and (((not prefix) and (default == "-")) or (prefix and (default == "+"))))):
+					res.append(z3.Not(local_use_id))
+				if (((suffix == "?") and prefix and (default == "+"))
+						or ((suffix == "=") and (((not prefix) and (default == "+")) or (prefix and (default == "-"))))):
+					res.append(local_use_id)
+			else:
+				if (default == "+" and "prefix" in selection) or (default == "-" and "prefix" not in selection):
+					return [smt_false]  # FALSE, this spl cannot be installed
+		else:
+			return [smt_false]  # FALSE, this spl cannot be installed
 	return res
 	# I don't deal with default value in this first approximation
 
@@ -181,6 +202,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return z3.And(map(self.visitRequiredEL, ctx))
 
 	def visitRequiredSIMPLE(self, ctx):
+		#print("Analyzing required simple: " + str(self.spl_name) + ": " + str(ctx['use']) )
 		# assert ctx["use"] in self.id_repository["flag"][self.spl_name]
 		res = get_smt_use(self.id_repository, self.spl_name, ctx["use"])
 		if "not" in ctx:
@@ -203,13 +225,13 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			if len(formulas) > 2:
 				return get_no_two_true_expressions(formulas)
 			else:
-				return z3.BoolVal(True)
+				return smt_true
 		elif ctx["choice"] == "^^":  # xor
 			if len(formulas) > 1:
 				return get_extactly_one_true_expressions(formulas)
 			elif len(formulas) == 1:
 				return formulas[0]
-			return z3.BoolVal(False)  # no formula to be satisfied
+			return smt_false  # no formula to be satisfied
 
 	def visitRequiredINNER(self, ctx):
 		return z3.And(self.visitRequired(ctx['els']))
@@ -224,7 +246,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 				if "prefix" in sel and sel["prefix"] == "-":
 					if "preference" in sel:
 						if sel["preference"] == "+":
-							return z3.BoolVal(False)
+							return smt_false
 					# preference - or absent
 					return get_smt_spl_name(self.id_repository, spl_name)
 				else: # prefix + or absent
@@ -232,7 +254,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 						if sel["preference"] == "+":
 							return get_smt_spl_name(self.id_repository, spl_name)
 					# preference - or absent
-					return z3.BoolVal(False)
+					return smt_false
 			else:  # package declared the use
 				if "prefix" in sel and sel["prefix"] == "-":
 					return z3.And(
@@ -254,14 +276,13 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			# decompact compact forms
 			if "selection" in ctx:
 				formulas = [
-					(get_smt_spl_name(self.id_repository, spl_name),
-					decompact_selection_list(self.id_repository, self.spl_name, spl_name, ctx['selection']))
+					decompact_selection_list(self.id_repository, self.spl_name, spl_name, ctx['selection'])
 					for spl_name in spl_names ]
-				formula = z3.Or([z3.And(formula + [spl_id]) for spl_id, formula in formulas])
+				formula = z3.Or([z3.And(formula) for formula in formulas])
 			else:
 				formula = z3.Or(get_smt_spl_names(self.id_repository, spl_names))
 		else:
-			formula = z3.BoolVal(False)
+			formula = smt_false
 
 		if "not" in ctx:
 			return z3.Not(formula)
@@ -270,6 +291,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 	def visitDependCONDITION(self, ctx):
 		formulas = self.visitDepend(ctx['els'])
 		# assert self.id_repository["flag"][self.spl_name][ctx['condition']['use']]  # flag must exists
+		# print("Analyzing depend condition: " + str(self.spl_name) + ": " + str(ctx['condition']['use']) )
 		use = get_smt_use(self.id_repository, self.spl_name, ctx['condition']['use'])
 		if 'not' in ctx['condition']:
 			use = z3.Not(use)
@@ -283,13 +305,13 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			if len(formulas) > 2:
 				return get_no_two_true_expressions(formulas)
 			else:
-				return z3.BoolVal(True)
+				return smt_true
 		elif ctx["choice"] == "^^":  # xor
 			if len(formulas) > 1:
 				return get_extactly_one_true_expressions(formulas)
 			elif len(formulas) == 1:
 				return formulas[0]
-			return z3.BoolVal(False) # no formula to be satisfied
+			return smt_false # no formula to be satisfied
 
 	def visitDependINNER(self, ctx):
 		return z3.And(self.visitDepend(ctx['els']))
@@ -302,7 +324,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 				if "prefix" in sel and sel["prefix"] == "-":
 					if "preference" in sel:
 						if sel["preference"] == "+":
-							return z3.BoolVal(False)
+							return smt_false
 					# preference - or absent
 					return get_smt_spl_name(self.id_repository, pkg)
 				else: # prefix + or absent
@@ -310,7 +332,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 						if sel["preference"] == "+":
 							return get_smt_spl_name(self.id_repository, pkg)
 					# preference - or absent
-					return z3.BoolVal(False)
+					return smt_false
 			else:  # package declared the use
 				if "prefix" in sel and sel["prefix"] == "-":
 					return z3.And(
@@ -357,7 +379,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			else:
 				return z3.Or(get_smt_spl_names(self.id_repository, pkgs))
 		else:
-			return z3.BoolVal(False)"""
+			return smt_false"""
 
 
 def simplify_constraints(name, constraints, simplify_mode):
