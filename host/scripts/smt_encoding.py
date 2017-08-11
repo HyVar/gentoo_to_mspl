@@ -433,7 +433,3 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 
 
 
-
-def generate_formulas(concurrent_map, mspl, map_name_id, simplify_mode):
-	ls = [(mspl, map_name_id, simplify_mode, package) for package in mspl]
-	return concurrent_map(convert, ls)

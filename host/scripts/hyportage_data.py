@@ -114,24 +114,24 @@ class SPL(object):
 		self.slot                  = slot
 		self.subslot               = subslot
 		self.slots                 = (slot, subslot)
-		self.fm_local              = fm_local
-		self.fm_combined           = fm_combined
-		self.smt_constraint        = None
-		self.dependencies          = dependencies
-		self.required_iuses_local  = required_iuses_local
-		self.required_iuses        = None
-		self.iuses_default         = iuses_default
-		self.iuses_profile         = None
-		self.iuses_user            = None
-		self.keywords_list         = keywords_list
-		self.keywords_default      = None
-		self.keywords_profile      = None
-		self.keywords_user         = None
-		self.use_selection_default = use_selection_default
-		self.use_selection_profile = None
-		self.use_selection_user    = None
-		self.mask_profile          = None
-		self.mask_user             = None
+		self.fm_local              = fm_local               # the part of the feature model related to local features, i.e., portage's REQUIRED_USE
+		self.fm_combined           = fm_combined            # the part of the feature model relatd to external dependencies, i.e., portage's DEPEND + RDEPEND + PDEPEND
+		self.smt_constraint        = None                   # translation of the full feature model into z3 constraints
+		self.dependencies          = dependencies           # mapping from pattern dependencies to list of features they must have declared
+		self.required_iuses_local  = required_iuses_local   # list of local features mentioned in local constraints
+		self.required_iuses        = None                   # list of features that must be declared in this spl
+		self.iuses_default         = iuses_default          # list of features declared in this spl by default
+		self.iuses_profile         = None                   # previous list extended with features implicitly declared by portage
+		self.iuses_user            = None                   # previous list extended with features implicitly declared by user
+		self.keywords_list         = keywords_list          # list of architectures valid for this spl
+		self.keywords_default      = None                   # boolean stating if this spl can be installed by default on the current architecture
+		self.keywords_profile      = None                   # boolean stating if this spl can be installed, considering the default portage information
+		self.keywords_user         = None                   # boolean stating if this spl can be installed, considering both default and user configuration
+		self.use_selection_default = use_selection_default  # default use selection
+		self.use_selection_profile = None                   # use selection considering default portage information
+		self.use_selection_user    = None                   # use selection considering both default and user configuration
+		self.mask_profile          = None                   # if portage states that this spl is masked or not
+		self.mask_user             = None                   # if this spl is masked, considering both default and user configuration
 
 	def __hash__(self): return hash(self.name)
 
@@ -314,10 +314,10 @@ def mspl_from_save_format(save_format):
 
 class SPLGroup(object):
 	def __init__(self, group_name, spl):
-		self.name = group_name
-		self.references = [spl]
-		self.slots_mapping = {spl_get_slots(spl): [spl]}
-		self.smt_constraint = None
+		self.name = group_name                            # name of the group
+		self.references = [spl]                           # list of spls contained in this group
+		self.slots_mapping = {spl_get_slots(spl): [spl]}  # mapping listings all spls stored in one slot
+		self.smt_constraint = None                        # z3 constraint encoding this group
 
 	def add_spl(self, spl):
 		self.references.append(spl)

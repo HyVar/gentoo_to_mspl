@@ -4,6 +4,8 @@ import hyportage_data
 import hyportage_pattern
 
 
+"""Used for incremental creation of the database"""
+
 def core_configuration_create():
 	return (
 		set(),  # the set of patterns used in the profile configuration

@@ -13,10 +13,10 @@ import hyportage_data
 
 class IDRepository(object):
 	def __init__(self):
-		self.id_current = 0
-		self.ids = {}
-		self.spls = {}
-		self.keywords = ([], {})
+		self.id_current = 0       # next usable id
+		self.ids = {}             # mapping between ids and id information
+		self.spls = {}            # mapping between spl names and spl id information
+		self.keywords = ([], {})  # list of keywords and mapping between keyword name and index in the list. not used
 
 def id_repository_create():
 	return IDRepository()
