@@ -18,11 +18,12 @@ import requests
 import click
 import time
 import multiprocessing
-import constraint_parser
+# import constraint_parser
 import smt_encoding
-import extract_dependencies
+# import extract_dependencies
 import pysmt.shortcuts
 import re
+import translate_portage
 
 
 from pysmt.smtlib.parser import SmtLib20Parser
@@ -303,36 +304,41 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
 @click.argument(
     'input_file',
     type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True))
-@click.argument(
-    'request_file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
-@click.argument(
-    'configuration_file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
-@click.argument(
-    'new_configuration_file',
-    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-@click.argument(
-    'package_use_file',
-    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-@click.argument(
-    'emerge_commands_file',
-    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-@click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
-@click.option('--verbose', '-v', is_flag=True, help="Print debug messages.")
+# @click.argument(
+#     'request_file',
+#     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
+# @click.argument(
+#     'configuration_file',
+#     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
+# @click.argument(
+#     'new_configuration_file',
+#     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+# @click.argument(
+#     'package_use_file',
+#     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+# @click.argument(
+#     'emerge_commands_file',
+#     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
+# @click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
+@click.option(
+	'--verbose', '-v',
+	count=True,
+	help="Print debug messages.")
 @click.option('--keep', '-k', is_flag=True, help="Do not delete intermediate files.")
 @click.option('--explain', is_flag=True, help="Run HyVarRec in explanation mode.")
 @click.option('--url', '-r', default="", help='URL of the remote hyvarrec to use if available (local command otherwise used).')
 @click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for running the local HyVarRec.')
-@click.option('--save-modality', default="json", type=click.Choice(["json","marshal"]),
-              help='Saving modality. Marshal is supposed to be faster but python version specific.')
+@click.option(
+	'--save-modality',
+	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="gzjson",
+	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(input_file,
-         request_file,
-         configuration_file,
-         new_configuration_file,
-         package_use_file,
-         emerge_commands_file,
-         environment,
+         # request_file,
+         # configuration_file,
+         # new_configuration_file,
+         # package_use_file,
+         # emerge_commands_file,
+         # environment,
          verbose,
          keep,
          explain,
@@ -363,9 +369,17 @@ def main(input_file,
         KEEP = True
 
     # OPTION: manage verbosity
-    if verbose:
+    if verbose != 0:
+        logging.info("Verbose (" + str(verbose) + ") output.")
+    else:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
+
+    if verbose == 1:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
+    elif verbose == 2:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-        logging.info("Verbose output.")
+    elif verbose >= 3:
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
     # OPTION: manage number of parallel threads
     if par != -1:
@@ -380,11 +394,20 @@ def main(input_file,
     else:
         concurrent_map = map
 
-    logging.info("Load the MSPL. This may take a while.")
+    # logging.info("Load the MSPL. This may take a while.")
+    # t = time.time()
+    # data = utils.load_data_file(input_file,save_modality)
+    # mspl,map_name_id,map_id_name = data["mspl"],data["map_name_id"],data["map_id_name"]
+    # logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+
+    logging.info("Loading the stored hyportage data.")
     t = time.time()
-    data = utils.load_data_file(input_file,save_modality)
-    mspl,map_name_id,map_id_name = data["mspl"],data["map_name_id"],data["map_id_name"]
+
+    hyportage_file_path = os.path.abspath(input_file)
+    pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls = \
+        translate_portage.load_hyportage(hyportage_file_path, save_modality)
     logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+    exit(0)
 
 
     logging.info("Load the request package list.")

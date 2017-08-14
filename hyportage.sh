@@ -44,6 +44,7 @@ function print_usage {
 	echo "   setup_host    create the directory structure on host"
 	echo "   clean_host    remove all generated files from host"
 	echo "   translate     translate uploaded portage files into internal representation"
+	echo "   reconfigure   trigger the reconfiguration attempt"
 	echo "   emerge        compute valid new configuration with the specified packages installed/removed"
 	echo "     valid options:"
 	echo "       -v     verbose mode"
@@ -106,6 +107,13 @@ function translate {
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 
+function reconfigure {
+	shift 1
+	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}" python "${HOST_SCRIPT_RECONFIGURE}" -v -v -v "${HOST_HOST_INSTALL_DIR}/${HOST_HOST_GEN_DIR}/hyportage.enc" $@
+	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
+}
+
+
 function emerge {
 	echo "not implemented yet"
 }
@@ -134,6 +142,9 @@ if [ -n "${1}" ]; then
 			;;
 		translate)
 			translate "$@"
+			;;
+		reconfigure)
+			reconfigure "$@"
 			;;
 		*)
 			echo "unknown action \"${1}\""

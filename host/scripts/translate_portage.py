@@ -206,10 +206,10 @@ def main(
 	if os.path.exists(path_hyportage):
 		last_update = os.path.getmtime(path_hyportage)
 
-	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration))
-	must_apply_user = (last_update < os.path.getmtime(path_user_configuration))
-	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords))
-	must_regenerate_installed_packages = (last_update < os.path.getmtime(path_installed_packages))
+	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration)) if os.path.isdir(path_profile_configuration) else True
+	must_apply_user = (last_update < os.path.getmtime(path_user_configuration)) if os.path.isdir(path_user_configuration) else True
+	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords)) if os.path.isdir(path_keywords) else True
+	must_regenerate_installed_packages = (last_update < os.path.getmtime(path_installed_packages)) if os.path.isdir(path_installed_packages) else True
 
 	egencache_files = hyportage_from_egencache.get_egencache_files(path_egencache_packages)
 	if force:
