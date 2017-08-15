@@ -122,7 +122,12 @@ class SPL(object):
 
 	def __hash__(self): return hash(self.name)
 
-	def __eq__(self, other): return self.name == other.name
+	def __eq__(self, other):
+		if isinstance(other, (str, unicode)):
+			# need to compare the object also with a string to be able to retrieve mspl[x] when x is a string
+			return self.name == other
+		else:
+			return self.name == other.name
 
 
 def spl_get_name(spl): return spl.name

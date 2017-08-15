@@ -25,6 +25,9 @@ import pysmt.shortcuts
 import re
 import translate_portage
 
+import hyportage_data
+import hyportage_from_egencache
+import hyportage_ids
 
 from pysmt.smtlib.parser import SmtLib20Parser
 import cStringIO
@@ -57,40 +60,46 @@ def read_json(json_file):
     return data
 
 
-def load_request_file(file_name,concurrent_map,mspl, map_name_id):
+def load_request_file(file_name,pattern_repository,id_repository):
     """
     Parses the request file which is composed by one or more dependencies
     """
-    constraints = []
     with open(file_name,"r") as f:
         lines = f.readlines()
-    # data structure to reuse the parse_spl function
-    spls = [{"name": unicode(i), "group_name" : "",
-              'fm': {'local': "", 'external': "", 'runtime': lines[i]}} for i in range(len(lines))]
-    # get the asts
-    asts = concurrent_map(constraint_parser.parse_spl, spls)
-    asts = [x for (_,_,x) in asts ]
-    # get the dependencies
-    visitor = extract_dependencies.GenerateDependenciesAST()
-    dependencies = concurrent_map(visitor.visitDepend,asts)
-    dependencies = [x for sublist in dependencies for x in set(sublist) if x in mspl]
-    # get constraints
-    visitor = smt_encoding.ASTtoSMTVisitor(mspl, map_name_id, "")
-    constraints = [smt_encoding.toSMT2(visitor.visitDepend(ast)) for ast in asts]
 
-    return dependencies,constraints
+    dep_visitor = hyportage_from_egencache.GETDependenciesVisitor("dummy_pkg_name")
+    smt_visitor = smt_encoding.ASTtoSMTVisitor(pattern_repository, id_repository, "dummy_pkg_name")
+
+    dependencies = set()
+    smt_constraints = []
+
+    # TODO Handle case when pattern has not previously seen
+    for l in lines:
+        parsed_line = hyportage_from_egencache.translate_depend(l)
+        dep_visitor.visitDepend(parsed_line)
+        dependencies.update([pattern[1] for pattern in dep_visitor.res[1].keys()])
+        smt_constraints.append(smt_visitor.visitDepend(parsed_line))
+    return dependencies,smt_constraints
 
 
-def load_configuration_file(file_name,mspl,map_name_id):
-    initial_configuration = read_json(file_name)
-    for i in initial_configuration:
-        if i in mspl:
-            initial_configuration[i] = [x[1:] for x in initial_configuration[i]
-                                        if x.startswith("+") and x[1:] in map_name_id["flag"][i]]
-        else:
-            logging.warning("Not found the package " + i + " defined in the initial configuration. It will be ignored.")
-            del(initial_configuration[i])
-    return initial_configuration
+# def load_configuration_file(file_name):
+#     """
+#     returns the mapping between the packages installed and their use selected
+#     :param file_name:
+#     :param id_repository:
+#     :return:
+#     """
+#     with open(file_name,"r") as f:
+#         lines = f.readlines()
+#     initial_configuration = {}
+#     for l in lines:
+#         ls = l.split(" ")
+#         assert ls
+#         assert ls[0][0] == "="
+#         pkg_name = ls[0][1:]
+#         initial_configuration[pkg_name] = [x for x in ls[1:]
+#                                     if not x.startswith("-")]
+#     return initial_configuration
 
 
 def run_hyvar(json_data,par,explain_modality):
@@ -131,14 +140,21 @@ def run_hyvar(json_data,par,explain_modality):
 #     return response.json()
 
 
-def get_transitive_closure_of_dependencies(mspl,pkgs):
+def get_transitive_closure_of_dependencies(mspl,spl_groups,pkg):
     # returns the transitive closure of the dependencies
-    deps = set(pkgs)
-    to_check = pkgs
+    deps = set([pkg])
+    to_check = [pkg]
     checked = set()
     while to_check:
         p = to_check.pop()
-        for i in mspl[p]["dependencies"]:
+        if p in spl_groups:
+            ls = hyportage_data.spl_group_get_references(spl_groups[p])
+        elif p in mspl:
+            ls = [pattern[1] for pattern in hyportage_data.spl_get_dependencies(mspl[p])]
+        else:
+            ls = []
+            logging.warning("Package " + p + " not found in the mspl or spl groups.")
+        for i in ls:
             if i not in checked:
                 to_check.append(i)
                 deps.add(i)
@@ -151,38 +167,42 @@ def create_hyvarrec_spls(package_request,
                          initial_configuration,
                          contex_value,
                          mspl,
-                         map_name_id,
-                         map_id_name):
+                         spl_groups,
+                         id_repository):
     """
     Given a list of packages it creates its hyvarrec SPL
     """
-    # todo read list of configures and depends for all packages
 
     spls = {}
 
+    logging.debug("Start computing the transitive closure of dependencies")
     to_process = set(package_request)
+    to_process.update(initial_configuration.keys())
     # todo: this part can be more efficient using union find
     while to_process:
         i = to_process.pop()
-        spls[i] = get_transitive_closure_of_dependencies(mspl,[i]+initial_configuration.keys())
+        spls[i] = get_transitive_closure_of_dependencies(mspl,spl_groups,i)
         to_process.difference_update(spls[i])
         intersections = [x for x in spls if spls[i].intersection(spls[x]) and x != i]
         if intersections:
             for j in intersections:
                 spls[i].update(spls[j])
                 del(spls[j])
+    logging.debug("Transitive closure of dependencies computed.")
 
     jsons = []
     for i in spls:
         data = {"attributes": [],
-                "contexts": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
-                              "min": 0,
-                              "max": len(map_name_id["context_int"])-1}],
+                "contexts": [],
+                    # {"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
+                    #           "min": 0,
+                    #           "max": len(map_name_id["context_int"])-1}],
                 "configuration": {
                     "selectedFeatures": [],
                     "attribute_values": [],
-                    "context_values": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
-                                        "value": map_name_id["context_int"][contex_value]}]},
+                    "context_values": []},
+                    # "context_values": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
+                    #                     "value": map_name_id["context_int"][contex_value]}]},
                 "constraints": [],
                 "preferences": [],
                 "smt_constraints": {
@@ -193,8 +213,8 @@ def create_hyvarrec_spls(package_request,
 
         # add the constraints of the packages
         for j in spls[i]:
-            if not "implementations" in mspl[j]:
-                data["smt_constraints"]["formulas"].extend(mspl[j]["smt_constraints"])
+            if j in mspl:
+                data["smt_constraints"]["formulas"].extend(hyportage_data.spl_get_smt_constraint(mspl[j]))
             # no need to add features since they are already boolean values
 
         # add constraints to select the required packages
@@ -202,19 +222,22 @@ def create_hyvarrec_spls(package_request,
 
         # add info about the initial configuration
         for j in initial_configuration:
-            if j in mspl[i]:
-                for k in initial_configuration[j]:
-                    data["configuration"]["selectedFeatures"].append(
-                        smt_encoding.get_hyvar_use(map_name_id,j,k))
+            if j in mspl and j in spls[i]:
+                for k in initial_configuration[j][0]:
+                    if k in hyportage_ids.id_repository_get_use_flag_from_spl_name(id_repository,j):
+                        data["configuration"]["selectedFeatures"].append(
+                            smt_encoding.get_hyvar_use(id_repository,j,k))
+                    else:
+                        logging.warning("The initial flag " + k + " was not available for the package " + j)
 
         # add preferences: do not remove packages already installed
         data["preferences"].append( " + ".join(
-            [smt_encoding.get_hyvar_spl_name(map_name_id, pkg) for pkg in initial_configuration
+            [smt_encoding.get_hyvar_spl_name(id_repository,pkg) for pkg in initial_configuration
 			 if pkg in spls[i]]))
 
         logging.debug("SPL created : constraints " + unicode(len(data["constraints"])) +
                       ", smt formulas " + unicode(len(data["smt_constraints"]["formulas"])))
-        logging.debug("Packages to configure " + unicode(len(mspl[i])))
+        logging.debug("Packages to configure " + unicode(len(spls[i])))
 
         jsons.append({"json":data, "deps": spls[i]})
     return jsons
@@ -301,15 +324,21 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
 
 
 @click.command()
-@click.argument(
-    'input_file',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True))
-# @click.argument(
-#     'request_file',
-#     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
-# @click.argument(
-#     'configuration_file',
-#     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True))
+@click.option(
+	'--input-file', '-i',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
+    help="File generated by using the hyportage translate functionality",
+    default="host/data/hyportage/hyportage.enc")
+@click.option(
+    '--request-file',
+    type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
+    help="Request file, following the dependency syntax (more than one line is allowed)",
+    default="myreq")
+# @click.option(
+#     '--configuration_file',
+#     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
+#     help="File representing the current configuration of the system",
+#     default="host/configuration/package.use")
 # @click.argument(
 #     'new_configuration_file',
 #     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
@@ -319,7 +348,7 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
 # @click.argument(
 #     'emerge_commands_file',
 #     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-# @click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
+@click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
 @click.option(
 	'--verbose', '-v',
 	count=True,
@@ -330,15 +359,15 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
 @click.option('--par', '-p', type=click.INT, default=-1, help='Number of process to use for running the local HyVarRec.')
 @click.option(
 	'--save-modality',
-	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="gzjson",
+	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="pickle",
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(input_file,
-         # request_file,
+         request_file,
          # configuration_file,
          # new_configuration_file,
          # package_use_file,
          # emerge_commands_file,
-         # environment,
+         environment,
          verbose,
          keep,
          explain,
@@ -368,18 +397,18 @@ def main(input_file,
         global KEEP
         KEEP = True
 
+
     # OPTION: manage verbosity
     if verbose != 0:
-        logging.info("Verbose (" + str(verbose) + ") output.")
+        if verbose == 1:
+            logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
+        elif verbose == 2:
+            logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+        elif verbose >= 3:
+            logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+        logging.warning("Verbose (" + str(verbose) + ") output.")
     else:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
-
-    if verbose == 1:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
-    elif verbose == 2:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-    elif verbose >= 3:
-        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
     # OPTION: manage number of parallel threads
     if par != -1:
@@ -402,36 +431,36 @@ def main(input_file,
 
     logging.info("Loading the stored hyportage data.")
     t = time.time()
-
     hyportage_file_path = os.path.abspath(input_file)
     pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls = \
         translate_portage.load_hyportage(hyportage_file_path, save_modality)
     logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-    exit(0)
-
 
     logging.info("Load the request package list.")
     t = time.time()
-    dependencies,constraints = load_request_file(request_file, concurrent_map, mspl, map_name_id)
+    dependencies,constraints = load_request_file(request_file,pattern_repository,id_repository)
     logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
     logging.debug("Dependencies: " + unicode(dependencies))
     logging.debug("Constraints: " + unicode(constraints))
 
-    logging.info("Load the configuration file.")
-    t = time.time()
-    initial_configuration = load_configuration_file(configuration_file, mspl, map_name_id)
-    logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+    # logging.info("Load the configuration file.")
+    # t = time.time()
+    # initial_configuration = load_configuration_file(configuration_file)
+    # logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
+    #
 
     logging.info("Computing the SPLs.")
     t = time.time()
     to_solve = create_hyvarrec_spls(dependencies,
                                     constraints,
-                                    initial_configuration,
+                                    installed_spls,
                                     environment,
                                     mspl,
-                                    map_name_id,
-                                    map_id_name)
+                                    spl_groups,
+                                    id_repository)
     logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
+
+    exit(0)
 
     configuration = {}
     for job in to_solve:

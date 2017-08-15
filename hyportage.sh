@@ -109,7 +109,8 @@ function translate {
 
 function reconfigure {
 	shift 1
-	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}" python "${HOST_SCRIPT_RECONFIGURE}" -v -v -v "${HOST_HOST_INSTALL_DIR}/${HOST_HOST_GEN_DIR}/hyportage.enc" $@
+	export PYTHONPATH="${HOST_GUEST_INSTALL_DIR}":"${YTHONPATH}"
+	nice -n 20 python "${HOST_SCRIPT_RECONFIGURE}" $@
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 
