@@ -166,7 +166,7 @@ def get_transitive_closure_of_dependencies(mspl,spl_groups,pkg):
 def create_hyvarrec_spls(package_request,
                          request_constraints,
                          initial_configuration,
-                         contex_value,
+                         # contex_value,
                          mspl,
                          spl_groups,
                          id_repository):
@@ -344,16 +344,19 @@ def get_better_constraint_visualization(constraints,mspl,id_repository):
 #     type=click.Path(exists=True, file_okay=True, dir_okay=False, writable=False, readable=True, resolve_path=True),
 #     help="File representing the current configuration of the system",
 #     default="host/configuration/package.use")
-# @click.argument(
+# @click.option(
 #     'new_configuration_file',
 #     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-# @click.argument(
+# @click.option(
 #     'package_use_file',
 #     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-# @click.argument(
-#     'emerge_commands_file',
-#     type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True))
-@click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
+@click.option(
+    '--emerge_commands_file',
+    type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True, readable=True, resolve_path=True),
+    help="Script command to execute emerge to install the computed packages",
+    default="emerge.sh")
+
+# @click.option('--environment', default="amd64", help="Keyword identifying the architecture to use.")
 @click.option(
 	'--verbose', '-v',
 	count=True,
@@ -368,11 +371,8 @@ def get_better_constraint_visualization(constraints,mspl,id_repository):
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 def main(input_file,
          request_file,
-         # configuration_file,
-         # new_configuration_file,
-         # package_use_file,
-         # emerge_commands_file,
-         environment,
+         emerge_commands_file,
+         # environment,
          verbose,
          keep,
          explain,
@@ -459,7 +459,7 @@ def main(input_file,
     to_solve = create_hyvarrec_spls(dependencies,
                                     constraints,
                                     installed_spls,
-                                    environment,
+                                    # environment,
                                     mspl,
                                     spl_groups,
                                     id_repository)
@@ -496,9 +496,9 @@ def main(input_file,
     logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
     logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
     logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
+    # print in std out the diff of the new configuration
     print(json.dumps(configuration_diff,indent=1))
 
-    exit(0)
     logging.debug("Generate emerge commands to run.")
     with open(emerge_commands_file, "w") as f:
         f.write("#!/bin/bash\n")
@@ -508,15 +508,15 @@ def main(input_file,
             f.write("emerge -a --newuse " + " ".join(["=" + x for x in configuration_diff["toUpdate"].keys()]) +
                 " " + " ".join(["=" + x for x in configuration_diff["toInstall"].keys()]) + "\n")
 
-    logging.debug("Printing the final configuration with all the positive and negative use flags.")
-    final_conf = get_conf_with_negative_use_flags(configuration,map_name_id)
-    with open(new_configuration_file,"w") as f:
-        json.dump(final_conf,f,indent=1)
+    # logging.debug("Printing the final configuration with all the positive and negative use flags.")
+    # final_conf = get_conf_with_negative_use_flags(configuration,map_name_id)
+    # with open(new_configuration_file,"w") as f:
+    #     json.dump(final_conf,f,indent=1)
 
-    logging.debug("Printing the package.use file.")
-    with open(package_use_file,"w") as f:
-        for i in final_conf.keys():
-            f.write("=" + i + " " + " ".join(final_conf[i]) + "\n")
+    # logging.debug("Printing the package.use file.")
+    # with open(package_use_file,"w") as f:
+    #     for i in final_conf.keys():
+    #         f.write("=" + i + " " + " ".join(final_conf[i]) + "\n")
 
     logging.info("Cleaning.")
     clean()
