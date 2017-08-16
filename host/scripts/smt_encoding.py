@@ -387,7 +387,7 @@ def simplify_constraints(name, constraints, simplify_mode):
 		formula = z3.simplify(z3.And(constraints))
 		if z3.is_false(formula):
 			logging.warning("Dependencies in package " + name + " make it uninstallable.")
-		return (name,[toSMT2(formula)])
+		return [toSMT2(formula)]
 	elif simplify_mode == "individual":
 		formulas = []
 		for i in constraints:
@@ -396,7 +396,7 @@ def simplify_constraints(name, constraints, simplify_mode):
 				logging.warning("Dependency " + unicode(i) + " in package " + name + " is false." +
 								"Package can not be installed")
 			formulas.append(formula)
-		return (name,[toSMT2(x) for x in formulas])
+		return [toSMT2(x) for x in formulas]
 
 
 def convert_spl(pattern_repository, id_repository, spl, simplify_mode):

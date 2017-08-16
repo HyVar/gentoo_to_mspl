@@ -79,6 +79,7 @@ def load_request_file(file_name,pattern_repository,id_repository):
         dep_visitor.visitDepend(parsed_line)
         dependencies.update([pattern[1] for pattern in dep_visitor.res[1].keys()])
         smt_constraints.append(smt_visitor.visitDepend(parsed_line))
+    smt_constraints = smt_encoding.simplify_constraints("user_req", smt_constraints, "individual")
     return dependencies,smt_constraints
 
 
@@ -243,15 +244,15 @@ def create_hyvarrec_spls(package_request,
     return jsons
 
 
-def update_configuration(hyvarrec_out,configuration,map_name_id,map_id_name):
+def update_configuration(hyvarrec_out,configuration,id_repository):
     pkgs = []
     flags = []
     for i in hyvarrec_out["features"]:
-        el = map_id_name[i[1:]]
-        if el["type"] == "package":
-            pkgs.append(el["name"])
-        else: # "type" == "flag"
-            flags.append((el["package"],el["name"]))
+        el = hyportage_ids.id_repository_get_ids(id_repository)[i[1:]]
+        if el[0] == "package": # el = ("package", spl_name)
+            pkgs.append(el[1])
+        else: # el = ("use", use, spl_name)
+            flags.append((el[2],el[0]))
 
     for p in pkgs:
         if p not in configuration:
@@ -264,15 +265,18 @@ def update_configuration(hyvarrec_out,configuration,map_name_id,map_id_name):
             configuration[p].append(f)
 
 
-def get_diff_configuration(new_conf,old_conf,mspl):
+def get_diff_configuration(new_conf,old_conf):
+    """
+    Compute the diff from the intial configuration
+    Assumes that in new_conf there are not spl_group packages
+    """
     data = {"toUpdate": {}, "toInstall": {}, "toRemove": {}}
-    for i in new_conf.keys():
-        if "implementations" not in mspl[i]:
-            if i in old_conf:
-                if set(new_conf[i]) != set(old_conf[i]):
-                    data["toUpdate"][i] = new_conf[i]
-            else:
-                data["toInstall"][i] = new_conf[i]
+    for i in new_conf:
+        if i in old_conf:
+            if set(new_conf[i]) != set(old_conf[i][0]):
+                data["toUpdate"][i] = new_conf[i]
+        else:
+            data["toInstall"][i] = new_conf[i]
     for i in old_conf.keys():
         if i not in new_conf:
             data["toRemove"][i] = {}
@@ -289,7 +293,8 @@ def get_conf_with_negative_use_flags(conf,map_name_id):
         data[i] = positive_flags + [ "-" + x for x in negative_flags]
     return data
 
-def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name):
+
+def get_better_constraint_visualization(constraints,mspl,id_repository):
     ls = []
     parser = SmtLib20Parser()
     for i in constraints:
@@ -298,26 +303,26 @@ def get_better_constraint_visualization(constraints,mspl,map_name_id,map_id_name
         f.close()
         formula = script.get_last_formula()
         formula = pysmt.shortcuts.to_smtlib(formula,daggify=False)
-        # translate contexts
-        nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
-        for i in nums:
-            num = int(i)
-            env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
-            assert len(env) == 1
-            formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
+        # # translate contexts
+        # nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
+        # for i in nums:
+        #     num = int(i)
+        #     env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
+        #     assert len(env) == 1
+        #     formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
         # translate packages
         where_declared = "user-required: "
         pkgs = set(re.findall('p([0-9]+)',formula))
         for pkg in pkgs:
-            name = map_id_name[pkg]["name"]
+            name = id_repository.ids[pkg][1]
             formula = re.sub('p' + pkg,name,formula)
-            if i in mspl[name]["smt_constraints"]:
+            if i in hyportage_data.spl_get_smt_constraint(mspl[name]):
                 where_declared = name + ": "
 
         # translate uses
         uses = set(re.findall('u([0-9]+)', formula))
         for use in uses:
-            formula = re.sub('u' + use, map_id_name[use]["package"] +  "[[" + map_id_name[use]["name"] + "]]", formula)
+            formula = re.sub('u' + use, id_repository.ids[pkg][2] + "[[" + id_repository.ids[pkg][1] + "]]", formula)
         ls.append(where_declared + formula)
     return ls
 
@@ -459,8 +464,7 @@ def main(input_file,
                                     spl_groups,
                                     id_repository)
     logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
-
-    exit(0)
+    logging.info("SPL to process: " + unicode(len(to_solve)))
 
     configuration = {}
     for job in to_solve:
@@ -475,25 +479,26 @@ def main(input_file,
             if explain:
                 # try to print a better explanation of the constraints
                 constraints = get_better_constraint_visualization(
-                    json_result["constraints"],mspl,map_name_id,map_id_name)
+                    json_result["constraints"],mspl,id_repository)
                 sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
             logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
             sys.exit(1)
         logging.debug("HyVarRec output: " + unicode(json_result))
         # update the info on the final configuration
-        update_configuration(json_result,configuration,map_name_id,map_id_name)
+        update_configuration(json_result,configuration,id_repository)
 
     # remove all the pacakges without version from final configuration
     for i in configuration.keys():
-        if "implementations" in mspl[i]:
+        if i in mspl:
             del(configuration[i])
 
-    configuration_diff = get_diff_configuration(configuration,initial_configuration,mspl)
+    configuration_diff = get_diff_configuration(configuration,installed_spls)
     logging.debug("Packages to update flags: " + unicode(len(configuration_diff["toUpdate"])))
     logging.debug("Packages to install: " + unicode(len(configuration_diff["toInstall"])))
     logging.debug("Packages to remove: " + unicode(len(configuration_diff["toRemove"])))
     print(json.dumps(configuration_diff,indent=1))
 
+    exit(0)
     logging.debug("Generate emerge commands to run.")
     with open(emerge_commands_file, "w") as f:
         f.write("#!/bin/bash\n")
