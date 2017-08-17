@@ -14,6 +14,7 @@ parse_package_name = core_data.parse_package_name
 pattern_create_from_atom = core_data.pattern_create_from_atom
 pattern_to_save_format = core_data.pattern_to_save_format
 pattern_from_save_format = core_data.pattern_from_save_format
+pattern_to_atom = core_data.pattern_to_atom
 
 
 def pattern_get_package_group(pattern): return pattern[1]
@@ -301,6 +302,11 @@ def pattern_repository_remove(pattern_repository, spl):
 ##
 
 def pattern_repository_local_map_get(pattern_repository_element, pattern): return pattern_repository_element[pattern]
+
+
+def is_pattern_in_pattern_repository(pattern_repository, pattern):
+	if pattern_is_package_group_specific(pattern): return pattern in pattern_repository[0][pattern_get_package_group(pattern)]
+	else: pattern in pattern_repository[1]
 
 
 def pattern_repository_get(pattern_repository, pattern):

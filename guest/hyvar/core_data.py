@@ -88,6 +88,20 @@ def pattern_to_save_format(pattern):
 	}
 
 
+def pattern_to_atom(pattern):
+	atom = ""
+	if pattern[0]: atom += pattern[0]
+	atom += pattern[1]
+	if pattern[2]: atom += "-" + pattern[2]
+	if pattern[4]: atom += "*"
+	if pattern[5] or pattern[6] or pattern[7]:
+		atom += ":"
+		if pattern[5]: atom += pattern[5]
+		if pattern[6]: atom += "/" + pattern[6]
+		if pattern[7]: atom += "="
+	return atom
+
+
 def pattern_from_save_format(save_format):
 	return (
 		save_format['vop'], save_format['package_group'], save_format['version_full'], save_format['version'],

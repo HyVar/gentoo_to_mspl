@@ -28,6 +28,8 @@ import translate_portage
 import hyportage_data
 import hyportage_from_egencache
 import hyportage_ids
+import hyportage_pattern
+import hyportage_configuration
 
 from pysmt.smtlib.parser import SmtLib20Parser
 import cStringIO
@@ -60,25 +62,35 @@ def read_json(json_file):
     return data
 
 
-def load_request_file(file_name,pattern_repository,id_repository):
+def load_request_file(file_name,pattern_repository,id_repository,mspl,spl_groups,core_configuration):
     """
     Parses the request file which is composed by one or more dependencies
     """
     with open(file_name,"r") as f:
         lines = f.readlines()
 
-    dep_visitor = hyportage_from_egencache.GETDependenciesVisitor("dummy_pkg_name")
+    # todo add in the request the default pattern request (assuming that is in core_configuration)
+    # add core_configuration profile does not work (some constraints there make the problem unsat since some patterns
+    # can not be installed
+    # lines.extend([hyportage_pattern.pattern_to_atom(x) for x in hyportage_configuration.core_configuration_get_profile_patterns(core_configuration)])
     smt_visitor = smt_encoding.ASTtoSMTVisitor(pattern_repository, id_repository, "dummy_pkg_name")
 
     dependencies = set()
     smt_constraints = []
 
-    # TODO Handle case when pattern has not previously seen
     for l in lines:
         parsed_line = hyportage_from_egencache.translate_depend(l)
+        dep_visitor = hyportage_from_egencache.GETDependenciesVisitor("dummy_pkg_name")
         dep_visitor.visitDepend(parsed_line)
-        dependencies.update([pattern[1] for pattern in dep_visitor.res[1].keys()])
+        patterns = dep_visitor.res[1]
+        for pattern in patterns:
+            if not hyportage_pattern.is_pattern_in_pattern_repository(pattern_repository, pattern):
+                hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern)
+        dependencies.update([pattern[1] for pattern in patterns])
         smt_constraints.append(smt_visitor.visitDepend(parsed_line))
+        print smt_constraints[-1]
+        print patterns
+        print [pattern[1] for pattern in patterns]
     smt_constraints = smt_encoding.simplify_constraints("user_req", smt_constraints, "individual")
     return dependencies,smt_constraints
 
@@ -443,7 +455,7 @@ def main(input_file,
 
     logging.info("Load the request package list.")
     t = time.time()
-    dependencies,constraints = load_request_file(request_file,pattern_repository,id_repository)
+    dependencies,constraints = load_request_file(request_file,pattern_repository,id_repository,mspl,spl_groups,core_configuration)
     logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
     logging.debug("Dependencies: " + unicode(dependencies))
     logging.debug("Constraints: " + unicode(constraints))
