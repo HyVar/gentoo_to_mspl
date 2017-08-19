@@ -4,17 +4,17 @@ import utils
 import logging
 import multiprocessing
 import click
-import time
 
+
+import hyportage_translation
+#import reconfigure
 
 import core_data
 import portage_data
-import hyportage_from_egencache
 import hyportage_data
 import hyportage_pattern
 import hyportage_ids
 import hyportage_configuration
-import smt_encoding
 
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
@@ -65,6 +65,12 @@ def load_hyportage(path_hyportage, save_modality):
 		return pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
 
 
+def load_configurations(path_profile_configuration, path_user_configuration):
+	profile = portage_data.configuration_from_save_format(utils.load_data_file(path_profile_configuration, "json"))
+	user = portage_data.configuration_from_save_format(utils.load_data_file(path_user_configuration, "json"))
+	return profile, user
+
+
 def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls, save_modality):
 	if save_modality.endswith("json"):
 		utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
@@ -88,15 +94,23 @@ def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_
 	'dir_hyportage',
 	#help="the directory containing the hyportage files (generate by this tool)",
 	type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
+@click.argument(
+	'dir_install',
+	#help="the directory containing the hyportage files (generate by this tool)",
+	type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
 @click.option(
-	'--input-files', '-i',
+	'--portage_files', '-i',
 	nargs=4,
 	default=("profile_configuration.json", "user_configuration.json", "keywords.json", "installed_packages.json", "packages"),
-	help='the three json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
+	help='the five json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
 @click.option(
-	'--output-files', '-o',
+	'--hyportage_file', '-o',
 	default="hyportage.enc",
 	help='the file in which are saved the hyportage data')
+@click.option(
+	'--generated_install_files', '-u',
+	default=("emerge.sh", "package.use"),
+	help='the file in which are saved the installation script and use flag configuration')
 @click.option(
 	'--verbose', '-v',
 	count=True,
@@ -110,27 +124,34 @@ def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_
 	default=False,
 	help='force the translation of the given packages.')
 @click.option(
-	'--simplify-mode',
-	type=click.Choice(["default","individual"]), default="default",			   # UNCLEAR
-	help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')  # UNCLEAR
-#@click.option('--translate-only',
-#	is_flag=True,
-#	help="Only performs only the translation into SMT formulas.")
+	'--simplify_mode',
+	type=click.Choice(["default","individual"]), default="default",
+	help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')
 @click.option(
 	'--save-modality',
 	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="gzjson",
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
+@click.option(
+	'--mode',
+	type=click.Choice(["update", "emerge"]), default="update",
+	help='Temporary option that states if the tool is used in translate mode or reconfigure mode.')
+@click.argument(
+	'atoms',
+	nargs=-1)
 def main(
-	dir_portage,
-	dir_hyportage,
-	input_files,
-	output_files,
-	verbose,
-	par,
-	force,
-	simplify_mode,
-	save_modality
-	):
+		dir_portage,
+		dir_hyportage,
+		dir_install,
+		portage_files,
+		hyportage_file,
+		generated_install_files,
+		verbose,
+		par,
+		force,
+		simplify_mode,
+		save_modality,
+		mode,
+		atoms):
 	"""
 	Tool that converts the gentoo files
 
@@ -140,9 +161,9 @@ def main(
 	dir_hyportage directory where all the files resulting of the translation will be put
 	Usually it is ../../../host/portage/json
 
-	Example: python translate_portage.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-	Example: python translate_portage.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-	Example: python translate_portage.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+	Example: python hyportage.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+	Example: python hyportage.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
+	Example: python hyportage.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
 
 	"""
 
@@ -150,66 +171,169 @@ def main(
 	# 1. OPTIONS
 	##########################################################################
 
-	print(save_modality)
-	#return
-
-	logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
-
-	# OPTION: manage number of parallel threads
-	if par != -1:
-		available_cores = min(par, multiprocessing.cpu_count())
+	# 1.1. verbose option
+	if verbose != 0:
+		if verbose == 1:
+			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
+		elif verbose == 2:
+			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+		elif verbose >= 3:
+			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
+		logging.warning("Verbose (" + str(verbose) + ") output.")
 	else:
-		available_cores = max(1, multiprocessing.cpu_count() - 1)
+		logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
+
+	# 1.2. parallel process option
+	if par != -1: available_cores = min(par, multiprocessing.cpu_count())
+	else: available_cores = 1
 	logging.info("number of available cores: " + str(available_cores))
 
-	# create concurrency maps
-	if available_cores > 1 and not force:
+	if available_cores > 1:
 		pool = multiprocessing.Pool(available_cores)
-		pool_thread = multiprocessing.dummy.Pool(available_cores)
 		concurrent_map = pool.map
-		concurrent_thread_map = pool_thread.map
-	else:
-		concurrent_map = map
-		concurrent_thread_map = map
+	else: concurrent_map = map
 
-	# OPTION: manage verbosity
-	if verbose != 0: logging.info("Verbose (" + str(verbose) + ") output.")
-	else: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
-
-	if verbose == 1: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
-	elif verbose == 2: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-	elif verbose >= 3: logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+	todo_update_hyportage = mode == "update"
+	todo_emerge = mode == "emerge"
 
 	##########################################################################
-	# 2. COMPUTE WHAT TO DO
+	# 2. SET THE FILE PATHS
 	##########################################################################
 
 	dir_portage = os.path.abspath(dir_portage)
 	dir_hyportage = os.path.abspath(dir_hyportage)
+	dir_install = os.path.abspath(dir_install)
 
-	file_profile_configuration, file_user_configuration, file_keywords, file_installed_packages, file_egencache_packages = input_files
+	file_profile_configuration, file_user_configuration, file_keywords, file_installed_packages, file_egencache_packages = portage_files
 	path_profile_configuration = os.path.join(dir_portage, file_profile_configuration)
 	path_user_configuration = os.path.join(dir_portage, file_user_configuration)
 	path_keywords = os.path.join(dir_portage, file_keywords)
 	path_installed_packages = os.path.join(dir_portage, file_installed_packages)
 	path_egencache_packages = os.path.join(dir_portage, file_egencache_packages)
 
-	output_files_hyportage = output_files
-	path_hyportage = os.path.join(dir_hyportage, output_files_hyportage)
+	path_db_hyportage = os.path.join(dir_hyportage, hyportage_file)
 
+	file_install_script, file_use_flag_configuration = generated_install_files
+	path_install_script = os.path.join(dir_install, file_install_script)
+	path_use_flag_configuration = os.path.join(dir_install, file_use_flag_configuration)
+
+	##########################################################################
+	# 3. COMPUTE WHAT TO DO
+	##########################################################################
+
+	if todo_update_hyportage:
+		last_db_hyportage_update = os.path.getmtime(path_db_hyportage) if os.path.exists(path_db_hyportage) else 0.0
+
+		todo_list = hyportage_translation.compute_portage_diff(
+			concurrent_map,	last_db_hyportage_update, force,
+			path_profile_configuration, path_user_configuration,
+			path_keywords, path_installed_packages, path_egencache_packages)
+
+		must_apply_profile, must_apply_user, must_regenerate_keywords_ids = todo_list[0], todo_list[1], todo_list[2]
+		must_regenerate_installed_packages, spl_name_list, loaded_spls = todo_list[3], todo_list[4], todo_list[5]
+
+	##########################################################################
+	# 4. LOAD THE HYPORTAGE DATABASE
+	##########################################################################
+
+	utils.phase_start("Loading the stored hyportage data.")
+	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls =\
+		load_hyportage(path_db_hyportage, save_modality)
+	profile_configuration, user_configuration = load_configurations(path_profile_configuration, path_user_configuration)
+	utils.phase_end("Loading completed")
+
+	##########################################################################
+	# 5. UPDATE THE HYPORTAGE DATABASE IF NECESSARY
+	##########################################################################
+
+	if todo_update_hyportage:
+		# update the hyportage spl database
+		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
+		spl_added, spl_updated, spl_removed, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
+		print("spl_updated = " + str(spl_updated))
+		zipped = zip(*spl_updated)
+		spl_added_full, spl_removed_full = (list(zipped[0]), list(zipped[1])) if len(zipped) > 0 else (list(), list())
+		spl_added_full.extend(spl_added)
+		spl_removed_full.extend(spl_removed)
+
+		# update the hyportage pattern repository
+		pattern_added, pattern_updated, pattern_removed = hyportage_translation.update_pattern_repository_with_spl_diff(
+			pattern_repository, mspl, spl_groups, spl_added_full, spl_removed_full)
+		pattern_added_conf, pattern_removed_conf = hyportage_translation.update_pattern_repository_with_configuration_diff(
+			pattern_repository, mspl, spl_groups, core_configuration,
+			must_apply_profile, must_apply_user, profile_configuration, user_configuration)
+
+		# update arch, keyword id list, and initialize iuses
+		arch_changed = hyportage_translation.update_arch(
+			core_configuration, mspl, spl_added_full, must_apply_profile, profile_configuration)
+		if must_regenerate_keywords_ids: hyportage_translation.update_keywords_ids(id_repository, path_keywords)
+
+		# update the hyportage database with the configurations
+		spl_modified_data, spl_modified_visibility = hyportage_translation.apply_configurations(
+			pattern_repository, mspl, spl_added_full,
+			profile_configuration, user_configuration, must_apply_profile, must_apply_user)
+
+		# finalize iuse list for the packages
+		spl_iuse_reset = hyportage_translation.initialize_iuse_flags(
+			pattern_repository, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
+
+		# update the id repository
+		hyportage_translation.update_id_repository(
+			pattern_repository, id_repository, spl_iuse_reset, spl_groups_removed, spl_groups_added)
+
+		# update the smt
+		hyportage_translation.update_smt_constraints(
+			pattern_repository, id_repository, mspl, spl_groups, arch_changed, simplify_mode,
+			pattern_added, pattern_updated, pattern_removed,
+			spl_iuse_reset, spl_modified_visibility)
+
+		# save the hypotage database
+		save_hyportage(
+			path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration,
+			installed_spls, save_modality)
+
+	##########################################################################
+	# 6. RUN RECONFIGURE IF NECESSARY
+	##########################################################################
+
+	if todo_emerge:
+		# compute what to install
+		core_patterns, full_patterns, use_selection = reconfigure.compute_request(
+			atoms, profile_configuration, user_configuration)
+		user_request_spl = set([
+			spl
+			for pattern in core_patterns
+			for spl in hyportage_pattern.pattern_repository_element_get_spls(
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))])
+
+		# extends the pattern repository with user-defined patterns
+		reconfigure.extends_pattern_repository_with_request(pattern_repository, core_patterns)
+
+		# adds the user required iuses to the id_repository
+		reconfigure.extends_id_repository_with_requested_use_flags(
+			id_repository, installed_spls, user_request_spl, use_selection)
+
+		# apply the user-specific use selection to the mspl
+		reconfigure.apply_requested_use_selection(user_request_spl, use_selection)
+
+
+		pass
+
+
+"""
 	# compute the difference from the previous state
 
 	logging.info("Computing what to do.")
 	t = time.time()
 	last_update = 0.0
 
-	if os.path.exists(path_hyportage):
-		last_update = os.path.getmtime(path_hyportage)
+	if os.path.exists(path_db_hyportage):
+		last_update = os.path.getmtime(path_db_hyportage)
 
-	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration)) if os.path.isdir(path_profile_configuration) else True
-	must_apply_user = (last_update < os.path.getmtime(path_user_configuration)) if os.path.isdir(path_user_configuration) else True
-	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords)) if os.path.isdir(path_keywords) else True
-	must_regenerate_installed_packages = (last_update < os.path.getmtime(path_installed_packages)) if os.path.isdir(path_installed_packages) else True
+	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration))
+	must_apply_user = (last_update < os.path.getmtime(path_user_configuration))
+	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords))
+	must_regenerate_installed_packages = (last_update < os.path.getmtime(path_installed_packages))
 
 	egencache_files = hyportage_from_egencache.get_egencache_files(path_egencache_packages)
 	if force:
@@ -240,10 +364,10 @@ def main(
 	logging.info("Loading the stored hyportage data.")
 	t = time.time()
 	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls =\
-		load_hyportage(path_hyportage, save_modality)
+		load_hyportage(path_db_hyportage, save_modality)
 	logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
-	logging.info("Updating the core hyportage data (pattern_repository, spl_groups, id_repository).")
+	logging.info("Updating the core hyportage data (pattern_repository, spl_groups).")
 	t = time.time()
 	package_to_add = []
 	package_to_update = []
@@ -340,8 +464,7 @@ def main(
 	##########################################################################
 	# 7. GENERATE THE SMT CONSTRAINTS
 	##########################################################################
-
-	#"""
+	
 	logging.info("Generating the SMT Constraints")
 	t = time.time()
 	# generate everything for now: laziness for the win
@@ -353,7 +476,6 @@ def main(
 	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
 	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
 	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-	#"""
 
 	##########################################################################
 	# 7. REGENERATE THE INSTALLED PACKAGE INFORMATION IF NECESSARY
@@ -369,110 +491,12 @@ def main(
 	logging.info("Saving the hyportage data")
 	t = time.time()
 	save_hyportage(
-		path_hyportage, pattern_repository, id_repository, mspl, spl_groups,
+		path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups,
 		core_configuration, installed_spls, save_modality)
-	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")
-
-
-"""
-
-
-	# setup the output directory
-	if not os.path.exists(dir_hyportage):
-		os.makedirs(dir_hyportage)
-
-	if not translate_only:
-		logging.info("Load the egencache files.")
-		t = time.time()
-		if translate_only_package: # process just one package
-			files = [os.path.join(dir_portage,translate_only_package)]
-			logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-		else:
-			files = egencache_utils.get_egencache_files(dir_portage)
-			logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-
-		# continues the translation, following the different steps
-		logging.debug("Considering " + unicode(len(files)) + " files")
-		t = time.time()
-		raw_mspl = egencache_utils.load_files_egencache(concurrent_thread_map, files)
-		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-		assert raw_mspl
-	
-		logging.info("Converting the gentoo dependencies into internal AST representation.")
-		t = time.time()
-		asts = constraint_parser.parse_mspl(concurrent_map, raw_mspl)
-		#asts = map(constraint_parser.parse_spl, raw_mspl)
-		logging.info("Conversion completed in " + unicode(time.time() - t) + " seconds.")
-		assert asts
-
-		logging.info("Creating the package group information.")
-		package_groups = extract_package_groups.from_mspl_list(concurrent_map, raw_mspl)
-		assert package_groups
-
-		logging.info("Matching every atoms constraint to the list of its correponding spls.")
-		t = time.time()
-		atom_mapping = atom_matching.extract_atom_mapping(concurrent_thread_map, package_groups, asts)
-		logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
-		assert atom_mapping
-	
-		logging.info("Extending spl with implicit iuse declarations")
-		t = time.time()
-		# profile_iuse = ???
-		#apply_profile.on_mspl(concurrent_map, atom_mapping, asts, profile_iuse)
-		logging.info("Completion completed in " + unicode(time.time() - t) + " seconds.")
-
-		logging.info("Extracting ids information from ASTs.")
-		t = time.time()
-		mappings = extract_id_maps.create_empty_name_mappings()
-		map_id_name, map_name_id = mappings
-		mappings_list = concurrent_thread_map(extract_id_maps.generate_name_mappings_spl, raw_mspl)
-		map(lambda x: extract_id_maps.update_name_mappings(mappings, x), mappings_list)
-		#map_id_name, map_name_id = extract_id_maps.generate_name_mappings(concurrent_map,raw_mspl,asts)
-		logging.info("Extraction completed in " + unicode(time.time() - t) + " seconds.")
-
-		logging.info("Start to create the mspl dictionary.")
-		# add name : spl
-		mspl = {spl['name']: spl for spl in raw_mspl}
-		# add asts
-		for spl, local_ast, combined_ast in asts:
-			spl['fm'] = {'local': local_ast, 'combined': combined_ast}
-
-		logging.info("Extract dependencies information from ASTs.")
-		all_pkg_names = set(mspl.keys())
-		t = time.time()
-		extract_dependencies.generate_dependencies_mspl(concurrent_thread_map, mspl)
-		t = time.time() - t
-		logging.info("Extraction completed in " + unicode(t) + " seconds.")
-	
-		# clean the package groups from links to their different implementations
-		extract_package_groups.clean(concurrent_map, package_groups)
-		# update the mspl dictionary with the package groups
-		extract_id_maps.update_name_mappings(mappings, extract_id_maps.generate_name_mappings_package_groups(package_groups))
-		#package_groups = generate_package_groups(concurrent_map,raw_mspl,map_name_id,map_id_name)
-		# add the package groups to the mspl
-		# context keywords are treaded differently
-		extract_id_maps.add_context_ints(map_name_id)
-		mspl.update(package_groups)
-
-	logging.info("Generation of SMT formulas.")
-	t = time.time()
-	# this process is too memory consuming. Using map instead of a concurrent map
-	# not possible to use threads due to the use of z3 :-(
-	if translate_only_package:
-		formulas = [smt_encoding.convert((mspl, map_name_id, simplify_mode, translate_only_package))]
-	else:
-		formulas = smt_encoding.generate_formulas(map,mspl,map_name_id,simplify_mode)
-	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-	# add formulas in mspl
-	for spl_name, formula_list in formulas:
-		mspl[spl_name]["smt_constraints"] = formula_list
-
-	# todo save into file (compressed if possible and option using marshal)
-	logging.info("Saving the file.")
-	t = time.time()
-	final_data = { "mspl": mspl, "map_name_id": map_name_id, "map_id_name": map_id_name }
-	utils.store_data_file(os.path.join(dir_hyportage, output_file_name),final_data,save_modality)
 	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")"""
+
+
+##
 
 if __name__ == "__main__":
 	main()

@@ -270,6 +270,12 @@ mspl_create = core_data.dict_configuration_create
 def mspl_add_spl(mspl, spl):
 	mspl[spl_get_name(spl)] = spl
 
+def mspl_remove_spl(mspl, spl):
+	mspl.pop(spl_get_name(spl))
+
+def mspl_update_spl(mspl, old_spl, new_spl):
+	mspl[spl_get_name(old_spl)] = new_spl
+
 class MSPLToSaveFormatGenerator(object):
 	def __init__(self, mspl):
 		self.items = mspl.iteritems()

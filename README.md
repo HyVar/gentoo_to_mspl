@@ -1,11 +1,40 @@
 # hyvar for reconfiguring gentoo
 
-**TODO:**
-* apply the profile to the data (need to define the functions, and call them)
-* generate modularily the ids
-* perform the smt translation to the spls that need it
+
+This tool allows for a correct and complete dependency resolution in portage,
+ thus giving a correct list of packages to for emerge to install and uninstall,
+ with a correct use flag configuration.
+
+This tool works by abstracting the portage tree and user configuration
+ (the files in /etc/portage) into some core data, that are then combined with the user request to solve the dependencies.
+The list of packages to instal and uninstall are saved in a bash script, and the use flag configuration is saved in a package.use file.
+
+This work is based on the theory of Software Product Line and Multi-Software Product Line,
+ and the fact that portage is a Multi-Sofware Product Line
+
+
+## Tool Usage
+
+Our tool consider two computers of VM:
+ - the guest VM hosts the gentoo OS. The core data is extracted from there, and the bash installation script is executed there
+ - the host VM hosts the main computation of the core data and the dependency resolution. It can be any OS with
+    1. python 2.7
+    2. python 2.7 packages: click, lrparsing, z3-solver
+
+All the functionalities of this tool can be accessed from the hyportage.sh bash script at the root of this repository.
+The functions are:
+ - `hyportage.sh setup_guest`: install extraction scripts in the guest VM.
+ - `hyportage.sh sync_guest`: extracts the data from the guest VM.
+ - `hyportage.sh clean_guest`: removed the installed scripts from the guest VM.
+ - `hyportage.sh setup_host`: creates the correct folder structure in the host to store the data. This must be executed before `sync_guest`
+ - `hyportage.sh translate`: translate the portage tree and the user data into our internal representation
+ - `hyportage.sh emerge`: acts like gentoo's `emerge -p`, except that it generates a installation script and a package.use file
+ - `hyportage.sh install`: copy the generated installation script and package.use file to the guest VM, and executes the scripts, thus performing the installation.
+
+
 
 ## Structure of the repository:
+
 
 Note that this structure is configurable in the main script hyportage.sh
 
@@ -149,6 +178,8 @@ TODO:
  Both: change world structure file to allow user to disinstall packages + extend capabilities (version,slots)
  
  Michael: correct generation of world from gentoo also translating the profile in hyvarrec
+
+ Michael: split the configuration files to have a more efficient update
 
  Both: find a way to deal with necessary packages (should be easy), and global use flags preference (more complex)
 

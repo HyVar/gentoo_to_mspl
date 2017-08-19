@@ -1,11 +1,12 @@
 #!/bin/bash
 
-SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd )"
+LOCAL_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 ######################################################################
 ### CONFIGURATION
 ######################################################################
 
+# Configures how to connect to the guest VM
 GUEST="localhost"
 GUEST_PORT="9022"
 
@@ -14,22 +15,23 @@ GUEST_PWD_ROOT="osboxes.org"
 GUEST_PWD_USER="osboxes.org"
 
 
-
+# States where scripts can be found, and where to save data.
+# Change only if you know what you are doing
 GUEST_SCRIPT_DIRECTORY_NAME="hyvar"
 
 GUEST_INSTALL_DIR="/home/${GUEST_USER}/${GUEST_SCRIPT_DIRECTORY_NAME}"
 GUEST_GEN_DIR="${GUEST_INSTALL_DIR}/gen/"
 
 
-HOST_SCRIPT_DIRECTORY="${SCRIPT_DIR}/host/scripts"
-HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/translate_portage.py"
-HOST_SCRIPT_RECONFIGURE="${HOST_SCRIPT_DIRECTORY}/reconfigure.py"
+HOST_SCRIPT_DIRECTORY="${LOCAL_DIR}/host/scripts"
+HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/hyportage.py"
+HOST_SCRIPT_EMERGE="${HOST_SCRIPT_DIRECTORY}/hyportage.py --mode=emerge"
 
-HOST_GUEST_INSTALL_DIR="${SCRIPT_DIR}/guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
-HOST_HOST_INSTALL_DIR="${SCRIPT_DIR}/host/data/portage"
-HOST_HOST_GEN_DIR="${SCRIPT_DIR}/host/data/hyportage"
+HOST_GUEST_INSTALL_DIR="${LOCAL_DIR}/guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
+HOST_HOST_INSTALL_DIR="${LOCAL_DIR}/host/data/portage"
+HOST_HOST_GEN_DIR="${LOCAL_DIR}/host/data/hyportage"
 
-
+HOST_EMERGE_SCRIPT_DIR="${LOCAL_DIR}/host/data/install"
 
 ######################################################################
 ### BASE FUNCTIONS
@@ -82,6 +84,9 @@ function setup_host {
 	if [ ! -e "${HOST_HOST_GEN_DIR}" ]; then
 		mkdir -p "${HOST_HOST_GEN_DIR}"
 	fi
+	if [ ! -e "${HOST_EMERGE_SCRIPT_DIR}" ]; then
+		mkdir -p "${HOST_EMERGE_SCRIPT_DIR}"
+	fi
 }
 
 function clean_host {
@@ -91,26 +96,22 @@ function clean_host {
 	if [ -e "${HOST_HOST_GEN_DIR}" ]; then
 		rm -rf "${HOST_HOST_GEN_DIR}"
 	fi	
+	if [ -e "${HOST_EMERGE_SCRIPT_DIR}" ]; then
+		rm -rf "${HOST_EMERGE_SCRIPT_DIR}"
+	fi
 }
 
 
 
 function translate {
 	shift 1
-	#if [ -n "${PYTHONPATH}" ]; then
-	#	PYTHONPATH="${PYTHONPATH}:${HOST_GUEST_INSTALL_DIR}"
-	#else
-	#	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}"
-	#fi
-	#echo $PYTHONPATH
-	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}" python "${HOST_SCRIPT_TRANSLATE}" $@ "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}"
-	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
+	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}:${PYTHONPATH}" python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update $@
 }
 
 function reconfigure {
 	shift 1
-	export PYTHONPATH="${HOST_GUEST_INSTALL_DIR}":"${YTHONPATH}"
-	nice -n 20 python "${HOST_SCRIPT_RECONFIGURE}" $@
+	#export PYTHONPATH="${HOST_GUEST_INSTALL_DIR}":"${PYTHONPATH}"
+	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}:${PYTHONPATH}" nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge $@
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 

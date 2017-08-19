@@ -77,6 +77,18 @@ def id_repository_add_spl(id_repository, spl):
 	names[spl_name] = (id_list[0], id_list[1], id_list[2], iuses_id)
 
 
+def id_repository_extends_spl_iuse_list(id_repository, spl_name, iuse_list):
+	ids = id_repository_get_ids(id_repository)
+	spl_data = id_repository_get_spls(id_repository)[spl_name]
+	core_iuse_list = spl_data[3].keys()
+
+	for iuse in iuse_list:
+		if iuse not in core_iuse_list:
+			id = utils.new_id(id_repository)
+			ids[id] = ("use", iuse, spl_name)
+			spl_data[3][iuse] = id
+
+
 def id_repository_remove_spl(id_repository, spl):
 	ids = id_repository_get_ids(id_repository)
 	spl_id, slot_id, subslot_id, iuses_ids = id_repository_get_spls(id_repository).pop(hyportage_data.spl_get_name(spl))

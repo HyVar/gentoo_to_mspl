@@ -193,49 +193,43 @@ def get_configuration_pattern(conf):
 	return res
 
 
-def apply_configurations(core_configuration, conf_profile, conf_user, is_conf_profile_new, is_conf_user_new, new_spls, mspl, spl_groups, pattern_repository):
-	# 1. update the pattern repository
-	if is_conf_profile_new:
-		conf_patterns = get_configuration_pattern(conf_profile)
-		core_conf_patterns = core_configuration_get_profile_patterns(core_configuration)
-		for pattern in conf_patterns - core_conf_patterns:
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern)
-		for pattern in core_conf_patterns - conf_patterns:
-			hyportage_pattern.pattern_repository_remove_pattern(pattern_repository, pattern)
-		core_conf_patterns.clear()
-		core_conf_patterns.update(conf_patterns)
-	if is_conf_user_new:
-		conf_patterns = get_configuration_pattern(conf_user)
-		core_conf_patterns = core_configuration_get_user_patterns(core_configuration)
-		for pattern in conf_patterns - core_conf_patterns:
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern)
-		for pattern in core_conf_patterns - conf_patterns:
-			hyportage_pattern.pattern_repository_remove_pattern(pattern_repository, pattern)
-		core_conf_patterns.clear()
-		core_conf_patterns.update(conf_patterns)
-	# 2. update the arch if necessary
-	if is_conf_profile_new:
-		core_configuration_set_arch(core_configuration, portage_data.configuration_get_arch(conf_profile))
-	arch = core_configuration_get_arch(core_configuration)
-	# 3. update the spls
-	for spl in new_spls:  # initialize the new spl keyword information
-		keywords_initialize(spl, arch)
-	if is_conf_profile_new:
+def configuration_update_pattern(pattern_repository, mspl, spl_groups, core_conf_patterns, new_configuration, setter):
+	pattern_added = set()
+	pattern_removed = set()
+
+	conf_patterns = get_configuration_pattern(new_configuration)
+	for pattern in conf_patterns - core_conf_patterns:
+		added = hyportage_pattern.pattern_repository_add_pattern_from_configuration(
+			pattern_repository, mspl, spl_groups, pattern, setter)
+		if added: pattern_added.add(pattern)
+	for pattern in core_conf_patterns - conf_patterns:
+		removed = hyportage_pattern.pattern_repository_remove_pattern_from_configuration(
+			pattern_repository, pattern, setter)
+		if removed: pattern_removed.add(pattern)
+	core_conf_patterns.clear()
+	core_conf_patterns.update(conf_patterns)
+	return pattern_added, pattern_removed
+
+
+def apply_configurations(
+		pattern_repository, mspl, spl_added_full,
+		profile_configuration, user_configuration, must_apply_profile, must_apply_user):
+	if must_apply_profile:
 		for spl in mspl.values():
-			spl_apply_profile_configuration(spl, pattern_repository, conf_profile)
+			spl_apply_profile_configuration(spl, pattern_repository, profile_configuration)
 	else:
-		for spl in new_spls:  # apply the configurations only on the new spls
-			spl_apply_profile_configuration(spl, pattern_repository, conf_profile)
-	spl_modified_data = set(new_spls)
-	spl_modified_visibility = set(new_spls)
-	if is_conf_profile_new or is_conf_user_new:
+		for spl in spl_added_full:  # apply the configurations only on the new spls
+			spl_apply_profile_configuration(spl, pattern_repository, profile_configuration)
+	spl_modified_data = set(spl_added_full)
+	spl_modified_visibility = set(spl_added_full)
+	if must_apply_profile or must_apply_user:
 		for spl in mspl.values():
-			updated_data, updated_visibility = spl_apply_user_configuration(spl, pattern_repository, conf_user)
+			updated_data, updated_visibility = spl_apply_user_configuration(spl, pattern_repository, user_configuration)
 			if updated_data: spl_modified_data.add(spl)
 			if updated_visibility: spl_modified_visibility.add(spl)
 	else:
-		for spl in new_spls:  # apply the configurations only on the new spls
-			spl_apply_user_configuration(spl, pattern_repository, conf_user)
+		for spl in spl_added_full:  # apply the configurations only on the new spls
+			spl_apply_user_configuration(spl, pattern_repository, user_configuration)
 	return spl_modified_data, spl_modified_visibility
 
 

@@ -4,6 +4,7 @@ utils.py: file containing some variables used by other modules
 
 import re
 import uuid
+import time
 
 import multiprocessing
 import threading
@@ -31,11 +32,9 @@ __status__ = "Prototype"
 # FILES RELATED INFORMATION AND FUNCTIONS
 ######################################################################
 
-TEMP_DIR = 'tmp'
-TMP_FILES_LOCK = threading.Lock()
-TMP_FILES = []
 
 # List of the temp files.
+__tmp_files_directory = "/tmp"
 __tmp_files = []
 __tmp_files_lock = multiprocessing.Lock()
 
@@ -43,14 +42,27 @@ __tmp_files_lock = multiprocessing.Lock()
 def get_new_temp_file(extension):
 	global __tmp_files_lock
 	global __tmp_files
-	name = '/tmp/' + uuid.uuid4().hex + '.' + extension
+	not_ok = False
+	while not_ok:
+		name = os.path.join(__tmp_files_directory, uuid.uuid4().hex + '.' + extension)
+		not_ok = not os.path.exists(name)
 	__tmp_files_lock.acquire()
 	__tmp_files.append(name)
 	__tmp_files_lock.release()
 	return name
 
 
-def load_data_file(file_name, save_modality="gzjson"):
+def clean_temp_files():
+	__tmp_files_lock.acquire()
+	for f in __tmp_files:
+		if os.path.exists(f):
+			os.remove(f)
+		__tmp_files_lock.release()
+
+
+##
+
+def load_data_file(file_name, save_modality="pickle"):
 	if save_modality == "marshal":
 		with open(file_name, "r") as f:
 			data = marshal.load(f)
@@ -71,7 +83,7 @@ def load_data_file(file_name, save_modality="gzjson"):
 	return data
 
 
-def store_data_file(file_name, data, save_modality="gzjson"):
+def store_data_file(file_name, data, save_modality="pickle"):
 	# 1. create file if does not exist
 	basedir = os.path.dirname(file_name)
 	if not os.path.exists(basedir): os.makedirs(basedir)
@@ -132,6 +144,24 @@ def new_ids(obj, nb=1):
 
 
 CONTEXT_VAR_NAME = "ccc"
+
+
+######################################################################
+# PHASE LOGGING
+######################################################################
+
+t = None
+
+
+def phase_start(message):
+	global t
+	logging.info(message)
+	t = time.time()
+
+def phase_end(message):
+	global t
+	logging.info(message + " in " + unicode(time.time() - t) + " seconds.")
+
 
 ######################################################################
 ### TRANSLATION SIMPLIFICATION FUNCTIONS

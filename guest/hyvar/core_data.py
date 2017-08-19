@@ -1,5 +1,14 @@
 #!/usr/bin/python
 
+__author__ = "Michael Lienhardt and Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt and Jacopo Mauro"
+__license__ = "ISC"
+__version__ = "0.1"
+__maintainer__ = "Michael Lienhardt and Jacopo Mauro"
+__email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
+
+
 def identity(x): return x
 
 
@@ -10,6 +19,10 @@ def identity(x): return x
 def parse_package_name(package_name):
 	"""
 	this function splits a portage package name into relevant information
+	:param package_name: the package name to be split
+	:return: a tuple containing the group name of this package, its full version and its core version
+	"""
+	"""
 	"""
 	filename_split = package_name.split("-")
 	version_full, version = None, None
@@ -31,6 +44,11 @@ def parse_package_name(package_name):
 
 
 def pattern_create_from_atom(atom):
+	"""
+	creates a pattern from a portage atom
+	:param atom: the string of the atom
+	:return: the corresponding pattern
+	"""
 	# 1. version operator
 	vop = None
 	begin = 0
@@ -75,20 +93,12 @@ def pattern_create_from_atom(atom):
 	return vop, package_group, version_full, version, has_star, slot, subslot, sop
 
 
-def pattern_to_save_format(pattern):
-	return {
-		'vop': pattern[0],
-		'package_group': pattern[1],
-		'version_full': pattern[2],
-		'version': pattern[3],
-		'has_star': pattern[4],
-		'slot': pattern[5],
-		'subslot': pattern[6],
-		'sop': pattern[7]
-	}
-
-
 def pattern_to_atom(pattern):
+	"""
+	translates a pattern into its corresponding portage atom
+	:param pattern: the pattern to translate
+	:return: the equivalent atom string
+	"""
 	atom = ""
 	if pattern[0]: atom += pattern[0]
 	atom += pattern[1]
@@ -102,7 +112,30 @@ def pattern_to_atom(pattern):
 	return atom
 
 
+def pattern_to_save_format(pattern):
+	"""
+	translates a pattern into a json-friendly dictionary
+	:param pattern: the pattern to translate
+	:return: the equivalent dictionary
+	"""
+	return {
+		'vop': pattern[0],
+		'package_group': pattern[1],
+		'version_full': pattern[2],
+		'version': pattern[3],
+		'has_star': pattern[4],
+		'slot': pattern[5],
+		'subslot': pattern[6],
+		'sop': pattern[7]
+	}
+
+
 def pattern_from_save_format(save_format):
+	"""
+	translates a json-friendly representation of a pattern into a real pattern
+	:param save_format: the dictionary to translate
+	:return: the corresponding pattern
+	"""
 	return (
 		save_format['vop'], save_format['package_group'], save_format['version_full'], save_format['version'],
 		save_format['has_star'], save_format['slot'], save_format['subslot'], save_format['sop']
