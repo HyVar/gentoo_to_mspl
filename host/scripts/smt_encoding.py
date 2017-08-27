@@ -29,28 +29,47 @@ smt_false = z3.BoolVal(False)
 smt_true  = z3.BoolVal(True)
 
 
+def get_smt_variable_spl_name(id_repository, spl_name):
+	return "p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name))
+
+
 def get_smt_spl_name(id_repository, spl_name):
-	return z3.Bool("p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name)))
+	return z3.Bool(get_smt_variable_spl_name(id_repository, spl_name))
 
 
-def get_hyvar_spl_name(id_repository, spl_name):
-	return "feature[p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name)) + "]"
+def get_smt_variable_use_flag(id_repository, spl_name, use_flag):
+	return "u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag))
+
+
+def get_smt_use_flag(id_repository, spl_name, use_flag):
+	return z3.Bool(get_smt_variable_use_flag(id_repository, spl_name, use_flag))
+
+
+def get_id_from_smt_variable(variable):
+	return variable[1:]
 
 
 def get_smt_spl_names(id_repository, spl_names):
 	return map(lambda spl_name: get_smt_spl_name(id_repository, spl_name), spl_names)
 
 
-def get_smt_use(id_repository, spl_name, use_flag):
-	return z3.Bool("u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag)))
-
-
 def get_smt_uses(id_repository, spl_name, use_flags):
-	return map(lambda use_flag: get_smt_use(id_repository, spl_name, use_flag), use_flags)
+	return map(lambda use_flag: get_smt_use_flag(id_repository, spl_name, use_flag), use_flags)
 
 
-def get_hyvar_use(id_repository, spl_name, use_flag):
-	return "feature[u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag)) + "]"
+##
+
+def get_smt_int_spl_name(id_repository, spl_name):
+	return "feature[" + get_smt_variable_spl_name(id_repository, spl_name) + "]"
+
+
+def get_smt_int_use_flag(id_repository, spl_name, use_flag):
+	return "feature[" + get_smt_variable_use_flag(id_repository, spl_name, use_flag) + "]"
+
+
+smt_or  = z3.Or
+smt_and = z3.And
+smt_not = z3.Not
 
 
 #def get_smt_context():
@@ -79,18 +98,18 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 		use_flag = selection['use']
 		#print("Analyzing selection: " + str(local_spl_name) + "," + str(spl_name) + ": " + str(selection) )
 		if hyportage_ids.id_repository_exists_use_flag(id_repository, spl_name, use_flag):
-			use_id = get_smt_use(id_repository, spl_name, use_flag)
+			use_id = get_smt_use_flag(id_repository, spl_name, use_flag)
 			if "prefix" in selection:  # two cases: "-" (not selected), or "!" (compact form)
 				if selection['prefix'] == "-":
 					res.append(z3.Not(use_id))
 				else:  # selection['prefix'] == "!"
-					local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+					local_use_id = get_smt_use_flag(id_repository, local_spl_name, use_flag)
 					if selection['suffix'] == "=":
 						res.append(local_use_id == z3.Not(use_id))
 					else:  # selection['suffix'] == "?"
 						res.append(z3.Implies(z3.Not(local_use_id), use_id))
 			elif "suffix" in selection:
-				local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+				local_use_id = get_smt_use_flag(id_repository, local_spl_name, use_flag)
 				if selection['suffix'] == "=":
 					res.append(local_use_id == use_id)
 				else:  # selection['suffix'] == "?"
@@ -101,7 +120,7 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 			prefix = "prefix" in selection
 			default = selection['default']
 			if "suffix" in selection:
-				local_use_id = get_smt_use(id_repository, local_spl_name, use_flag)
+				local_use_id = get_smt_use_flag(id_repository, local_spl_name, use_flag)
 				suffix = selection['suffix']
 				if (((suffix == "?") and (not prefix) and (default == "-"))
 						or ((suffix == "=") and (((not prefix) and (default == "-")) or (prefix and (default == "+"))))):
@@ -116,71 +135,6 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 			return [smt_false]  # FALSE, this spl cannot be installed
 	return res
 	# I don't deal with default value in this first approximation
-
-
-"""
-def decompact_atom(ctx):
-
-	def get_use(ctx, prefix=""): # replace the prefix of the context with a default one. What for?
-		use = {"use": ctx["use"]}
-		if prefix:
-			use['prefix'] = prefix
-		if "preference" in ctx:
-			use["preference"] = ctx["preference"]
-		return use
-
-	def get_dcondition(ctx, use):
-		new_ctx = {
-			'type': "dcondition",
-			'condition': get_use(use),
-			'els': [{'type': "dsimple", 'atom': {x: ctx[x] for x in ctx if x != "selection"}}]}
-		new_ctx['els'][0]['atom']['decompacted'] = ""
-		return new_ctx
-
-	# decompact the comapct atoms
-	assert "selection" in ctx
-	condELs = []
-	normal_sels = []
-	for i in ctx["selection"]:
-		if "prefix" in i and i["prefix"] == "!":
-			if "suffix" in i:
-				if i["suffix"] == "?":
-					# app - misc / foo[!bar?]    bar? (app - misc / foo) !bar? (app - misc / foo[-bar])
-					first = get_dcondition(ctx, i)
-					second = get_dcondition(ctx ,i)
-					second["condition"]["not"] = ""
-					second["els"][0]["atom"]["selection"] = [get_use(i, "-")]
-					condELs.extend([first, second])
-				elif i["suffix"] == "=":
-					# app - misc / foo[!bar =]    bar? (app - misc / foo[-bar]) !bar? (app - misc / foo[bar])
-					first = get_dcondition(ctx, i)
-					second = get_dcondition(ctx, i)
-					first["els"][0]["atom"]["selection"] = [get_use(i, "-")]
-					second["els"][0]["atom"]["selection"] = [get_use(i)]
-					second["condition"]["not"] = ""
-					condELs.extend([first, second])
-			else:
-				raise Exception("Find prefix ! but not suffix ? or = for use " + i["use"])
-		elif "suffix" in i:
-			if i["suffix"] == "?":
-				# app - misc / foo[bar?]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo)
-				first = get_dcondition(ctx,i)
-				second = get_dcondition(ctx,i)
-				first["els"][0]["atom"]["selection"] = [get_use(i)]
-				second["condition"]["not"] = ""
-				condELs.extend([first, second])
-			elif i["suffix"] == "=":
-				# app - misc / foo[bar =]    bar? (app - misc / foo[bar]) !bar? (app - misc / foo[-bar])
-				first = get_dcondition(ctx,i)
-				second = get_dcondition(ctx,i)
-				first["els"][0]["atom"]["selection"] = [get_use(i)]
-				second["els"][0]["atom"]["selection"] = [get_use(i, "-")]
-				second["condition"]["not"] = ""
-				condELs.extend([first, second])
-		else:
-			normal_sels.append(i)
-	return condELs, normal_sels
-"""
 
 
 ##############################################
@@ -202,9 +156,9 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return z3.And(map(self.visitRequiredEL, ctx))
 
 	def visitRequiredSIMPLE(self, ctx):
-		#print("Analyzing required simple: " + str(self.spl_name) + ": " + str(ctx['use']) )
+		# print("Analyzing required simple: " + str(self.spl_name) + ": " + str(ctx['use']) )
 		# assert ctx["use"] in self.id_repository["flag"][self.spl_name]
-		res = get_smt_use(self.id_repository, self.spl_name, ctx["use"])
+		res = get_smt_use_flag(self.id_repository, self.spl_name, ctx["use"])
 		if "not" in ctx:
 			res = z3.Not(res)
 		return res
@@ -212,7 +166,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 	def visitRequiredCONDITION(self, ctx):
 		formulas = self.visitRequired(ctx['els'])
 		# assert (self.id_repository["flag"][self.spl_name][ctx['condition']['use']])  # flag must exists
-		use = get_smt_use(self.id_repository, self.spl_name, ctx['condition']['use'])
+		use = get_smt_use_flag(self.id_repository, self.spl_name, ctx['condition']['use'])
 		if 'not' in ctx['condition']:
 			use = z3.Not(use)
 		return z3.Implies(use, z3.And(formulas))
@@ -259,16 +213,13 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 				if "prefix" in sel and sel["prefix"] == "-":
 					return z3.And(
 						get_smt_spl_name(self.id_repository, spl_name),
-						z3.Not(get_smt_use(self.id_repository, spl_name, sel["use"])))
+						z3.Not(get_smt_use_flag(self.id_repository, spl_name, sel["use"])))
 				else: # prefix + or absent
 					return z3.And(
 						get_smt_spl_name(self.id_repository, spl_name),
-						get_smt_use(self.id_repository, spl_name, sel["use"]))
+						get_smt_use_flag(self.id_repository, spl_name, sel["use"]))
 
-		def aux_visit_select(spl_names, sel):
-			return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in spl_names])
-
-		#print(str(ctx['atom']))
+		# print(str(ctx['atom']))
 		spls = hyportage_pattern.pattern_repository_element_get_spls_visible(
 			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']))
 		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
@@ -292,7 +243,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		formulas = self.visitDepend(ctx['els'])
 		# assert self.id_repository["flag"][self.spl_name][ctx['condition']['use']]  # flag must exists
 		# print("Analyzing depend condition: " + str(self.spl_name) + ": " + str(ctx['condition']['use']) )
-		use = get_smt_use(self.id_repository, self.spl_name, ctx['condition']['use'])
+		use = get_smt_use_flag(self.id_repository, self.spl_name, ctx['condition']['use'])
 		if 'not' in ctx['condition']:
 			use = z3.Not(use)
 		return z3.Implies(use, z3.And(formulas))
@@ -316,85 +267,21 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 	def visitDependINNER(self, ctx):
 		return z3.And(self.visitDepend(ctx['els']))
 
-	"""def visitAtom(self, ctx):
 
-		def aux_visit_single_pkg_single_select(pkg, sel):
-			if sel["use"] not in self.id_repository["flag"][pkg]:
-				# the package considered did not declared the use
-				if "prefix" in sel and sel["prefix"] == "-":
-					if "preference" in sel:
-						if sel["preference"] == "+":
-							return smt_false
-					# preference - or absent
-					return get_smt_spl_name(self.id_repository, pkg)
-				else: # prefix + or absent
-					if "preference" in sel:
-						if sel["preference"] == "+":
-							return get_smt_spl_name(self.id_repository, pkg)
-					# preference - or absent
-					return smt_false
-			else:  # package declared the use
-				if "prefix" in sel and sel["prefix"] == "-":
-					return z3.And(
-						get_smt_spl_name(self.id_repository, pkg),
-						z3.Not(get_smt_use(self.id_repository, pkg, sel["use"])))
-				else: # prefix + or absent
-					return z3.And(
-						get_smt_spl_name(self.id_repository, pkg),
-						get_smt_use(self.id_repository, pkg, sel["use"]))
-
-		def aux_visit_select(pkgs, sel):
-			return z3.Or([aux_visit_single_pkg_single_select(x, sel) for x in pkgs])
-
-		template = ctx["package"]
-		if 'version_op' in ctx:
-			operator = ctx['version_op']
-			if "times"in ctx:
-				template += "*"
-		else:
-			operator = "="
-			template += "*"
-
-		slot = ""
-		subslot = ""
-		if "slots" in ctx:
-			if "slot" in ctx["slots"]:
-				slot = ctx["slots"]["slot"]
-			if "subslot" in ctx["slots"]:
-				subslot = ctx["slots"]["subslot"]
-
-		pkgs = get_packages(self.mspl,template, operator, slot, subslot)
-
-		if pkgs:
-			# decompact compact forms
-			if "selection" in ctx:
-				if not "decompacted" in ctx: # decompact procedure has not been run yet
-					condELs, normal_sels = decompact_atom(ctx)
-				else:
-					normal_sels = ctx["selection"]
-					condELs = []
-				formulas = [aux_visit_select(pkgs, x) for x in normal_sels]
-				formulas.append(self.visitDepend(condELs))
-				return z3.And(formulas)
-			else:
-				return z3.Or(get_smt_spl_names(self.id_repository, pkgs))
-		else:
-			return smt_false"""
-
-
-def simplify_constraints(name, constraints, simplify_mode):
+def simplify_constraints(spl_name, constraints, simplify_mode):
 	if simplify_mode == "default":
 		formula = z3.simplify(z3.And(constraints))
 		if z3.is_false(formula):
-			logging.warning("Dependencies in package " + name + " make it uninstallable.")
+			logging.warning("Dependencies in package " + spl_name + " make it uninstallable.")
 		return [toSMT2(formula)]
 	elif simplify_mode == "individual":
 		formulas = []
 		for i in constraints:
 			formula = z3.simplify(i)
 			if z3.is_false(formula):
-				logging.warning("Dependency " + unicode(i) + " in package " + name + " is false." +
-								"Package can not be installed")
+				logging.warning(
+					"Dependency " + unicode(i) + " in package " + spl_name + " is false."
+					+ "Package can not be installed")
 			formulas.append(formula)
 		return [toSMT2(x) for x in formulas]
 
@@ -404,7 +291,7 @@ def convert_spl(pattern_repository, id_repository, spl, simplify_mode):
 	spl_id = get_smt_spl_name(id_repository, spl_name)
 	logging.debug("Processing spl " + spl_name)
 	constraints = []
-	#print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
+	# print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
 	# 1. convert feature model
 	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, spl_name)
 	for constraint in map(visitor.visitRequiredEL, hyportage_data.spl_get_fm_local(spl)):

@@ -119,6 +119,8 @@ class SPL(object):
 		self.use_selection_user    = None                   # use selection considering both default and user configuration
 		self.mask_profile          = None                   # if portage states that this spl is masked or not
 		self.mask_user             = None                   # if this spl is masked, considering both default and user configuration
+		self.visited               = False                  # if the spl was visited in a graph traversal
+		# self.has_several_parents   = False                  # if there are two paths to access this spl during graph traversal
 
 	def __hash__(self): return hash(self.name)
 
@@ -171,6 +173,9 @@ def spl_get_mask_user(spl): return spl.mask_user
 
 
 def spl_is_visible(spl): return spl_get_keywords_user(spl) and (not spl_get_mask_user(spl))
+
+
+def spl_is_visited(spl): return spl.visited
 
 ##
 
@@ -231,7 +236,7 @@ def spl_to_save_format(spl):
 		'mask_profile': spl_get_mask_profile(spl),
 		'mask_user': spl_get_mask_user(spl),
 		#
-		'smt_constraint': spl_get_smt_constraint(spl)
+		'smt_constraint': spl_get_smt_constraint(spl),
 	}
 
 

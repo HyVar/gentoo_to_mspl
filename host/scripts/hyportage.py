@@ -7,7 +7,7 @@ import click
 
 
 import hyportage_translation
-#import reconfigure
+import reconfigure
 
 import core_data
 import portage_data
@@ -297,27 +297,31 @@ def main(
 	##########################################################################
 
 	if todo_emerge:
+		explain_modality = verbose >= 3
 		# compute what to install
-		core_patterns, full_patterns, use_selection = reconfigure.compute_request(
+		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
 			atoms, profile_configuration, user_configuration)
-		user_request_spl = set([
-			spl
-			for pattern in core_patterns
-			for spl in hyportage_pattern.pattern_repository_element_get_spls(
-				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))])
+		smt_constraint, requested_spls, all_spls = reconfigure.process_request(
+			pattern_repository, id_repository, requested_patterns, default_patterns)
 
 		# extends the pattern repository with user-defined patterns
-		reconfigure.extends_pattern_repository_with_request(pattern_repository, core_patterns)
+		reconfigure.extends_pattern_repository_with_request(pattern_repository, requested_patterns)
 
 		# adds the user required iuses to the id_repository
 		reconfigure.extends_id_repository_with_requested_use_flags(
-			id_repository, installed_spls, user_request_spl, use_selection)
+			id_repository, installed_spls, requested_spls, use_selection)
 
 		# apply the user-specific use selection to the mspl
-		reconfigure.apply_requested_use_selection(user_request_spl, use_selection)
+		reconfigure.apply_requested_use_selection(requested_spls, use_selection)
 
+		# compute the new configuration
+		to_install_spls = reconfigure.get_hyvarrec_input_monolithic(
+			pattern_repository, id_repository, mspl, spl_groups, installed_spls,
+			all_spls, smt_constraint, par, explain_modality)
 
-		pass
+		# generate the emerge script and use configuration files
+		reconfigure.generate_emerge_script_file(path_install_script, installed_spls, to_install_spls)
+		reconfigure.generate_package_use_file(path_use_flag_configuration, to_install_spls)
 
 
 """

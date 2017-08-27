@@ -3,8 +3,7 @@ import sys
 import utils
 import logging
 import os
-from subprocess import PIPE
-import psutil
+import subprocess
 import click
 import time
 import multiprocessing
@@ -34,63 +33,371 @@ __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 
-##
+##########################################################################
+# 1. INITIALIZE THE DATA (COMPUTE REQUEST AND UPDATE THE DATABASE)
+##########################################################################
 
 def compute_request(atoms, profile_configuration, user_configuration):
-	core_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
-	full_patterns = set(core_patterns)
-	full_patterns.update([pattern for pattern in portage_data.configuration_get_pattern_required(profile_configuration).values()])
-	full_patterns.update([pattern for pattern in portage_data.configuration_get_pattern_required(user_configuration).values()])
+	requested_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
+	default_patterns = set(portage_data.configuration_get_pattern_required(profile_configuration).values())
+	default_patterns.update(portage_data.configuration_get_pattern_required(user_configuration).values())
 
 	use_selection = core_data.use_selection_create_from_uses_list(os.environ.get("USE", "").split())
-	return core_patterns, full_patterns, use_selection
+	return requested_patterns, default_patterns, use_selection
 
 
-def extends_pattern_repository_with_request(pattern_repository, core_patterns):
+def process_request(pattern_repository, id_repository, requested_patterns, default_patterns):
+	def local_function(pattern_repository, id_repository, patterns):
+		spls = set()
+		smt_constraint = []
+		for pattern in patterns:
+			local_spls = hyportage_pattern.pattern_repository_element_get_spls(
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))
+			smt_constraint.append(smt_encoding.smt_or(
+				smt_encoding.get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in local_spls])))
+			spls.update(local_spls)
+		return spls, smt_constraint
+	requested_spls, smt_constraint = local_function(pattern_repository, id_repository, requested_patterns)
+	all_spls, additional_smt_constraint = local_function(pattern_repository, id_repository, default_patterns)
+	smt_constraint.extend(additional_smt_constraint)
+	all_spls.update(requested_spls)
+	return smt_constraint, requested_spls, all_spls
+
+
+def extends_pattern_repository_with_request(pattern_repository, requested_patterns):
 	def dummy_setter(pattern_repository_element, boolean): pass
-	for pattern in core_patterns:
+	for pattern in requested_patterns:
 		hyportage_pattern.pattern_repository_add_pattern_from_configuration(pattern_repository, pattern, dummy_setter)
 
 
-def extends_id_repository_with_requested_use_flags(id_repository, installed_spls, user_request_spl, use_selection):
+def extends_id_repository_with_requested_use_flags(id_repository, installed_spls, requested_spls, use_selection):
 	for spl_name, use_selection in installed_spls.iteritems():
 		iuse_set = core_data.use_selection_get_positive(use_selection) | core_data.use_selection_get_negative(use_selection)
 		hyportage_ids.id_repository_extends_spl_iuse_list(id_repository, spl_name, iuse_set)
 	iuse_set = core_data.use_selection_get_positive(use_selection) | core_data.use_selection_get_negative(use_selection)
-	for spl in user_request_spl:
+	for spl in requested_spls:
 		hyportage_ids.id_repository_extends_spl_iuse_list(id_repository, hyportage_data.spl_get_name(spl), iuse_set)
 
 
-def apply_requested_use_selection(user_request_spl, use_selection):
-	for spl in user_request_spl:
+def apply_requested_use_selection(requested_spls, use_selection):
+	for spl in requested_spls:
 		new_use_selection = core_data.use_selection_apply_configuration(
 			hyportage_data.spl_get_use_selection_user(spl),
 			use_selection)
 		hyportage_data.spl_set_use_selection_user(spl, new_use_selection)
 
 
+##########################################################################
+# 2. CORE CONSTRAINT GENERATION AND SOLVING
+##########################################################################
+
+
+def get_smt_constraint_from_spls(spl_groups, spls):
+	res = [hyportage_data.spl_get_smt_constraint(spl) for spl in spls]
+	res.extend([
+		hyportage_data.spl_group_get_smt_constraint(spl_groups[spl_group_name])
+		for spl_group_name in {hyportage_data.spl_get_group_name(spl) for spl in spls}
+	])
+	return res
+
+
+def get_smt_variables_from_spls(pattern_repository, id_repository, spl_groups, spls):
+	local_spl_groups = [
+		spl_groups[spl_group_name]
+		for spl_group_name in {hyportage_data.spl_get_group_name(spl) for spl in spls}]
+
+	smt_variable_spls = {  # spls in the list
+		smt_encoding.get_smt_variable_spl_name(id_repository, hyportage_data.spl_get_name(spl))
+		for spl_group in local_spl_groups
+		for spl in hyportage_data.spl_group_get_references(spl_group)}
+
+	smt_variable_use_flags = {
+		smt_encoding.get_smt_variable_use_flag(id_repository, hyportage_data.spl_get_name(spl), use_flag)
+		for spl in spls
+		for use_flag in hyportage_data.spl_get_iuses_user(spl)
+	}
+	smt_variable_use_flags.update({  # add the use flags of the dependencies
+		smt_encoding.get_smt_variable_use_flag(id_repository, hyportage_data.spl_get_name(dep_spl), use_flag)
+		for spl in spls
+		for pattern, use_flags in hyportage_data.spl_get_dependencies(spl).iteritems()
+		for dep_spl in hyportage_pattern.pattern_repository_element_get_spls(hyportage_pattern.pattern_repository_get(pattern_repository, pattern))
+		for use_flag in use_flags})
+
+	return smt_variable_spls | smt_variable_use_flags
+
+
+def get_preferences_from_use_selection(id_repository, spl_name, use_selection):
+	def local_function(id_repository, spl_name, use_flags):
+		if use_flags:
+			return " + ".join([
+				smt_encoding.get_smt_int_use_flag(id_repository, spl_name, use_flag)
+				for use_flag in use_flags])
+		else:
+			return None
+	res_positive = local_function(id_repository, spl_name, core_data.use_selection_get_positive(use_selection))
+	res_negative = local_function(id_repository, spl_name, core_data.use_selection_get_negative(use_selection))
+	if res_negative:
+		res_negative = " - (" + res_negative + ")"
+		return (res_positive + res_negative) if res_positive else res_negative
+	return res_positive
+
+
+def get_preferences_from_spl_use_selection(id_repository, spl):
+	return get_preferences_from_use_selection(
+		id_repository, hyportage_data.spl_get_name(spl), hyportage_data.spl_get_use_selection_user(spl))
+
+
+def get_preferences_from_spls_use_selection(id_repository, spls):
+	res = []
+	for spl in spls:
+		v = get_preferences_from_spl_use_selection(id_repository, spl)
+		if v: res.append(v)
+	return res
+
+
+def get_preferences_initial(id_repository, mspl, installed_spls, spls):
+	pref_spls = " + ".join([
+		smt_encoding.get_smt_int_spl_name(id_repository, spl_name)
+		for spl_name in installed_spls.keys()
+		if not hyportage_data.spl_is_deprecated(mspl[spl_name])])
+	if pref_spls != "":
+		pref_use_selection = []
+		for spl_name, use_selection in installed_spls:
+			if not hyportage_data.spl_is_deprecated(mspl[spl_name]):
+				tmp = get_preferences_from_use_selection(id_repository, spl_name, use_selection)
+				if tmp:
+					pref_use_selection.append(tmp)
+		res = ([pref_spls, " + ".join(pref_use_selection)] if pref_use_selection else [pref_spls])
+	else: res = []
+
+	if spls:
+		local_sum = " + ".join([
+			smt_encoding.get_smt_int_spl_name(id_repository, hyportage_data.spl_get_name(spl))
+			for spl in installed_spls.keys()])
+		res.append(" - (" + local_sum + ")")
+	return res
+
+
+def get_smt_variables_from_installed_spls(id_repository, installed_spls):
+	res = []
+	for spl_name, use_selection in installed_spls.iteritems():
+		res.append(smt_encoding.get_smt_variable_spl_name(id_repository, spl_name))
+		res.extend([
+			smt_encoding.get_smt_variable_use_flag(id_repository, spl_name, use_flag)
+			for use_flag in core_data.use_selection_get_positive(use_selection)])
+	return res
+
+
+def get_better_constraint_visualization(id_repository, mspl, constraints):
+	ls = []
+	parser = SmtLib20Parser()
+	for i in constraints:
+		f = cStringIO.StringIO(i)
+		script = parser.get_script(f)
+		f.close()
+		formula = script.get_last_formula()
+		formula = pysmt.shortcuts.to_smtlib(formula, daggify=False)
+		# # translate contexts
+		# nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
+		# for i in nums:
+		#     num = int(i)
+		#     env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
+		#     assert len(env) == 1
+		#     formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
+		# translate packages
+		where_declared = "user-required: "
+		pkgs = set(re.findall('p([0-9]+)', formula))
+		for pkg in pkgs:
+			name = id_repository.ids[pkg][1]
+			formula = re.sub('p' + pkg,name,formula)
+			if i in hyportage_data.spl_get_smt_constraint(mspl[name]):
+				where_declared = name + ": "
+
+		# translate uses
+		uses = set(re.findall('u([0-9]+)', formula))
+		for use in uses:
+			formula = re.sub('u' + use, id_repository.ids[pkg][2] + "[[" + id_repository.ids[pkg][1] + "]]", formula)
+		ls.append(where_declared + formula)
+	return ls
+
+
+def run_hyvarrec(id_repository, mspl, data, par, explain_modality):
+	"""
+	Run hyvar locally assuming that there is a command hyvar-rec
+	"""
+	file_name = utils.get_new_temp_file("json")
+	with open(file_name, "w") as f:
+		json.dump(data, f)
+	cmd = ["hyvar-rec", "--features-as-boolean"]
+	if par > 1:	cmd += ["-p", unicode(par)]
+	if explain_modality: cmd.append("--explain")
+	cmd.append(file_name)
+
+	utils.phase_start("Running " + unicode(cmd))
+	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	out, err = process.communicate()
+	logging.debug('Stderr of ' + unicode(cmd))
+	logging.debug(err)
+	logging.debug('Return code of ' + unicode(cmd) + ': ' + str(process.returncode))
+	utils.phase_end("Execution ended")
+
+	res = json.loads(out)
+	if res["result"] != "sat":
+		if explain_modality:
+			# try to print a better explanation of the constraints
+			constraints = get_better_constraint_visualization(res["constraints"], mspl, id_repository)
+			sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
+		logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
+		sys.exit(1)
+	logging.debug("HyVarRec output: " + unicode(res))
+
+	return res['features']
+
+
+def update_to_install_spls(id_repository, mspl, to_install_spls, feature_list):
+	spl_names = []
+	use_flags = []
+	for feature in feature_list:
+		el = hyportage_ids.id_repository_get_ids(id_repository)[smt_encoding.get_id_from_smt_variable(feature)]
+		if el[0] == "package":  # el = ("package", spl_name)
+			spl_names.append(el[1])
+		else:  # el = ("use", use, spl_name)
+			use_flags.append((el[1], el[2]))
+
+	for spl_name in spl_names:
+		if spl_name not in to_install_spls:
+			to_install_spls[spl_name] = core_data.use_selection_invert(
+				core_data.use_selection_create_from_uses_list(hyportage_data.spl_get_iuses_user(mspl[spl_name])))
+	for spl_name, use_flag in use_flags:
+		if spl_name not in to_install_spls:
+			logging.error(
+				"The output of hyvar-rec selected the use flag " + use_flag
+				+ " but its package " + spl_name + " was not selected.")
+		else:
+			core_data.use_selection_add(to_install_spls[spl_name], use_flag)
+
+
+##########################################################################
+# 3. MONOLITHIC CONFIGURATION SEARCH
+##########################################################################
+
+
+def next_spls(pattern_repository, spl):
+	res = set()
+	for pattern in hyportage_data.spl_get_dependencies(spl).keys():
+		res.update(hyportage_pattern.pattern_repository_element_get_spls(
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern)))
+	return res
+
+
+def get_dependency_transitive_closure(pattern_repository, spls):
+	nexts = spls
+	res = set()
+	while len(nexts) > 0:
+		accu = set()
+		for spl in nexts:
+			spl.visited = True
+			res.add(spl)
+			accu.update(next_spls(pattern_repository, spl))
+		nexts = filter(lambda spl: not hyportage_data.spl_is_visited(spl), accu)
+	return res
+
+
+def get_hyvarrec_input_monolithic(
+		pattern_repository, id_repository, mspl, spl_groups, installed_spls,
+		all_spls, smt_constraint, par, explain_modality):
+	data = {
+			"attributes": [],             # attributes of the features (empty in our case)
+			"contexts": [],               # contexts to consider (empty in our case)
+			"configuration": {            # current configuration (list of selected features)
+				"selectedFeatures": [],
+				"attribute_values": [],
+				"context_values": []},
+			"constraints": [],            # constraints to fill in hyvarrec format (empty in our case for efficiency)
+			"preferences": [],            # preferences in hyvarrec format
+			"smt_constraints": {          # constraints, in smt format
+				"formulas": [],
+				"features": [],
+				"other_int_symbols": []}
+		}
+	# get the transitive closure of the dependency
+	dep_spls = get_dependency_transitive_closure(
+		pattern_repository, all_spls | {mspl[spl_name] for spl_name in installed_spls.keys()})
+	# setup the constraint
+	data['smt_constraints']['formulas'] = smt_constraint
+	data['smt_constraints']['formulas'].extend(get_smt_constraint_from_spls(spl_groups, dep_spls))
+	# setup the preferences
+	data['preferences'] = get_preferences_initial(id_repository, mspl, installed_spls, dep_spls)
+	data['preferences'].extend(get_preferences_from_spls_use_selection(id_repository, dep_spls))
+	# setup the initial configuration
+	data['configuration']['selectedFeatures'] = get_smt_variables_from_installed_spls(id_repository, installed_spls)
+
+	# execute hyvar-rec
+	feature_list = run_hyvarrec(id_repository, mspl, data, par, explain_modality)
+	to_install_spls = core_data.package_installed_create()
+	update_to_install_spls(id_repository, mspl, to_install_spls, feature_list)
+	return to_install_spls
+
+
+##########################################################################
+# 4. INCREMENTAL CONFIGURATION SEARCH
+##########################################################################
+
+# TODO
+
+##########################################################################
+# 5. SCRIPT AND CONFIGURATION FILES GENERATION
+##########################################################################
+
+
+def generate_emerge_script_file(path_install_script, installed_spls, to_install_spls):
+	installed_spl_names = installed_spls.keys()
+	to_install_spl_names = to_install_spls.keys()
+
+	added_spl_names = set()
+	updated_spl_names = set()
+	for spl_name in to_install_spl_names:
+		if spl_name in installed_spl_names:
+			if installed_spls[spl_name] != to_install_spls[spl_name]:
+				updated_spl_names.add(spl_name)
+		else:
+			added_spl_names.add(spl_name)
+	emerge_spl_names  = added_spl_names | updated_spl_names
+	unmerge_spl_names = installed_spl_names.difference(to_install_spl_names)
+
+	with open(path_install_script, 'w') as f:
+		f.write("#!/bin/bash\n")
+		f.write()
+		f.write("# File auto-generated by the hyportage tool")
+		f.write("# Do not update, any modification on this file will will overwritten by the tool")
+		f.write()
+		if emerge_spl_names:
+			f.write("emerge -a --newuse " + " ".join(["=" + spl_name for spl_name in emerge_spl_names]) + "\n")
+		if unmerge_spl_names:
+			f.write("emerge --unmerge " + " ".join(["=" + spl_name for spl_name in unmerge_spl_names]) + "\n")
+
+
+def generate_package_use_file(path_use_flag_configuration, to_install_spls):
+	with open(path_use_flag_configuration, 'w') as f:
+		f.write("# File auto-generated by the hyportage tool")
+		f.write("# Do not update, any modification on this file will will overwritten by the tool")
+		f.write()
+		for spl_name, use_selection in to_install_spls.iteritems():
+			string = "=" + spl_name + " "
+			string = string + " ".join(core_data.use_selection_get_positive(use_selection))
+			string = string + " -".join(core_data.use_selection_get_negative(use_selection))
+			f.write(string)
+		f.write()
 
 
 
+###############################################################################
+###############################################################################
+###############################################################################
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+"""
 def load_request_file(file_name, pattern_repository, id_repository, mspl, spl_groups, core_configuration):
-	"""
-	Parses the request file which is composed by one or more dependencies
-	"""
 	with open(file_name, "r") as f:
 		lines = f.readlines()
 
@@ -121,12 +428,6 @@ def load_request_file(file_name, pattern_repository, id_repository, mspl, spl_gr
 	# returns the spl_group_names referenced in the request and the smt constraints corresponding to the request
 
 # def load_configuration_file(file_name):
-#     """
-#     returns the mapping between the packages installed and their use selected
-#     :param file_name:
-#     :param id_repository:
-#     :return:
-#     """
 #     with open(file_name,"r") as f:
 #         lines = f.readlines()
 #     initial_configuration = {}
@@ -141,9 +442,6 @@ def load_request_file(file_name, pattern_repository, id_repository, mspl, spl_gr
 
 
 def run_hyvar(json_data, par, explain_modality):
-	"""
-	Run hyvar locally assuming that there is a command hyvar-rec
-	"""
 	file_name = utils.get_new_temp_file("json")
 	with open(file_name, "w") as f:
 		json.dump(json_data, f)
@@ -168,9 +466,6 @@ def run_hyvar(json_data, par, explain_modality):
 	return json.loads(out)
 
 # def run_remote_hyvar(json_data,url):
-#     """
-#     Run hyvar
-#     """
 #     logging.debug("Invoking service at url " + url)
 #     response = requests.post(url + "/explain",
 #                              data=json.dumps(json_data),
@@ -207,9 +502,6 @@ def create_hyvarrec_spls(package_request,
 						 mspl,
 						 spl_groups,
 						 id_repository):
-	"""
-	Given a list of packages it creates its hyvarrec SPL
-	"""
 
 	spls = {}
 
@@ -230,19 +522,19 @@ def create_hyvarrec_spls(package_request,
 
 	jsons = []
 	for i in spls:
-		data = {"attributes": [],
-				"contexts": [],
+		data = {"attributes": [],  # attributes of the features (empty in our case)
+				"contexts": [],  # contexts to consider (empty in our case)
 					# {"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
 					#           "min": 0,
 					#           "max": len(map_name_id["context_int"])-1}],
-				"configuration": {
+				"configuration": {  # current configuration (list of selected features)
 					"selectedFeatures": [],
 					"attribute_values": [],
 					"context_values": []},
 					# "context_values": [{"id": "context[" + utils.CONTEXT_VAR_NAME + "]",
 					#                     "value": map_name_id["context_int"][contex_value]}]},
-				"constraints": [],
-				"preferences": [],
+				"constraints": [],  # constraints to fill in hyvarrec format (empty in our case for efficiency)
+				"preferences": [],  # preferences in hyvarrec format
 				"smt_constraints": {
 					"formulas": [],
 					"features": [],
@@ -264,13 +556,13 @@ def create_hyvarrec_spls(package_request,
 				for k in initial_configuration[j][0]:
 					if k in hyportage_ids.id_repository_get_use_flag_from_spl_name(id_repository,j):
 						data["configuration"]["selectedFeatures"].append(
-							smt_encoding.get_hyvar_use(id_repository,j,k))
+							smt_encoding.get_smt_int_use_flag(id_repository, j, k))
 					else:
 						logging.warning("The initial flag " + k + " was not available for the package " + j)
 
 		# add preferences: do not remove packages already installed
 		data["preferences"].append( " + ".join(
-			[smt_encoding.get_hyvar_spl_name(id_repository,pkg) for pkg in initial_configuration
+			[smt_encoding.get_smt_int_spl_name(id_repository, pkg) for pkg in initial_configuration
 			 if pkg in spls[i]]))
 
 		logging.debug("SPL created : constraints " + unicode(len(data["constraints"])) +
@@ -297,32 +589,8 @@ def create_hyvarrec_spls(package_request,
 
 
 
-def update_configuration(hyvarrec_out,configuration,id_repository):
-	pkgs = []
-	flags = []
-	for i in hyvarrec_out["features"]:
-		el = hyportage_ids.id_repository_get_ids(id_repository)[i[1:]]
-		if el[0] == "package": # el = ("package", spl_name)
-			pkgs.append(el[1])
-		else: # el = ("use", use, spl_name)
-			flags.append((el[2],el[0]))
 
-	for p in pkgs:
-		if p not in configuration:
-			configuration[p] = []
-	for p,f in flags:
-		if p not in configuration:
-			logging.error("The output of hyvar-rec sets the flag " + f + " but its package " + p +
-						  " was not selected.")
-		else:
-			configuration[p].append(f)
-
-
-def get_diff_configuration(new_conf,old_conf):
-	"""
-	Compute the diff from the intial configuration
-	Assumes that in new_conf there are not spl_group packages
-	"""
+def get_diff_configuration(new_conf, old_conf):
 	data = {"toUpdate": {}, "toInstall": {}, "toRemove": {}}
 	for i in new_conf:
 		if i in old_conf:
@@ -336,7 +604,7 @@ def get_diff_configuration(new_conf,old_conf):
 	return data
 
 
-def get_conf_with_negative_use_flags(conf,map_name_id):
+def get_conf_with_negative_use_flags(conf, map_name_id):
 	data = {}
 	for i in conf.keys():
 		all_flags = map_name_id["flag"][i].keys()
@@ -347,37 +615,6 @@ def get_conf_with_negative_use_flags(conf,map_name_id):
 	return data
 
 
-def get_better_constraint_visualization(constraints,mspl,id_repository):
-	ls = []
-	parser = SmtLib20Parser()
-	for i in constraints:
-		f = cStringIO.StringIO(i)
-		script = parser.get_script(f)
-		f.close()
-		formula = script.get_last_formula()
-		formula = pysmt.shortcuts.to_smtlib(formula,daggify=False)
-		# # translate contexts
-		# nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
-		# for i in nums:
-		#     num = int(i)
-		#     env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
-		#     assert len(env) == 1
-		#     formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
-		# translate packages
-		where_declared = "user-required: "
-		pkgs = set(re.findall('p([0-9]+)',formula))
-		for pkg in pkgs:
-			name = id_repository.ids[pkg][1]
-			formula = re.sub('p' + pkg,name,formula)
-			if i in hyportage_data.spl_get_smt_constraint(mspl[name]):
-				where_declared = name + ": "
-
-		# translate uses
-		uses = set(re.findall('u([0-9]+)', formula))
-		for use in uses:
-			formula = re.sub('u' + use, id_repository.ids[pkg][2] + "[[" + id_repository.ids[pkg][1] + "]]", formula)
-		ls.append(where_declared + formula)
-	return ls
 
 
 
@@ -432,23 +669,7 @@ def main(
 		url,
 		par,
 		save_modality):
-	"""
-	Uses HyVarRec to produce a valid configuration of packages to install.
 
-	INPUT_DIR Input directory containing the hyvar mspl json translation files
-
-	REQUEST_FILE File containing the request
-
-	CONFIGURATION_FILE File containing the current configuration
-
-	NEW_CONFIGURATION_FILE File containing the new_configuration_file that will be generated
-
-	PACKAGE_USE_FILE File containing the package.use file that will be generated and copied into the guest
-
-	EMERGE_COMMANDS_FILE File containing the script to run in the guest to generate the configuration
-
-	Exampe: python reconfigure.py -v --save-modality marshal --environment amd64 ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec ../../../git ../../../host/configuration/json/configuration.json ../../../host/configuration/json/new_configuration.json ../../../host/configuration/package.use ../../../host/configuration/update.sh 2>&1 | tee log1.log
-	"""
 
 	##########################################################################
 	# 1. OPTIONS
@@ -575,3 +796,5 @@ def main(
 
 if __name__ == "__main__":
 	main()
+	
+"""

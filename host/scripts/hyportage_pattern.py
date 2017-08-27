@@ -317,6 +317,16 @@ def pattern_repository_local_map_get_spl_required_use(pattern_repository_element
 	return res
 
 
+##
+
+def pattern_repository_local_map_to_save_format(pattern_repository_element):
+	return [ { 'pattern': pattern_to_save_format(pattern), 'data': pattern_repository_element_to_save_format(element) } for pattern, element in pattern_repository_element.iteritems() ]
+
+
+def pattern_repository_local_map_from_save_format(save_format, mspl):
+	return { pattern_from_save_format(save_formal_element['pattern']): pattern_repository_element_from_save_format(save_formal_element['data'], mspl)  for save_formal_element in save_format }
+
+
 ######################################################################
 # PATTERN REPOSITORY
 
@@ -425,7 +435,8 @@ def is_pattern_in_pattern_repository(pattern_repository, pattern):
 
 
 def pattern_repository_get(pattern_repository, pattern):
-	if pattern_is_package_group_specific(pattern): return pattern_repository_local_map_get(pattern_repository[0][pattern_get_package_group(pattern)], pattern)
+	if pattern_is_package_group_specific(pattern):
+		return pattern_repository_local_map_get(pattern_repository[0][pattern_get_package_group(pattern)], pattern)
 	else: return pattern_repository_local_map_get(pattern_repository[1], pattern)
 
 
@@ -443,21 +454,22 @@ def pattern_repository_get_pattern_from_spl_group_name(pattern_repository, spl_g
 	for pattern in pattern_repository[1].keys():
 		if match_only_package_group(pattern, spl_group_name): res.add(pattern)
 	return res
+
+
 ##
 
-def pattern_repository_local_map_to_save_format(pattern_repository_element):
-	return [ { 'pattern': pattern_to_save_format(pattern), 'data': pattern_repository_element_to_save_format(element) } for pattern, element in pattern_repository_element.iteritems() ]
-
-
 def pattern_repository_to_save_format(pattern_repository):
-	return { 'package_specific': { k: pattern_repository_local_map_to_save_format(local_map) for k, local_map in pattern_repository[0].iteritems() },  'global_patterns': pattern_repository_local_map_to_save_format(pattern_repository[1]) }
-
-
-def pattern_repository_local_map_from_save_format(save_format, mspl):
-	return { pattern_from_save_format(save_formal_element['pattern']): pattern_repository_element_from_save_format(save_formal_element['data'], mspl)  for save_formal_element in save_format }
+	return {
+		'package_specific': {
+			k: pattern_repository_local_map_to_save_format(local_map)
+			for k, local_map in pattern_repository[0].iteritems() },
+		'global_patterns': pattern_repository_local_map_to_save_format(pattern_repository[1]) }
 
 
 def pattern_repository_from_save_format(save_format, mspl):
-	return ( { k: pattern_repository_local_map_from_save_format(sf_local_map, mspl) for k, sf_local_map in save_format['package_specific'].iteritems() }, pattern_repository_local_map_from_save_format(save_format['global_patterns'], mspl) )
+	return ( {
+			k: pattern_repository_local_map_from_save_format(sf_local_map, mspl)
+			for k, sf_local_map in save_format['package_specific'].iteritems() },
+		pattern_repository_local_map_from_save_format(save_format['global_patterns'], mspl) )
 
 

@@ -334,8 +334,8 @@ def use_selection_from_save_format(save_format):
 package_installed_create = dict_configuration_create
 
 
-def package_installed_set(package_installed, package_name, use_configuration):
-	return dict_configuration_add(package_installed, package_name, use_configuration)
+def package_installed_set(package_installed, package_name, use_selection):
+	return dict_configuration_add(package_installed, package_name, use_selection)
 
 
 def package_installed_to_save_format(package_installed):
