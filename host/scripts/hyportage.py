@@ -129,12 +129,16 @@ def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_
 	help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')
 @click.option(
 	'--save-modality',
-	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="gzjson",
+	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="pickle",
 	help='Saving modality. Marshal is supposed to be faster but python version specific.')
 @click.option(
 	'--mode',
 	type=click.Choice(["update", "emerge"]), default="update",
 	help='Temporary option that states if the tool is used in translate mode or reconfigure mode.')
+@click.option(
+	'--explain-modality',
+	is_flag=True,
+	help='Execution modality that tried to explain why a request can not be satisfied.')
 @click.argument(
 	'atoms',
 	nargs=-1)
@@ -151,6 +155,7 @@ def main(
 		simplify_mode,
 		save_modality,
 		mode,
+		explain_modality,
 		atoms):
 	"""
 	Tool that converts the gentoo files
@@ -297,7 +302,7 @@ def main(
 	##########################################################################
 
 	if todo_emerge:
-		explain_modality = verbose >= 3
+		# explain_modality = verbose >= 3
 		# compute what to install
 		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
 			atoms, profile_configuration, user_configuration)
@@ -308,6 +313,7 @@ def main(
 		reconfigure.extends_pattern_repository_with_request(pattern_repository, requested_patterns)
 
 		# adds the user required iuses to the id_repository
+		# todo: ask Michael why he treats current iuses as the one required by the user - same priority???
 		reconfigure.extends_id_repository_with_requested_use_flags(
 			id_repository, installed_spls, requested_spls, use_selection)
 

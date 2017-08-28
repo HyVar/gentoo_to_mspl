@@ -50,6 +50,7 @@ def process_request(pattern_repository, id_repository, requested_patterns, defau
 	def local_function(pattern_repository, id_repository, patterns):
 		spls = set()
 		smt_constraint = []
+		# todo: ask michael if the or works when the pattern is a conflict
 		for pattern in patterns:
 			local_spls = hyportage_pattern.pattern_repository_element_get_spls(
 				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))
@@ -61,6 +62,7 @@ def process_request(pattern_repository, id_repository, requested_patterns, defau
 	all_spls, additional_smt_constraint = local_function(pattern_repository, id_repository, default_patterns)
 	smt_constraint.extend(additional_smt_constraint)
 	all_spls.update(requested_spls)
+	# todo smt constraint need to be string - not z3 constraints
 	return smt_constraint, requested_spls, all_spls
 
 
@@ -156,6 +158,8 @@ def get_preferences_from_spls_use_selection(id_repository, spls):
 
 
 def get_preferences_initial(id_repository, mspl, installed_spls, spls):
+	# todo: preferences needs to be written using standard hyvarrec format
+	# todo: decide the priority of preferences (remove less packages installed as possible, keep more use flags used as possible, minimize number of new packages to install, minimize number of flags install in new packages)?
 	pref_spls = " + ".join([
 		smt_encoding.get_smt_int_spl_name(id_repository, spl_name)
 		for spl_name in installed_spls.keys()
@@ -333,6 +337,7 @@ def get_hyvarrec_input_monolithic(
 	data['configuration']['selectedFeatures'] = get_smt_variables_from_installed_spls(id_repository, installed_spls)
 
 	# execute hyvar-rec
+	# todo handle explain modality when the answer is unsat
 	feature_list = run_hyvarrec(id_repository, mspl, data, par, explain_modality)
 	to_install_spls = core_data.package_installed_create()
 	update_to_install_spls(id_repository, mspl, to_install_spls, feature_list)
