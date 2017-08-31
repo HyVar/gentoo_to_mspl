@@ -143,11 +143,13 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 
 class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
-	def __init__(self, pattern_repository, id_repository, spl_name):
+	def __init__(self, pattern_repository, id_repository, mspl, spl_groups, spl_name):
 		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
 		self.id_repository = id_repository
-		self.spl_name = spl_name
 		self.pattern_repository = pattern_repository
+		self.mspl = mspl
+		self.spl_groups = spl_groups
+		self.spl_name = spl_name
 
 	# def CombineValue(self, value1, value2):
 	#     return value1
@@ -221,7 +223,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
 		# print(str(ctx['atom']))
 		spls = hyportage_pattern.pattern_repository_element_get_spls_visible(
-			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']))
+			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']), self.mspl, self.spl_groups)
 		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
 		if spl_names:
 			# decompact compact forms
@@ -286,14 +288,14 @@ def simplify_constraints(spl_name, constraints, simplify_mode):
 		return [toSMT2(x) for x in formulas]
 
 
-def convert_spl(pattern_repository, id_repository, spl, simplify_mode):
+def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simplify_mode):
 	spl_name = hyportage_data.spl_get_name(spl)
 	spl_id = get_smt_spl_name(id_repository, spl_name)
-	logging.debug("Processing spl " + spl_name)
+	#logging.debug("Processing spl " + spl_name)
 	constraints = []
 	# print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
 	# 1. convert feature model
-	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, spl_name)
+	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, mspl, spl_groups, spl_name)
 	for constraint in map(visitor.visitRequiredEL, hyportage_data.spl_get_fm_local(spl)):
 		constraints.append(z3.Implies(spl_id, constraint))
 	for constraint in map(visitor.visitDependEL, hyportage_data.spl_get_fm_combined(spl)):

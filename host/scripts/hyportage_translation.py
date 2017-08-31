@@ -120,11 +120,11 @@ def update_pattern_repository_with_spl_diff(pattern_repository, mspl, spl_groups
 		pattern_removed.update(hyportage_pattern.pattern_repository_remove_pattern_from_spl(
 			pattern_repository, old_spl))
 
-	for new_spl in spl_added_full:
-		pattern_updated.update(hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl))
-	for old_spl in spl_removed_full:
-		pattern_updated.update(hyportage_pattern.pattern_repository_remove_spl(pattern_repository, old_spl))
-	pattern_updated.difference_update(pattern_added)
+	#for new_spl in spl_added_full:
+	#	pattern_updated.update(hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl))
+	#for old_spl in spl_removed_full:
+	#	pattern_updated.update(hyportage_pattern.pattern_repository_remove_spl(pattern_repository, old_spl))
+	#pattern_updated.difference_update(pattern_added)
 
 	utils.phase_end("Updating completed")
 	return pattern_added, pattern_updated, pattern_removed
@@ -181,14 +181,16 @@ def update_keywords_ids(id_repository, path_keywords):
 	utils.phase_end("Regeneration completed")
 
 
-def initialize_iuse_flags(pattern_repository, spl_added_full, pattern_added, pattern_updated, pattern_removed):
+def initialize_iuse_flags(
+		pattern_repository, mspl, spl_groups,
+		spl_added_full, pattern_added, pattern_updated, pattern_removed):
 	utils.phase_start("Resetting the spls' use flag list.")
 	spl_iuse_to_update = set(spl_added_full)
 	spl_iuse_to_update.update([
 		spl
 		for pattern in pattern_added | pattern_updated | pattern_removed
 		for spl in hyportage_pattern.pattern_repository_element_get_spls(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern))])
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)])
 	for spl in spl_iuse_to_update:
 		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
 
@@ -240,13 +242,14 @@ def update_smt_constraints(
 			spl
 			for pattern in pattern_added | pattern_updated | pattern_removed | pattern_visibility
 			for spl in hyportage_pattern.pattern_repository_element_get_spls(
-				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))])
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)])
 		spl_groups_to_update = [
 			spl_groups[spl_group_name]
 			for spl_group_name in set([hyportage_data.spl_get_group_name(spl) for spl in spls_to_update])]
 
 	spl_smts = map(
-		lambda spl: smt_encoding.convert_spl(pattern_repository, id_repository, spl, simplify_mode), spls_to_update)
+		lambda spl: smt_encoding.convert_spl(
+			pattern_repository, id_repository, mspl, spl_groups, spl, simplify_mode), spls_to_update)
 	spl_group_smts = map(
 		lambda spl_group: smt_encoding.convert_spl_group(id_repository, spl_group, simplify_mode), spl_groups_to_update)
 

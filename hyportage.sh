@@ -33,6 +33,19 @@ HOST_HOST_GEN_DIR="${LOCAL_DIR}/host/data/hyportage"
 
 HOST_EMERGE_SCRIPT_DIR="${LOCAL_DIR}/host/data/install"
 
+# set PYTHONPATH so it would work on linux and windows
+if [ -n "${WINDIR}" ]; then
+	PATH_SEPARATOR=";"
+else
+	PATH_SEPARATOR=":"
+fi
+
+if [ -n "${PYTHONPATH}" ]; then
+	LOCAL_PYTHONPATH="${HOST_GUEST_INSTALL_DIR}${PATH_SEPARATOR}${PYTHONPATH}"
+else
+	LOCAL_PYTHONPATH="${HOST_GUEST_INSTALL_DIR}"
+fi
+
 ######################################################################
 ### BASE FUNCTIONS
 ######################################################################
@@ -105,13 +118,14 @@ function clean_host {
 
 function translate {
 	shift 1
-	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}:${PYTHONPATH}" python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update $@
+	export PYTHONPATH="${LOCAL_PYTHONPATH}"
+	python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update $@
 }
 
 function reconfigure {
 	shift 1
-	#export PYTHONPATH="${HOST_GUEST_INSTALL_DIR}":"${PYTHONPATH}"
-	PYTHONPATH="${HOST_GUEST_INSTALL_DIR}:${PYTHONPATH}" nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge $@
+	export PYTHONPATH="${LOCAL_PYTHONPATH}"
+	nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge $@
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 

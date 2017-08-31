@@ -1,4 +1,5 @@
 
+import sys
 import os
 import utils
 import logging
@@ -280,7 +281,7 @@ def main(
 
 		# finalize iuse list for the packages
 		spl_iuse_reset = hyportage_translation.initialize_iuse_flags(
-			pattern_repository, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
+			pattern_repository, mspl, spl_groups, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
 
 		# update the id repository
 		hyportage_translation.update_id_repository(
@@ -297,6 +298,8 @@ def main(
 			path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration,
 			installed_spls, save_modality)
 
+		return
+
 	##########################################################################
 	# 6. RUN RECONFIGURE IF NECESSARY
 	##########################################################################
@@ -307,10 +310,10 @@ def main(
 		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
 			atoms, profile_configuration, user_configuration)
 		smt_constraint, requested_spls, all_spls = reconfigure.process_request(
-			pattern_repository, id_repository, requested_patterns, default_patterns)
+			pattern_repository, id_repository, mspl, spl_groups, requested_patterns, default_patterns)
 
 		# extends the pattern repository with user-defined patterns
-		reconfigure.extends_pattern_repository_with_request(pattern_repository, requested_patterns)
+		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
 
 		# adds the user required iuses to the id_repository
 		# todo: ask Michael why he treats current iuses as the one required by the user - same priority???
@@ -329,185 +332,9 @@ def main(
 		reconfigure.generate_emerge_script_file(path_install_script, installed_spls, to_install_spls)
 		reconfigure.generate_package_use_file(path_use_flag_configuration, to_install_spls)
 
-
-"""
-	# compute the difference from the previous state
-
-	logging.info("Computing what to do.")
-	t = time.time()
-	last_update = 0.0
-
-	if os.path.exists(path_db_hyportage):
-		last_update = os.path.getmtime(path_db_hyportage)
-
-	must_apply_profile = (last_update < os.path.getmtime(path_profile_configuration))
-	must_apply_user = (last_update < os.path.getmtime(path_user_configuration))
-	must_regenerate_keywords_ids = (last_update < os.path.getmtime(path_keywords))
-	must_regenerate_installed_packages = (last_update < os.path.getmtime(path_installed_packages))
-
-	egencache_files = hyportage_from_egencache.get_egencache_files(path_egencache_packages)
-	if force:
-		patterns = [ hyportage_pattern.pattern_create_from_atom(atom) for atom in force.split() ]
-		def filter_function(path_file): return filter_egencache_file_full(path_file, last_update, patterns)
-	else:
-		def filter_function(path_file): return filter_egencache_file(path_file, last_update)
-	egencache_files_to_load = filter(filter_function, egencache_files)
-	logging.info("number of egencache files found: " + str(len(egencache_files)))
-	logging.info("number of egencache files to load: " + str(len(egencache_files_to_load)))
-
-	logging.info("Computation completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 3. UPDATE THE MSPL DATA IF NECESSARY
-	##########################################################################
-
-	nb_egencache_files_to_load = len(egencache_files_to_load)
-	if nb_egencache_files_to_load > 0:  # load new hyportage spls  from egencache files
-		logging.info("Loading the " + str(len(egencache_files_to_load)) + " egencache files.")
-		raw_spls = concurrent_map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
-		#raw_spls = map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
-		logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-	else: raw_spls = []
-
-	# load the full hyportage data, remove overwritten data and update the pattern_repository
-
-	logging.info("Loading the stored hyportage data.")
-	t = time.time()
-	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls =\
-		load_hyportage(path_db_hyportage, save_modality)
-	logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
-
-	logging.info("Updating the core hyportage data (pattern_repository, spl_groups).")
-	t = time.time()
-	package_to_add = []
-	package_to_update = []
-	for spl in raw_spls:
-		if hyportage_data.spl_get_name(spl) in mspl: package_to_update.append(spl)
-		else: package_to_add.append(spl)
-	package_name_to_remove = [
-		spl_name for spl_name in mspl.keys()
-		if spl_name not in set([hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files])]
-	package_update_info = (
-		[ (hyportage_data.spl_get_name(spl), spl) for spl in package_to_update ]
-		+ [ (el, None) for el in package_name_to_remove ])
-
-	spl_groups_removed = []
-	spl_groups_added = []
-	# add the added spls
-	for new_spl in package_to_add:
-		hyportage_data.mspl_add_spl(mspl, new_spl)
-		added_group = hyportage_data.spl_groups_add_spl(spl_groups, new_spl)
-		if added_group is not None: spl_groups_added.append(added_group)
-		hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl)
-	for new_spl in package_to_add:
-		for pattern, required_use in hyportage_data.spl_get_dependencies(new_spl).iteritems():
-			hyportage_pattern.pattern_repository_add_pattern(pattern_repository, mspl, spl_groups, pattern, required_use)
-	# update or removed the updated spls
-	for package_name, new_spl in package_update_info:  # remove the removed spls, and update the updated ones
-		old_spl = mspl.pop(package_name)
-		# update pattern repository
-		if new_spl:
-			hyportage_pattern.pattern_repository_update(pattern_repository, old_spl, new_spl)
-			hyportage_data.spl_groups_replace_spl(spl_groups, old_spl, new_spl)
-		else:
-			hyportage_pattern.pattern_repository_remove(pattern_repository, old_spl)
-			removed_group = hyportage_data.spl_groups_remove_spl(spl_groups, old_spl)
-			if removed_group is not None: spl_groups_removed.append(removed_group)
-			# remove entries from id repository: must be entierly re-generated
-			hyportage_ids.id_repository_remove_spl(id_repository, old_spl)
-
-	# update the spls required iuse list, for the new spls and the old ones, and regenerate the ids
-	spl_updated_iuses = set(raw_spls)
-	for spl in raw_spls:
-		for pattern, iuses in hyportage_data.spl_get_dependencies(spl).iteritems():
-			el = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)  # hmm, did I forget to update the pattern repository at that point?
-			spl_updated_iuses.update(hyportage_pattern.pattern_repository_element_get_spls(el))
-
-	logging.info("Update completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 4. REGENERATE THE KEYWORD IDS IF NECESSARY
-	##########################################################################
-
-	if must_regenerate_keywords_ids:
-		logging.info("Regenerating the keyword list")
-		t = time.time()
-		keywords_list = portage_data.keyword_set_from_save_format(utils.load_data_file(path_keywords, "json"))
-		hyportage_ids.id_repository_set_keywords(id_repository, keywords_list)
-		logging.info("Regeneration completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 5. APPLY THE CONFIGURATION IF NECESSARY
-	##########################################################################
-
-	logging.info("Applying the configuration if necessary")
-	t = time.time()
-	new_spls_loaded = len(raw_spls) > 0
-	if new_spls_loaded or must_apply_profile:
-		conf_profile = portage_data.configuration_from_save_format(utils.load_data_file(path_profile_configuration, "json"))
-	else: conf_profile = None
-	if new_spls_loaded or must_apply_user:
-		conf_user = portage_data.configuration_from_save_format(utils.load_data_file(path_user_configuration, "json"))
-	else: conf_user = None
-	if (conf_profile is not None) or (conf_user is not None):
-		spl_modified_data, spl_modified_visibility = hyportage_configuration.apply_configurations(
-			core_configuration, conf_profile, conf_user, must_apply_profile, must_apply_user,
-			raw_spls, mspl, spl_groups, pattern_repository)
-	logging.info("Application completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 6. REGENERATE THE IDS IF NECESSARY
-	##########################################################################
-
-	logging.info("Generating the ids if necessary")
-	t = time.time()
-	for spl in spl_updated_iuses:
-		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
-		hyportage_ids.id_repository_add_spl(id_repository, spl)
-
-	for spl_group in spl_groups_removed:
-		hyportage_ids.id_repository_remove_spl_group(id_repository, spl_group)
-	for spl_group in spl_groups_added:
-		hyportage_ids.id_repository_add_spl_group(id_repository, spl_group)
-	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 7. GENERATE THE SMT CONSTRAINTS
-	##########################################################################
-	
-	logging.info("Generating the SMT Constraints")
-	t = time.time()
-	# generate everything for now: laziness for the win
-	spl_smts = map(
-		lambda spl: smt_encoding.convert_spl(pattern_repository, id_repository, spl, simplify_mode), mspl.values())
-	spl_group_smts = map(
-		lambda spl_group: smt_encoding.convert_spl_group(id_repository, spl_group, simplify_mode), spl_groups.values())
-
-	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
-	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
-	logging.info("Generation completed in " + unicode(time.time() - t) + " seconds.")
-
-	##########################################################################
-	# 7. REGENERATE THE INSTALLED PACKAGE INFORMATION IF NECESSARY
-	##########################################################################
-
-	if must_regenerate_installed_packages:
-		installed_spls = core_data.package_installed_from_save_format(utils.load_data_file(path_installed_packages, "json"))
-
-	##########################################################################
-	# 8. WRITE THE FILES
-	##########################################################################
-
-	logging.info("Saving the hyportage data")
-	t = time.time()
-	save_hyportage(
-		path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups,
-		core_configuration, installed_spls, save_modality)
-	logging.info("Saving completed in " + unicode(time.time() - t) + " seconds.")"""
-
-
 ##
 
 if __name__ == "__main__":
 	main()
+	print("14")
 

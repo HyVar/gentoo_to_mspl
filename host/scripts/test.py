@@ -1,17 +1,12 @@
 #!/usr/bin/python
 
 import os.path
-import json
-import multiprocessing
-import time
-import re
-import timeit
-
-import hyportage_from_egencache
 
 import utils
+import hyportage
 import hyportage_data
 import hyportage_pattern
+import hyportage_from_egencache
 
 
 # base configuration
@@ -89,7 +84,40 @@ def test_pattern_group_name():
 				print(hyportage_data.spl_get_name(spl) + " => " + (str(pattern)))
 
 
+def load_hyportage_db():
+	save_modality = "pickle"
+	path_db_hyportage = os.path.abspath(os.path.join(os.path.dirname(os.path.realpath(__file__)),"../data/hyportage/hyportage.enc"))
+	print(path_db_hyportage)
+	global pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls = hyportage.load_hyportage(path_db_hyportage, save_modality)
 
+
+
+
+
+def get_spl(spl_name):
+	return mspl[spl_name]
+
+
+def get_pattern_element(atom):
+	return hyportage_pattern.pattern_repository_get(pattern_repository, hyportage_pattern.pattern_create_from_atom(atom))
+
+def quick_get(atom):
+	load_hyportage_db()
+	el = get_pattern_element(atom)
+	return [spl.name for spl in el.containing_spl]
+
+def local_mapping_to_mapping(local_mapping):
+	return {
+		hyportage_pattern.pattern_to_atom(pattern): [ spl.name for spl in el.containing_spl ]
+		for pattern, el in local_mapping.iteritems()
+	}
+
+def get_core_pattern_repository():
+	m = local_mapping_to_mapping(pattern_repository[1])
+	for mapping in pattern_repository[0].values():
+		m.update(local_mapping_to_mapping(mapping))
+	return m
 
 # main
 

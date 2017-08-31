@@ -90,7 +90,8 @@ def pattern_create_from_atom(atom):
 		version_full = version_full[:-1]
 		if version[-1] == "*":
 			version = version[:-1]
-	return vop, package_group, version_full, version, has_star, slot, subslot, sop
+	# return vop, package_group, version_full, version, has_star, slot, subslot, sop
+	return vop, package_group, version_full, version, has_star, slot, subslot
 
 
 def pattern_to_atom(pattern):
@@ -104,11 +105,11 @@ def pattern_to_atom(pattern):
 	atom += pattern[1]
 	if pattern[2]: atom += "-" + pattern[2]
 	if pattern[4]: atom += "*"
-	if pattern[5] or pattern[6] or pattern[7]:
+	if pattern[5] or pattern[6]:# or pattern[7]:
 		atom += ":"
 		if pattern[5]: atom += pattern[5]
 		if pattern[6]: atom += "/" + pattern[6]
-		if pattern[7]: atom += "="
+		# if pattern[7]: atom += pattern[7]
 	return atom
 
 

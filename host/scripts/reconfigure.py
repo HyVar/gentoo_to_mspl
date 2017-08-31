@@ -4,22 +4,16 @@ import utils
 import logging
 import os
 import subprocess
-import click
-import time
-import multiprocessing
 import smt_encoding
 import pysmt.shortcuts
 import re
-import hyportage
 
 import core_data
 import portage_data
 
 import hyportage_data
-import hyportage_from_egencache
 import hyportage_ids
 import hyportage_pattern
-import hyportage_configuration
 
 from pysmt.smtlib.parser import SmtLib20Parser
 import cStringIO
@@ -46,14 +40,14 @@ def compute_request(atoms, profile_configuration, user_configuration):
 	return requested_patterns, default_patterns, use_selection
 
 
-def process_request(pattern_repository, id_repository, requested_patterns, default_patterns):
+def process_request(pattern_repository, id_repository, mspl, spl_groups, requested_patterns, default_patterns):
 	def local_function(pattern_repository, id_repository, patterns):
 		spls = set()
 		smt_constraint = []
 		# todo: ask michael if the or works when the pattern is a conflict
 		for pattern in patterns:
 			local_spls = hyportage_pattern.pattern_repository_element_get_spls(
-				hyportage_pattern.pattern_repository_get(pattern_repository, pattern))
+				hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)
 			smt_constraint.append(smt_encoding.smt_or(
 				smt_encoding.get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in local_spls])))
 			spls.update(local_spls)
@@ -66,10 +60,11 @@ def process_request(pattern_repository, id_repository, requested_patterns, defau
 	return smt_constraint, requested_spls, all_spls
 
 
-def extends_pattern_repository_with_request(pattern_repository, requested_patterns):
+def extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns):
 	def dummy_setter(pattern_repository_element, boolean): pass
 	for pattern in requested_patterns:
-		hyportage_pattern.pattern_repository_add_pattern_from_configuration(pattern_repository, pattern, dummy_setter)
+		hyportage_pattern.pattern_repository_add_pattern_from_configuration(
+			pattern_repository, mspl, spl_groups, pattern, dummy_setter)
 
 
 def extends_id_repository_with_requested_use_flags(id_repository, installed_spls, requested_spls, use_selection):
@@ -103,7 +98,7 @@ def get_smt_constraint_from_spls(spl_groups, spls):
 	return res
 
 
-def get_smt_variables_from_spls(pattern_repository, id_repository, spl_groups, spls):
+def get_smt_variables_from_spls(pattern_repository, id_repository, mspl, spl_groups, spls):
 	local_spl_groups = [
 		spl_groups[spl_group_name]
 		for spl_group_name in {hyportage_data.spl_get_group_name(spl) for spl in spls}]
@@ -122,7 +117,8 @@ def get_smt_variables_from_spls(pattern_repository, id_repository, spl_groups, s
 		smt_encoding.get_smt_variable_use_flag(id_repository, hyportage_data.spl_get_name(dep_spl), use_flag)
 		for spl in spls
 		for pattern, use_flags in hyportage_data.spl_get_dependencies(spl).iteritems()
-		for dep_spl in hyportage_pattern.pattern_repository_element_get_spls(hyportage_pattern.pattern_repository_get(pattern_repository, pattern))
+		for dep_spl in hyportage_pattern.pattern_repository_element_get_spls(
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)
 		for use_flag in use_flags})
 
 	return smt_variable_spls | smt_variable_use_flags
@@ -286,15 +282,15 @@ def update_to_install_spls(id_repository, mspl, to_install_spls, feature_list):
 ##########################################################################
 
 
-def next_spls(pattern_repository, spl):
+def next_spls(pattern_repository, mspl, spl_groups, spl):
 	res = set()
 	for pattern in hyportage_data.spl_get_dependencies(spl).keys():
-		res.update(hyportage_pattern.pattern_repository_element_get_spls(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern)))
+		res.update(hyportage_pattern.pattern_repository_element_get_spls_visible(
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups))
 	return res
 
 
-def get_dependency_transitive_closure(pattern_repository, spls):
+def get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, spls):
 	nexts = spls
 	res = set()
 	while len(nexts) > 0:
@@ -302,7 +298,7 @@ def get_dependency_transitive_closure(pattern_repository, spls):
 		for spl in nexts:
 			spl.visited = True
 			res.add(spl)
-			accu.update(next_spls(pattern_repository, spl))
+			accu.update(next_spls(pattern_repository, mspl, spl_groups, spl))
 		nexts = filter(lambda spl: not hyportage_data.spl_is_visited(spl), accu)
 	return res
 
@@ -326,7 +322,7 @@ def get_hyvarrec_input_monolithic(
 		}
 	# get the transitive closure of the dependency
 	dep_spls = get_dependency_transitive_closure(
-		pattern_repository, all_spls | {mspl[spl_name] for spl_name in installed_spls.keys()})
+		pattern_repository, mspl, spl_groups, all_spls | {mspl[spl_name] for spl_name in installed_spls.keys()})
 	# setup the constraint
 	data['smt_constraints']['formulas'] = smt_constraint
 	data['smt_constraints']['formulas'].extend(get_smt_constraint_from_spls(spl_groups, dep_spls))
