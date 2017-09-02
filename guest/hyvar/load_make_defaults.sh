@@ -1,152 +1,189 @@
 #!/bin/bash
 
+# this file loads a make.defaults or make.conf file (following the portage specification),
+#  expands the IUSE and USE variables, and outputs the bash variable environment
+
+
 ######################################################################
-### LOADS THE MAKE.CONF / MAKE.DEFAULTS FILE
+# 1. LOADS THE MAKE.CONF / MAKE.DEFAULTS FILE
 ######################################################################
 
-if [ -n "${1}" ]; then 
+if [ -n "${1}" ]; then
+	#echo "Loading ${1}" >> log.txt
 	source ${1}
 fi
 
-echo "managing file \"${1}\"" >> log.txt
-echo " variable USE_EXPAND_VALUES_ARCH = ${USE_EXPAND_VALUES_ARCH}" >> log.txt
-
-# seems to me that the make.defaults must be loaded in sequence, together...
-# I have to check that the iuse and use list are generated correctly
 
 ######################################################################
-### FUNCTIONS TO MANAGE THE VARIABLE EXPANSION
+# 2. UTILITY FUNCTIONS
 ######################################################################
-	
 
-manage_variable_list() {
+# classic iter implementation in bash
+iter() {
 	FUNCTION=$1
 	LIST=$2
 	if [ -n "${LIST}" ]; then
- 		for i in ${LIST}; do
-	 		if [ ${i:0:1} == "-" ]; then
-	 			${FUNCTION} "-" ${i:1}
-	 		else
-	 			${FUNCTION} "" ${i}
-	 		fi
-	 	done
+		for i in ${LIST}; do
+			${FUNCTION} ${i}
+		done
 	fi
 }
 
-manage_use() {
-	if [ "${1:0:1}" == "-" ]; then
-		TMP_PREFIX="-"
-		[ "${PREFIX}" == "-" ] && TMP_PREFIX=""
-		PREFIX="${TMP_PREFIX}"
-		RESULT="${1:1}"
-	elif [ "${1:0:1}" == "+" ]; then
-		TMP_PREFIX=""
-		[ "${PREFIX}" == "-" ] && TMP_PREFIX="-"
-		PREFIX="${TMP_PREFIX}"
-		RESULT="${1:1}"
+
+# extract the "-" sign if present from a variable
+extract_sign() {
+	VAR=$1
+	if [ ${i:0:1} == "-" ]; then
+		SIGN="-"
+		VARIABLE=${i:1}
 	else
-		RESULT="${1}"
+		SIGN=""
+		VARIABLE=${i}
 	fi
 }
 
-prefix_clean() {
-	[ "${PREFIX:1:1}" == "+" ] && PREFIX=""
+
+# check if a string is in a list
+contains() {
+	LIST=$1
+	EL=$2
+	[[ $LIST =~ (^|[[:space:]])"$EL"($|[[:space:]]) ]] && return 0 || return 1
 }
 
-EXPANDED_USE=""
-EXPANDED_IUSE=""
 
-function_use_expand() { # does not implicitly add use flag to IUSE
-	PREFIX=$1
-	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${RESULT}"
+# function that declares the parameter as a use flag
+declare_use_flag() {
+	#echo "declaring $1" >> log.txt
+	if [ -n "${IUSE}" ]; then
+		IUSE="${IUSE} $1"
+	else
+		IUSE="$1"
+	fi
+}
+
+# function to add the parameter in the use flag selection
+select_use_flag() {
+	#echo "selecting $1" >> log.txt
+	if [ -n "${USE}" ]; then
+		USE="${USE} $1"
+	else
+		USE="$1"
+	fi
+}
+
+# function that adds a variable to the set of profile-only variables
+set_as_profile_only() {
+	#echo "hiding $1" >> log.txt
+	if [ -n "${FLAT_PROFILE_ONLY_VARIABLES}" ]; then
+		FLAT_PROFILE_ONLY_VARIABLES="${FLAT_PROFILE_ONLY_VARIABLES} $1"
+	else
+		FLAT_PROFILE_ONLY_VARIABLES="$1"
+	fi
+}
+
+######################################################################
+# 3. FUNCTIONS TO MANAGE THE VARIABLE EXPANSION
+######################################################################
+
+
+######################################################################
+# 3.1. USE FLAG DECLARATION
+
+# declares the use flags in any IUSE list variable
+manage_iuse_list() {
+	for i in "$1"; do
+		declare_use_flag "$i"
 	done
 }
 
-function_use_expand_implicit() {
-	PREFIX=$1
-	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${VARIABLE,,}_${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} ${VARIABLE,,}_${RESULT}"
-	done
+# declare the use flags in the USE_EXPAND_IMPLICIT
+# note that these use flags may be or may not be prefixed depending if the containing variable is in USE_EXPAND OR USE_EXPAND_UNPREFIXED
+manage_use_expand_implicit_get_prefix_from_variable() {
+	if contains "${USE_EXPAND}" "$1"; then
+		PREFIX="${1,,}_"
+	else
+		PREFIX=""
+	fi
 }
-
-function_use_expand_unprefixed() {
-	PREFIX=$1
-	VARIABLE=$2
-	eval TMP=\$${VARIABLE}
-	for i in ${TMP}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${RESULT}"
-	done
-}
-
-function_use_expand_values_arch() {
-	PREFIX=$1
-	VARIABLE=$2
-	for i in ${VARIABLE}; do
-		manage_use "$i"
-		echo "    ${PREFIX} ${RESULT}" >> log.txt
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} ${RESULT}"
-	done
-}
-
-function_use_expand_values_elibc() {
-	PREFIX=$1
-	VARIABLE=$2
-	for i in ${VARIABLE}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}elibc_${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} elibc_${RESULT}"
-	done
-}
-
-function_use_expand_values_kernel() {
-	PREFIX=$1
-	VARIABLE=$2
-	for i in ${VARIABLE}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}kernel_${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} kernel_${RESULT}"
-	done
-}
-
-function_use_expand_values_userland() {
-	PREFIX=$1
-	VARIABLE=$2
-	for i in ${VARIABLE}; do
-		manage_use "$i"
-		EXPANDED_USE="${EXPANDED_USE} ${PREFIX}userland_${RESULT}"
-		EXPANDED_IUSE="${EXPANDED_IUSE} userland_${RESULT}"
+manage_use_expand_implicit_inner() {
+	VARIABLE="$1"
+	manage_use_expand_implicit_get_prefix_from_variable "${VARIABLE}"
+	eval LIST="\$${VARIABLE}"
+	for i in ${LIST}; do
+		declare_use_flag "${PREFIX}$i"
 	done
 }
 
 
 ######################################################################
-### PERFORM THE VARIABLE EXPANSION
+# 3.2. USE FLAG SELECTION
+
+manage_use_expand_inner() {
+	SIGNED_VARIABLE="$1"
+	extract_sign "${SIGNED_VARIABLE}"
+	PREFIX="${VARIABLE,,}_"
+	eval LIST="\$${VARIABLE}"
+	for i in ${LIST}; do
+		select_use_flag "${SIGN}${PREFIX}$i"
+	done
+}
+
+
+manage_use_expand_unprefixed_inner() {
+	SIGNED_VARIABLE="$1"
+	extract_sign "${SIGNED_VARIABLE}"
+	eval LIST="\$${VARIABLE}"
+	for i in ${LIST}; do
+		select_use_flag "${SIGN}$i"
+	done
+}
+
+
+######################################################################
+# 3.2. USE FLAG HIDING
+
+manage_profile_only_variables() {
+	for i in ${1}; do
+	    #echo "VARIABLE=$i"
+		eval LIST="\$${i}"
+		if [ -n "${LIST}" ]; then
+			manage_profile_only_variables "${LIST}"
+		else
+			set_as_profile_only "$i"
+		fi
+	done
+}
+
+
+
+######################################################################
+# 4. MAIN
 ######################################################################
 
 
+# use flag declaration
+#echo "IUSE_IMPLICIT=${IUSE_IMPLICIT}"
+manage_iuse_list "${IUSE_IMPLICIT}"
+manage_iuse_list "${USE_EXPAND_VALUES_ARCH}"
+manage_iuse_list "${USE_EXPAND_VALUES_ELIBC}"
+manage_iuse_list "${USE_EXPAND_VALUES_KERNEL}"
+manage_iuse_list "${USE_EXPAND_VALUES_USERLAND}"
 
-EXPANDED_IUSE="${IUSE_IMPLICIT}"
+#echo "USE_EXPAND_IMPLICIT=${USE_EXPAND_IMPLICIT}"
+iter manage_use_expand_implicit_inner "${USE_EXPAND_IMPLICIT}"
 
-manage_variable_list function_use_expand "${USE_EXPAND}"
-manage_variable_list function_use_expand_implicit "${USE_EXPAND_IMPLICIT}"
-manage_variable_list function_use_expand_unprefixed "${USE_EXPAND_UNPREFIXED}"
-manage_variable_list function_use_expand_values_arch "${USE_EXPAND_VALUES_ARCH}"
-manage_variable_list function_use_expand_values_elibc "${USE_EXPAND_VALUES_ELIBC}"
-manage_variable_list function_use_expand_values_kernel "${USE_EXPAND_VALUES_KERNEL}"
-manage_variable_list function_use_expand_values_userland "${USE_EXPAND_VALUES_USERLAND}"
+# use flag selection
+#echo "USE_EXPAND=${USE_EXPAND}"
+iter manage_use_expand_inner "${USE_EXPAND}"
 
-[ -n "${EXPANDED_USE}" ] && USE="${USE} ${EXPANDED_USE}"
-[ -n "${EXPANDED_IUSE}" ] && IUSE="${IUSE} ${EXPANDED_IUSE}"
+#echo "USE_EXPAND_UNPREFIXED=${USE_EXPAND_UNPREFIXED}"
+iter manage_use_expand_unprefixed_inner "${USE_EXPAND_UNPREFIXED}"
 
-# export the environment, for loading the next make.defaults/make.conf
+#echo "PROFILE_ONLY_VARIABLES=${PROFILE_ONLY_VARIABLES}"
+manage_profile_only_variables "${PROFILE_ONLY_VARIABLES}"
+
+# display
 set -o posix ; set
+
+
+
