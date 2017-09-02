@@ -256,7 +256,6 @@ def main(
 		# update the hyportage spl database
 		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
 		spl_added, spl_updated, spl_removed, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
-		print("spl_updated = " + str(spl_updated))
 		zipped = zip(*spl_updated)
 		spl_added_full, spl_removed_full = (list(zipped[0]), list(zipped[1])) if len(zipped) > 0 else (list(), list())
 		spl_added_full.extend(spl_added)
@@ -309,11 +308,13 @@ def main(
 		# compute what to install
 		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
 			atoms, profile_configuration, user_configuration)
-		smt_constraint, requested_spls, all_spls = reconfigure.process_request(
-			pattern_repository, id_repository, mspl, spl_groups, requested_patterns, default_patterns)
 
 		# extends the pattern repository with user-defined patterns
 		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
+
+		# translate the request into corresponding smt constraint and corresponding spls
+		smt_constraint, requested_spls, all_spls = reconfigure.process_request(
+			pattern_repository, id_repository, mspl, spl_groups, requested_patterns, default_patterns)
 
 		# adds the user required iuses to the id_repository
 		# todo: ask Michael why he treats current iuses as the one required by the user - same priority???

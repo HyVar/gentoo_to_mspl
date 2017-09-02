@@ -309,6 +309,7 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 	spl_group_name = hyportage_data.spl_get_group_name(spl)
 	constraints.append(z3.Implies(spl_id, get_smt_spl_name(id_repository, spl_group_name)))
 
+	#logging.debug("getting the use of spl " + spl_name)
 	spl_uses_id = get_smt_uses(
 		id_repository, spl_name, hyportage_ids.id_repository_get_use_flag_from_spl_name(id_repository, spl_name))
 
@@ -327,7 +328,7 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 	spls = filter(hyportage_data.spl_is_visible, hyportage_data.spl_group_get_references(spl_group))
 	spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
 
-	logging.debug("Processing spl group " + spl_group_name)
+	#logging.debug("Processing spl group " + spl_group_name)
 	constraints = []
 
 	# 1. if installed then one of its version should be installed as well

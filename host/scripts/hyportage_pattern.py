@@ -132,6 +132,18 @@ def match_spl_simple(pattern, spl):
 spl_list_save_limit = 10
 
 
+class USEInformation(object):
+	def __init__(self, is_required):
+		self.ref_count = 1
+		self.is_required = is_required
+
+	def add(self, is_required):
+		self.ref_count = self.ref_count + 1
+		if is_required: self.is_required = is_required
+
+	def remove(self):
+		self.ref_count = self.ref_count - 1
+
 class PatternElement(object):
 	def __init__(self, pattern):
 		self.pattern = pattern
@@ -144,18 +156,18 @@ class PatternElement(object):
 
 	def add_required_uses_from_spl(self, spl, required_use):
 		self.containing_spl.add(spl)
-		for use in required_use:
+		for use, is_required in required_use.iteritems():
 			if use in self.use_mapping:
-				self.use_mapping[use] = self.use_mapping[use] + 1
+				self.use_mapping[use].add(is_required)
 			else:
-				self.use_mapping[use] = 1
+				self.use_mapping[use] = USEInformation(is_required)
 
 	def remove_required_uses_from_spl(self, spl, required_use):
 		# logging.debug("Pattern element: Removing uses from " + hyportage_data.spl_get_name(spl))
 		self.containing_spl.discard(spl)
 		for use in required_use:
-			if self.use_mapping[use] == 1: self.use_mapping.pop(use)
-			else: self.use_mapping[use] = self.use_mapping[use] - 1
+			if self.use_mapping[use].ref_count == 1: self.use_mapping.pop(use)
+			else: self.use_mapping[use].remove()
 
 	def set_in_profile_configuration(self, in_profile_configuration):
 		self.in_profile_configuration = in_profile_configuration
@@ -174,6 +186,8 @@ class PatternElement(object):
 			self.matched_spls_visible.discard(spl)
 
 	def get_required_uses(self): return self.use_mapping.keys()
+	def get_required_uses_required(self):
+		return {use for use, data in self.use_mapping.iteritems() if data.is_required}
 
 	def match_self_pattern_simple(self, spl): return match_spl_simple(self.pattern, spl)
 	def match_self_pattern_full(self, spl): return match_spl_full(self.pattern, spl)
@@ -235,6 +249,10 @@ def pattern_repository_element_remove_spl(pattern_repository_element, spl): patt
 
 def pattern_repository_element_get_required_use(pattern_repository_element):
 	return pattern_repository_element.get_required_uses()
+
+
+def pattern_repository_element_get_required_use_required(pattern_repository_element):
+	return pattern_repository_element.get_required_uses_required()
 
 
 def pattern_repository_element_get_spls(pattern_repository_element, mspl, spl_groups):

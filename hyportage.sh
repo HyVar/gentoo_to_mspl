@@ -25,7 +25,7 @@ GUEST_GEN_DIR="${GUEST_INSTALL_DIR}/gen/"
 
 HOST_SCRIPT_DIRECTORY="${LOCAL_DIR}/host/scripts"
 HOST_SCRIPT_TRANSLATE="${HOST_SCRIPT_DIRECTORY}/hyportage.py"
-HOST_SCRIPT_EMERGE="${HOST_SCRIPT_DIRECTORY}/hyportage.py --mode=emerge"
+HOST_SCRIPT_EMERGE="${HOST_SCRIPT_DIRECTORY}/hyportage.py"
 
 HOST_GUEST_INSTALL_DIR="${LOCAL_DIR}/guest/${GUEST_SCRIPT_DIRECTORY_NAME}"
 HOST_HOST_INSTALL_DIR="${LOCAL_DIR}/host/data/portage"
@@ -122,17 +122,13 @@ function translate {
 	python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update $@
 }
 
-function reconfigure {
+function emerge {
 	shift 1
 	export PYTHONPATH="${LOCAL_PYTHONPATH}"
-	nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge $@
+	nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge  $@
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 
-
-function emerge {
-	echo "not implemented yet"
-}
 
 
 ######################################################################
@@ -159,8 +155,8 @@ if [ -n "${1}" ]; then
 		translate)
 			translate "$@"
 			;;
-		reconfigure)
-			reconfigure "$@"
+		emerge)
+			emerge "$@"
 			;;
 		*)
 			echo "unknown action \"${1}\""

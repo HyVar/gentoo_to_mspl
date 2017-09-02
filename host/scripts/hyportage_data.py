@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import logging
+
 import core_data
 
 import hyportage_constraint_ast
@@ -17,6 +19,14 @@ keywords_copy = core_data.set_configuration_copy
 keywords_to_save_format = core_data.set_configuration_to_save_format
 keywords_from_save_format = core_data.set_configuration_from_save_format
 
+def get_core_keyword(keyword):
+	if (keyword[0] in ['-', '~']) and (keyword[1] != '*'): return keyword[1:]
+	elif keyword[0] != '*': return keyword
+
+def keywords_get_core_set(keywords):
+	res = {get_core_keyword(keyword) for keyword in keywords}
+	res.discard(None)
+	return res
 
 ######################################################################
 # IUSE MANIPULATION
@@ -58,11 +68,15 @@ dependencies_create = core_data.dict_configuration_create
 
 
 def dependencies_add_pattern(raw_dependencies, pattern):
-	if pattern not in raw_dependencies: raw_dependencies[pattern] = set([])
+	if pattern not in raw_dependencies: raw_dependencies[pattern] = {}
 
 
-def dependencies_add_pattern_use(raw_dependencies, pattern, use):
-	raw_dependencies[pattern].add(use)
+def dependencies_add_pattern_use(raw_dependencies, pattern, use, is_required):
+	mapping = raw_dependencies[pattern]
+	if is_required:
+		mapping[use] = is_required
+	elif use not in mapping:
+		mapping[use] = is_required
 
 
 def dependencies_get_patterns(raw_dependencies): return raw_dependencies.keys()
@@ -72,12 +86,12 @@ def dependencies_get_patterns(raw_dependencies): return raw_dependencies.keys()
 
 def dependencies_to_save_format(dependencies):
 	return core_data.dict_configuration_to_save_format(
-		dependencies, hyportage_pattern.pattern_to_save_format, core_data.set_configuration_to_save_format_simple)
+		dependencies, hyportage_pattern.pattern_to_save_format, core_data.identity)
 
 
 def dependencies_from_save_format(save_format):
 	return core_data.dict_configuration_from_save_format(
-		save_format, hyportage_pattern.pattern_from_save_format, core_data.set_configuration_from_save_format_simple)
+		save_format, hyportage_pattern.pattern_from_save_format, core_data.identity)
 
 
 ######################################################################
@@ -196,6 +210,7 @@ def spl_reset_required_iuses(spl, pattern_repository):
 	spl.required_iuses = list(set.intersection(spl_get_iuses_user(spl), set.union(
 		spl.required_iuses_local,
 		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl))))
+	#logging.debug("IUSE(" + spl_get_name(spl) + ") = " + str(sorted(spl.required_iuses)))
 
 
 def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constraint

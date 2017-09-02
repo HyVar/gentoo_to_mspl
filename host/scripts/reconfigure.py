@@ -27,14 +27,20 @@ __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 
+# todo: generate constraint from use selection, as a valid alternative from preference
+
 ##########################################################################
 # 1. INITIALIZE THE DATA (COMPUTE REQUEST AND UPDATE THE DATABASE)
 ##########################################################################
 
 def compute_request(atoms, profile_configuration, user_configuration):
 	requested_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
-	default_patterns = set(portage_data.configuration_get_pattern_required(profile_configuration).values())
-	default_patterns.update(portage_data.configuration_get_pattern_required(user_configuration).values())
+	default_patterns = {
+		pattern
+		for pattern_set in (
+			portage_data.configuration_get_pattern_required(profile_configuration).values()
+			+ portage_data.configuration_get_pattern_required(user_configuration).values())
+		for pattern in pattern_set}
 
 	use_selection = core_data.use_selection_create_from_uses_list(os.environ.get("USE", "").split())
 	return requested_patterns, default_patterns, use_selection
@@ -116,16 +122,17 @@ def get_smt_variables_from_spls(pattern_repository, id_repository, mspl, spl_gro
 	smt_variable_use_flags.update({  # add the use flags of the dependencies
 		smt_encoding.get_smt_variable_use_flag(id_repository, hyportage_data.spl_get_name(dep_spl), use_flag)
 		for spl in spls
-		for pattern, use_flags in hyportage_data.spl_get_dependencies(spl).iteritems()
+		for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems()
 		for dep_spl in hyportage_pattern.pattern_repository_element_get_spls(
 			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)
-		for use_flag in use_flags})
+		for use_flag in required_use.keys()})
 
 	return smt_variable_spls | smt_variable_use_flags
 
 
 def get_preferences_from_use_selection(id_repository, spl_name, use_selection):
 	def local_function(id_repository, spl_name, use_flags):
+		print(" getting use selection preference from " + spl_name + " " + str(use_flags))
 		if use_flags:
 			return " + ".join([
 				smt_encoding.get_smt_int_use_flag(id_repository, spl_name, use_flag)
@@ -284,7 +291,7 @@ def update_to_install_spls(id_repository, mspl, to_install_spls, feature_list):
 
 def next_spls(pattern_repository, mspl, spl_groups, spl):
 	res = set()
-	for pattern in hyportage_data.spl_get_dependencies(spl).keys():
+	for pattern in hyportage_data.spl_get_dependencies(spl):
 		res.update(hyportage_pattern.pattern_repository_element_get_spls_visible(
 			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups))
 	return res
