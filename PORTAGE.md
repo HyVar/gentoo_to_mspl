@@ -1,8 +1,11 @@
 # Portage: Some Technical Information
 
+In this document, we give a brief and precise summary of many information scattered in the portage's documentation,
+ and that is essential to correctly compute a valid portage configuration.
+In some cases, the information presented here are the result of exhaustive testing,
+ as the available documentation did not describe the behavior of portage in certain cases.
 
-
-### USE Flags Declaration and Selection
+## USE Flags Declaration and Selection
 
 USE Flag declaration and selection is a core part of portage, as presented in its [documentation](https://wiki.gentoo.org/wiki/USE_flag).
 They are the core of a package configuration during its installation.
@@ -11,7 +14,7 @@ Hence, we present here a detailed documentation on two aspects of the portage us
  * how the use flags are declared
  * how packages are configured using these use flags
 
-#### USE Flag Declaration
+### USE Flag Declaration
 
 
 According to the [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/ebuild.5.html),
@@ -32,7 +35,7 @@ However, in reality, many USE flags, not only the ones that are arch related, ar
     and so we can simply use the files in [metadata/md5-cache](https://wiki.gentoo.org/wiki//usr/portage/metadata/md5-cache)  (like `emerge` does)
     to get all these USE flags, in addition to the ones explicitly declared by the package.
  * The `make.defaults` files in the [portage's profile](https://wiki.gentoo.org/wiki/Profile_(Portage)),
-    are bash script files (see [portage's manpage](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html))
+    are *bash<sup>1</sup>* script files (see [portage's manpage](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html))
     that implicitly declares system-wide USE flags (i.e., for all packages),
     like the different `kernel_*`, `elibc_*`, and other USE flags, including the arch-related ones.
    Such declaration is done by the mean of different variables:
@@ -54,14 +57,14 @@ However, in reality, many USE flags, not only the ones that are arch related, ar
           the variable name is expanded into a list of `(lowercase(variable name))_(use flag)`
           where `use flag` is an element of the variable name's contained list
 
-       **Example**
-       ```
-       USE_EXPAND_IMPLICIT="ARCH KERNEL"
-       USE_EXPAND="KERNEL OTHER_UNRELATED_VARIABLES"
-       USE_EXPAND_UNPREFIXED="ARCH YET_OTHER_VARIABLES"
-       ARCH="amd64"
-       KERNEL="linux"
-       ```
+         **Example**
+         ```
+         USE_EXPAND_IMPLICIT="ARCH KERNEL"
+         USE_EXPAND="KERNEL OTHER_UNRELATED_VARIABLES"
+         USE_EXPAND_UNPREFIXED="ARCH YET_OTHER_VARIABLES"
+         ARCH="amd64"
+         KERNEL="linux"
+         ```
        This declares the USE flags `amd64` and `kernel_linux`.
 
    Another important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
@@ -76,9 +79,14 @@ However, in reality, many USE flags, not only the ones that are arch related, ar
     as discussed in the [documentation](https://wiki.gentoo.org/wiki/Profile_(Portage)).
 
 
+<sup>1</sup>: More precisely, the `make.defaults` file supports a small subset of bash-like terminal language,
+ as described in the `make.conf` [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html).
+The actual parser of the `make.defaults` and similar files uses [shlex](https://docs.python.org/3/library/shlex.html)
+ and is defined in [portage/util](https://github.com/gentoo/portage/blob/master/pym/portage/util/__init__.py)
+ and in [portage/package/ebuild/config.py](https://github.com/gentoo/portage/blob/master/pym/portage/package/ebuild/config.py).
 
 
-#### Package Configuration with Use Flags
+### Package Configuration with Use Flags
 
 While the USE flags declaration in portage is quite intricate,
  the USE flag selection (i.e., stating for which package which USE flag is selected and which is not)
@@ -95,7 +103,7 @@ We consequently structure the presentation of Package Configuration in two parts
  * how they are combined to build the configuration of each package
 
 
-##### USE Flag Selection Declaration
+#### USE Flag Selection Declaration
 
 A global overview of where USE flag selections are declared can be found in
  the [make.conf documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html)
@@ -115,6 +123,101 @@ Here is an excerpt of the documentation:
 > * **repo**: USE from make.defaults and package.use in the repo's profiles/ top dir (e.g. /usr/portage/profiles/package.use) (see portage(5))
 > * **env.d**: USE from the environment variables, such as LINGUAS, defined by files in /etc/env.d/
 
+Hence, there are six general locations in which USE flag selections can be specified.
+Moreover, these locations are ordered (with the `USE_ORDER` variable),
+ thus partially specifying the order in which the different USE flag selections are combined.
+
+Let briefly overview these locations, in their loading order:
+ * [**env.d**](https://wiki.gentoo.org/wiki/Handbook:X86/Working/EnvVar): this folder sets many environment variables,
+    including some that are used to construct the USE flag selections.
+   These variables are loaded system-wide, and we don't need to explicitly manage them.
+ * [**repo**](https://wiki.gentoo.org/wiki/Profile_(Portage)):
+    the folder `/usr/portage/profiles/` may contain several files that define some USE flag selections.
+   These files follow the structure of the rest of the portage's profile,
+    which is quite complex and will be discussed in detail in its own section.
+ * [**pkginternal**](https://devmanual.gentoo.org/ebuild-writing/eapi/index.html): 
+    the IUSE defaults is the USE flag selection extracted from the package's IUSE variables
+    (from the `+` and `-` annotation on its USE flags).
+   This is the default USE flag selection of the package, specified by the package's maintainer.
+ * [**defaults**](https://wiki.gentoo.org/wiki/Profile_(Portage)): this corresponds to the user selected profile,
+    usually specified by a simlink from `/etc/portage/make.profile` to a folder in the portage's profile tree.
+   As for the **repo** location, many files are considered to construct the USE flag selection of this location,
+    which will be discussed in detail later in its own section.
+ * [**pkg**](https://wiki.gentoo.org/wiki//etc/portage/package.use): the `/etc/portage/package.use` path is
+    a user-defined file or folder containing several files declaring a USE flag selection for several *atoms* (i.e., sets of [packages]).
+   As this/these file/s have the same structure as some in the profile, we will present its/their structure in a dedicated Section.
+ * **env**: this corresponds to the `USE` variable available in the current environment, like in the following command line:
+   ```
+   USE="unicode -pcre" emerge -av sys-apps/less 
+   ```
+
+##### USE Flag Selection Declaration in Profile
+
+The USE flag selection done in the two parts from the portage profile (**repo** and **defaults**)
+ is based on a similar file structure.
+The difference is that the **defaults** part is recursive, based on the `parent` file,
+ as described in the [documentation](https://wiki.gentoo.org/wiki/Profile_(Portage).)
+
+We structure he presentation of the files that take part in the USE flag selection in the profile
+ in three parts: the Core files, the force and mask files, and the Stable files.
+
+###### Core Files
+
+ * `make.defaults`: we already discussed this file in the USE flag declaration section,
+    and this file is also used to declare system-wide USE flag selection, based on other bash variables.
+   Two variables are responsible for the construction of the USE flag selection in this file:
+    * `USE_EXPAND`: this variable expands into a USE flag selection,
+      in a similar manner to the `USE_EXPAND_IMPLICIT` variable for USE flag declaration,
+      except that all the USE flags in the expanded list are prefixed.
+     Note that additionally, the variables in the `USE_EXPAND` list can be prefixed by `-` sign to
+      state that the USE flag in that variable must be unselected.
+
+      **Example**
+      ```
+      USE_EXPAND="KERNEL APACHE2_MODULES -INPUT_DEVICES"
+      KERNEL="linux"
+      APACHE2_MODULES="authn_core authz_core"
+      INPUT_DEVICES="keyboard mouse"
+      ```
+      This defines the USE flag selection `kernel_linux apache2_modules_authn_core apache2_modules_authz_core -input_devices_keyboard -input_devices_mouse`.
+    * `USE_EXPAND_UNPREFIXED`: this variable also expands in a USE flag selection,
+       except that the expanded USE flags are not prefixed.
+
+      **Example**
+      ```
+      USE_EXPAND_UNPREFIXED="ARCH"
+      ARCH=amd64
+      ```
+      This defined the USE flag selection `amd64`.
+ * `use`: this file states a system-wide USE flag selection,
+    by simply listing USE flags to be selected, or unselected if guarded with a `-` sign.
+   The list is constructed with only one (possibly guarded) USE flag per line.
+ * [`package.use`](https://wiki.gentoo.org/wiki//etc/portage/package.use):
+    this file lists a set of atoms, one per line,
+    with its corresponding USE flag selection (i.e., a list of possibly guarded USE flags) on the same line.
+   Note that atoms corresponds to sets of packages,
+    and thus each line of this file defines a USE selection for a set of packages.
+   Note also that two different atoms in this file could include a common package, which is thus configured twice.
+
+    **Example**
+    ```
+    # Globally disable the unwanted USE Flags which were enabled by the profile
+    */* -bluetooth -consolekit -dbus -ldap -libnotify -nls -qt3support -udisks
+
+    # enable the offensive USE flag for app-admin/sudo
+    app-admin/sudo offensive
+
+    # disable mysql support for dev-lang/php
+    dev-lang/php -mysql
+
+    # enable java and set the python interpreter version for libreoffice-5.1
+    app-office/libreoffice java PYTHON_SINGLE_TARGET: python3_4
+    ```
+
+###### Force and Mask Files
+
+
+###### Stable Files
 
 
 In portage, the use flags manipulation (declaration and selection) is not very clear.
@@ -136,18 +239,27 @@ In the portage profile tree, there are several files that manipulate use flags:
  - package.use.stable.mask:
  - make.defaults: this is actually where default use flags are declared
 
+files `*.stable.*` are configuration files that only affect package with a stable (i.e., not `~`)keyword.
+
 In the previous items,
  `positively selected` meant that the use flag is selected (or unseletected if guarded by -) for every packages that contain it;
  `negatively selected` meant that the use flag is unselected (or seletected if guarded by -) for every packages that contain it;
 
 
-##### USE Flag Selection Combination
+#### USE Flag Selection Combination
 
 
 
+## Package Visibility
+
+### Package Masking
 
 
-### Semantics of Use Flags Selection in Constraints
+### Package Keywords
+
+
+
+## Semantics of Use Flags Selection in Constraints
 
 Consider the constraint syntax in the DEPEND variable of a package, as described in [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
 This syntax, starting from EAPI=2, allows for Use dependencies, i.e., when specifying a dependency, one can specify which use flags must be selected or unselected for that dependency.
