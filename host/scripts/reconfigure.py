@@ -51,6 +51,7 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, request
 		spls = set()
 		smt_constraint = []
 		# todo: ask michael if the or works when the pattern is a conflict
+		# for now limitation -> no conflict -> implement unmerge in future
 		for pattern in patterns:
 			local_spls = hyportage_pattern.pattern_repository_element_get_spls(
 				hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)

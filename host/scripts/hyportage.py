@@ -309,6 +309,8 @@ def main(
 		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
 			atoms, profile_configuration, user_configuration)
 
+		# all_spls the spls required by default and by the request
+
 		# extends the pattern repository with user-defined patterns
 		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
 
