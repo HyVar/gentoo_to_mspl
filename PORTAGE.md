@@ -1,6 +1,127 @@
+# Portage: an Overview
+
+[Portage](https://wiki.gentoo.org/wiki/Portage) ([wikipedia](https://en.wikipedia.org/wiki/Portage_(software))) is the package manager of the [Gentoo](https://gentoo.org/) Linux distribution.
+
+
+## Core Principles
+
+The main characteristics of portage, compared to other package manager, is that its packages are distributed as source code (when possible),
+ which can be configured by the machine's administrator, prior to compilation and installation of the package.
+Portage contains a unified interface for configuring the package, called [USE flags](https://wiki.gentoo.org/wiki/Handbook:AMD64/Working/USE).
+The documentation is a bit unclear: USE flags are *features* giving an [SPL](https://en.wikipedia.org/wiki/Software_product_line) structure to all of the portage's packages.
+
+#### Portage's Repository Structure
+
+Portage declares its package in [*.ebuild*](https://devmanual.gentoo.org/ebuild-writing/index.html) files.
+These files are structured in a folder structure of the following form:
+```
+/usr/portage/ +
+              |
+              +-> category / +
+                             |
+                             +-> group / +
+                                         |
+                                         +-> group-version.ebuild
+```
+
+The folder `/usr/portage` is the root directory of the portage tree.
+This root directory contains many categories (e.g., `kde-apps`, `www-client`),
+ plus several folders containing configuration data (we may discuss them later).
+These categories contains several groups corresponding to one library or one software (e.g., `konsole`, `firefox`).
+Finally, these groups contains several `.ebuild` files, one per version of the group.
+
+#### Portage's Packages as Software Product Lines
+
+A package's *.ebuild* file follows a syntax close to a bash script file,
+ and declares a set of information defining its (hybrid-dependent) SPL structure:
+ * `IUSE`: this variable declares the list of USE flags (i.e., SPL's features) for this package
+ * `REQUIRED_USE`: this variable declares a constraint on the package's USE flag, thus defining the local feature model of this SPL
+ * [`DEPEND`, `RDEPEND` and `PDEPEND`](https://devmanual.gentoo.org/general-concepts/dependencies/index.html):
+    these variables declare constraints stating the dependencies to other packages,
+    thus giving a structure of **Dependent SPL** to the package.
+   Note that the dependency of a package is structure in three variables to follow the package's installation life cycle:
+    `DEPEND` is the dependency activated for the installation of the package,
+    `RDEPEND` is the dependency activated for the correct usage of the content of the package,
+    and `PDEPEND` has a similar semantics to `RDEPEND` but is used to avoid circular dependency within the same life-cycle stage.
+ * `KEYWORDS`: this variable lists the architecture on which this package can be installed,
+    thus giving a structure of **Hybrid SPL** to the package.
+   Note that these package can be prefixed by `~` to state that this package is not thoroughly tested on that architecture.
+
+###### Feature Model Syntax
+
+As discussed previously, the Feture Model of a Portage package is declared with six variables:
+ * `IUSE` lists the features of the feature model
+ * `REQUIRED_USE` defines the *local* part of the feature model
+ * `DEPEND`, `RDEPEND` and `PDEPEND` define the *dependency* part of the feature model
+
+The syntax of the `REQUIRED_USE` constraint is as follows:
+```
+REQUIRED_USE ::= EL*
+EL ::= '!'? feature | '!'? feature '?' '(' EL* ')' | OPERATOR '(' EL* ')' | '(' EL* ')'
+OPERATOR ::= '||' | '^^' | '??'
+```
+In this syntax, `feature` requires for `feature` to be selected,
+ `!` is the standard not operator,
+ `?` is the implication operator (`!feature? (EL*)` means that if the feature `feature` is not selected, then `EL*` must hold),
+ `||` is the or operator (at least one constraint in the following group must be satisfied),
+ `^^` is the xor operator (exactly one constraint in the following group must be satisfied),
+ `??` is the one-max operator (at most one constraint in the following group can be satisfied).
+
+The syntax of the `*DEPEND` constraint is as follows:
+```
+DEPEND ::= EL*
+EL ::= '!'? atom SELECTION? | '!'? feature '?' '(' EL* ')' | OPERATOR '(' EL* ')' | '(' EL* ')'
+SELECTION ::= '[' feature_selection (',' feature_selection)* ']'
+OPERATOR ::= '||' | '^^' | '??'
+```
+This syntax is similar to the one for `REQUIRED_USE`, with two core difference:
+ * instead of selecting features, this syntax selects *atoms*, with an optional `SELECTION`.
+   Portage is a package manager with a little less than 40000 packages,
+    and so package selection is not done on a per-package basis, but through atoms (or [*package dependency specification*](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)) that corresponds to a set of packages.
+   We won't go in details into the syntax of atoms in this section,
+    we just want to point out that atoms are a very low level and implicit notion of SPL Interface:
+     it is a name on which an SPL can depend on, and that can be implemented by several SPLs.
+   No notion of feature model or code interface is associated to this low level notion of SPL interface.
+ * `SELECTION` is the portage's way to specify a *partial product* for a package's dependency.
+   Like for atoms, we won't go in details into the syntax of partial product,
+    we just want to point our that it can select or require unselected some features,
+    with such feature selection possibly guarded by some local feature being selected or unselected.
+
+For more information about the `*DEPEND` variables, you can look at the [documentation](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
+ and the full semantics of [full semantics of partial product specification](#semantics-of-use-flags-selection-in-constraints).
+
+
+## Configuration
+
+As introduced previously, portage's packages are configured
+ via the selection and non-selection (i.e., a product) of USE flags (i.e., features).
+The most direct way to configure packages is via the file [`/etc/portage/package.use`](https://wiki.gentoo.org/wiki//etc/portage/package.use),
+ in which the administrator can specify a list of USE flags to select or unselect (when guarded with `-`) for an *atom*, one per line.
+Note that the list of USE flags specifies a *partial product* (i.e., the administrator can miss to specify the selection status of some USE flags, which are then implicitly set to unselected by portage).
+
+**Example**
+```
+# Configure one package of the group git, selecting curl and unselecting emacs
+=dev-vcs/git-2.12.1 curl -emacs
+
+# Globally disable the unwanted USE Flags which were enabled by the profile
+*/* -bluetooth -consolekit -dbus -ldap -libnotify -nls -qt3support -udisks
+
+# enable the offensive USE flag for app-admin/sudo
+app-admin/sudo offensive
+
+# disable mysql support for dev-lang/php
+dev-lang/php -mysql
+
+# enable java and set the python interpreter version for libreoffice-5.1
+app-office/libreoffice java python_single_target_python3_4
+```
+
+
+
 # Portage: Some Technical Information
 
-In this document, we give a brief and precise summary of many information scattered in the portage's documentation,
+In this section, we give a brief and precise summary of many information scattered in the portage's documentation,
  and that is essential to correctly compute a valid portage configuration.
 In some cases, the information presented here are the result of exhaustive testing,
  as the available documentation did not describe the behavior of portage in certain cases.
@@ -38,34 +159,71 @@ However, in reality, many USE flags, not only the ones that are arch related, ar
     are *bash<sup>1</sup>* script files (see [portage's manpage](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html))
     that implicitly declares system-wide USE flags (i.e., for all packages),
     like the different `kernel_*`, `elibc_*`, and other USE flags, including the arch-related ones.
-   Such declaration is done by the mean of different variables:
-    * the variables `IUSE_IMPLICIT`, `USE_EXPAND_VALUES_ARCH`, `USE_EXPAND_VALUES_ELIBC`,
-       `USE_EXPAND_VALUES_KERNEL` and `USE_EXPAND_VALUES_USERLAND` simply list USE flags to be declared.
+   The [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html)
+    vaguely describe how several variables are involved in the implicit declaration of USE flags,
+    however it does not corresponds to the reality.
+   I actually had to look up the [actual implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1852)
+    of the IUSE variable construction to know how USE flags are implicitly declared.
 
-       **Example**
-       ```
-       IUSE_IMPLICIT="prefix prefix-guest"
-       USE_EXPAND_VALUES_USERLAND="BSD GNU"
-       ```
-       This declares the USE flags `prefix`, `prefix-guest`, `BSD` and `GNU`.
-    * the variable `USE_EXPAND_IMPLICIT` is more complex:
-       it lists variables names that are expanded into USE flags lists to declare.
-      The way a variable name is expanded is as follows:
-       * if that variable name is listed in the variable `USE_EXPAND_UNPREFIXED`,
-          the variable name is directly expanded into its contained list
-       * if instead that variable name is listed in the variable `USE_EXPAND`,
-          the variable name is expanded into a list of `(lowercase(variable name))_(use flag)`
-          where `use flag` is an element of the variable name's contained list
+#### USE Flag Declaration in a `make.defaults` file
 
-         **Example**
-         ```
-         USE_EXPAND_IMPLICIT="ARCH KERNEL"
-         USE_EXPAND="KERNEL OTHER_UNRELATED_VARIABLES"
-         USE_EXPAND_UNPREFIXED="ARCH YET_OTHER_VARIABLES"
-         ARCH="amd64"
-         KERNEL="linux"
-         ```
-       This declares the USE flags `amd64` and `kernel_linux`.
+This file declares two sets of USE flags,
+ one for the packages with EAPI equal or lower than 4
+ and one for the packages with EAPI equal or greater than 5.
+
+##### USE Flag Declaration for EAPI <= 4
+
+We did not find any information on this subject in the portage documentation,
+ so I describes how the [implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1882) generates the list.
+
+The USE flags are declared with the following variables:
+ * `ARCH`: this variable contains the name of the architecture of the host machine (e.g., amd64), which is included in the list of declared USE flags
+ * `PORTAGE_ARCHLIST`: this variables declares a list of architecture names, which are included in the list of declared USE flags
+ * `USE_EXPAND_HIDDEN`: this variable contains a list of other variables names, themselves containing a list of USE flags to declare.
+    This variable is thus expanded into a list of USE flag to declare, of the form`(lowercase(variable name))_(use flag)`
+     where `variable_name` is an element of the list contained in  `USE_EXPAND_HIDDEN` and `use flag` is an element of the variable name's contained list.
+ * `BOOTSTRAP_USE`: this variables contains a list of USE flag to declare for creating a bootstrap image of portage.
+    These USE flags are also declared for the packages with an EAPI <= 4.
+
+   **Example**
+   ```
+   ARCH="amd64"
+   PORTAGE_ARCHLIST="amd64 x86"
+   USE_EXPAND_HIDDEN="KERNEL ELIBC"
+   KERNEL="linux"
+   ELIBC="glibc"
+   BOOTSTRAP_USE="cxx unicode"
+   ```
+   This declares the USE flags `amd64`, `x86`, `kernel_linux`, `elibc_glibc`, `cxx` and `unicode`.
+
+
+##### USE Flag Declaration for EAPI >= 5
+
+Such declaration is done by the mean of two variables:
+ * the variable `IUSE_IMPLICIT` simply list USE flags to be declared.
+
+   **Example**
+   ```
+   IUSE_IMPLICIT="prefix prefix-guest"
+   ```
+   This declares the USE flags `prefix` and `prefix-guest`.
+* the variable `USE_EXPAND_IMPLICIT` is more complex:
+   it lists variables names that are expanded into USE flags lists to declare.
+  The way a variable name is expanded is as follows:
+   * if that variable name is listed in the variable `USE_EXPAND_UNPREFIXED`,
+      the variable name, prefixed with `USE_EXPAND_VALUES_`, is directly expanded into its contained list
+   * if instead that variable name is listed in the variable `USE_EXPAND`,
+      the variable name, prefixed with `USE_EXPAND_VALUES_`, is expanded into a list of `(lowercase(variable name))_(use flag)`
+      where `use flag` is an element of the variable name's contained list
+
+     **Example**
+     ```
+     USE_EXPAND_IMPLICIT="KERNEL"
+     USE_EXPAND="KERNEL"
+     USE_EXPAND_UNPREFIXED="KERNEL"
+     USE_EXPAND_VALUES_KERNEL="linux"
+     ```
+     This declares the USE flags `kernel_linux` and `linux`.
 
    Another important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
     which expands into a list of USE flags that cannot be changed by the user,
@@ -143,6 +301,7 @@ Let briefly overview these locations, in their loading order:
     usually specified by a simlink from `/etc/portage/make.profile` to a folder in the portage's profile tree.
    As for the **repo** location, many files are considered to construct the USE flag selection of this location,
     which will be discussed in detail later in its own section.
+ * [**conf**](https://wiki.gentoo.org/wiki//etc/portage/make.conf):
  * [**pkg**](https://wiki.gentoo.org/wiki//etc/portage/package.use): the `/etc/portage/package.use` path is
     a user-defined file or folder containing several files declaring a USE flag selection for several *atoms* (i.e., sets of [packages]).
    As this/these file/s have the same structure as some in the profile, we will present its/their structure in a dedicated Section.
@@ -190,8 +349,10 @@ We structure he presentation of the files that take part in the USE flag selecti
       ```
       This defined the USE flag selection `amd64`.
  * `use`: this file states a system-wide USE flag selection,
-    by simply listing USE flags to be selected, or unselected if guarded with a `-` sign.
+    by simply listing USE flags to be selected.
    The list is constructed with only one (possibly guarded) USE flag per line.
+   Note that there is a way to remove an element from this list,
+    by declaring a USE flag guarded by a `-` sign.
  * [`package.use`](https://wiki.gentoo.org/wiki//etc/portage/package.use):
     this file lists a set of atoms, one per line,
     with its corresponding USE flag selection (i.e., a list of possibly guarded USE flags) on the same line.
@@ -211,13 +372,67 @@ We structure he presentation of the files that take part in the USE flag selecti
     dev-lang/php -mysql
 
     # enable java and set the python interpreter version for libreoffice-5.1
-    app-office/libreoffice java PYTHON_SINGLE_TARGET: python3_4
+    app-office/libreoffice java python_single_target_python3_4
     ```
 
 ###### Force and Mask Files
 
+In addition to the previously presented files, a profile folder can contain
+ other files with a syntax identical to the ones of the `use` and `package.use` files,
+ and a very similar semantics:
+ * `use.force`: identical to `use`
+ * `use.mask`: similar to `use`, but with an opposite semantics.
+   The constructed list corresponds to the USE flags that must be unselected.
+   This list override declarations made in `use` and `use.force`.
+ * `package.use.force`: it has a similar semantics of `use.force`
+    (i.e., the `-` sign just states that the guarded USE flag is removed from the selected list),
+    but per atom.
+   This file override declarations made in `package.use`
+ * `package.use.mask`: opposite to `package.use.force`
+   This file override declarations made in `package.use.force`
+
+ TODO: write a complete example
+
 
 ###### Stable Files
+
+The previously discussed `use*` and `package.use*` have yet another variation:
+ `use.stable.force`, `use.stable.mask`, `package.use.stable.force` and `package.use.stable.mask`.
+These files follows the same syntax of `use` and `package.use` respectively,
+ and have the same semantics of the files without the `stable` annotation,
+ except that they apply only on packages that are stable (i.e., with a stable keyword),
+ as discussed in the [portage man page](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html):
+
+> Beginning with **EAPI 5**, new USE configuration files are supported:
+> use.stable.mask, use.stable.force, package.use.stable.mask and package.use.stable.force.
+> These files behave similarly to previously supported USE configuration files,
+> except that they only influence packages that are merged due to a stable keyword.
+
+
+###### USE Flag Selection Combination in Profile
+
+
+
+So, the first tests I did shown that the files in a profile layer are managed separately.
+Between layers, the files of the same category are combined.
+Then, the resulting configuration are combined in the end.
+
+So, we have a configuration is a sub profile that is -everything
+in parallel, we have a use.force that sets two variables to true
+
+so, we have on one layer package.use < use.force < package.use.force < use.mask
+
+I need to test all interactions between these different files, and also the profile recursive structure.
+
+Hence, I need to
+ - add `my_feature1` and `my_feature2` in an `IUSE_IMPLICIT`
+ - check, with `dev-vcs/my-svn` if these features are indeed declared.
+   Hmm, to be able to see them, we need to have the variable `PROFILE_ONLY_VARIABLES` is set correctly.
+   Maybe I could create a dummy profile that does exactly what I want
+ -
+
+
+ - test the semantics of .stable.
 
 
 In portage, the use flags manipulation (declaration and selection) is not very clear.
@@ -254,6 +469,7 @@ In the previous items,
 
 ### Package Masking
 
+package.unmask is applied after package.mask
 
 ### Package Keywords
 
@@ -280,10 +496,10 @@ We consider the following:
 |-----------|------------|
 | `my-feature` , `my-feature(+)` , `my-feature(-)` | `feature-external`|
 | `-my-feature` , `-my-feature(+)` , `-my-feature(-)` | `not feature-external` |
-| `my-feature?` , `my-feature(+)?` , `my-feature)(-)?` | `feature-local => feature-external` |
+| `my-feature?` , `my-feature(+)?` , `my-feature(-)?` | `feature-local => feature-external` |
 | `!my-feature?` , `!my-feature(+)?` , `!my-feature)(-)?` | `(not feature-local) => (not feature-external)` |
-| `my-feature=` , `my-feature(+)=` , `my-feature)(-)=` | `feature-local <=> feature-external` |
-| `!my-feature=` , `!my-feature(+)=` , `!my-feature)(-)=` | `feature-local <=> (not feature-external)` |
+| `my-feature=` , `my-feature(+)=` , `my-feature(-)=` | `feature-local <=> feature-external` |
+| `!my-feature=` , `!my-feature(+)=` , `!my-feature(-)=` | `feature-local <=> (not feature-external)` |
 
 
 **2. If use flag is NOT present in the external package**
