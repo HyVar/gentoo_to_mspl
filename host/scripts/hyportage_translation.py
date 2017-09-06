@@ -67,7 +67,7 @@ def compute_portage_diff(
 	if nb_egencache_files_to_load > 0:  # load new hyportage spls  from egencache files
 		utils.phase_start("Loading the " + str(nb_egencache_files_to_load) + " egencache files.")
 		loaded_spls = concurrent_map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
-		#raw_spls = map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
+		#loaded_spls = map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
 		utils.phase_end("Loading completed")
 	else: loaded_spls = []
 
@@ -184,6 +184,18 @@ def update_keywords_ids(id_repository, path_keywords):
 	utils.phase_end("Regeneration completed")
 
 
+def apply_configurations(
+		pattern_repository, mspl, spl_iuse_reset,
+		profile_configuration, user_configuration, must_apply_profile, must_apply_user):
+	utils.phase_start("Applying the configuration on the hyportage database.")
+	spl_modified_data, spl_modified_visibility = hyportage_configuration.apply_configurations(
+			pattern_repository, mspl, spl_iuse_reset,
+			profile_configuration, user_configuration, must_apply_profile, must_apply_user)
+
+	utils.phase_end("Application completed")
+	return spl_modified_data, spl_modified_visibility
+
+
 def initialize_iuse_flags(
 		pattern_repository, mspl, spl_groups,
 		spl_added_full, pattern_added, pattern_updated, pattern_removed):
@@ -201,22 +213,9 @@ def initialize_iuse_flags(
 	return spl_iuse_to_update
 
 
-def apply_configurations(
-		pattern_repository, mspl, spl_iuse_reset,
-		profile_configuration, user_configuration, must_apply_profile, must_apply_user):
-	utils.phase_start("Applying the configuration on the hyportage database.")
-	spl_modified_data, spl_modified_visibility = hyportage_configuration.apply_configurations(
-			pattern_repository, mspl, spl_iuse_reset,
-			profile_configuration, user_configuration, must_apply_profile, must_apply_user)
-
-	utils.phase_end("Application completed")
-	return spl_modified_data, spl_modified_visibility
-
-
 def update_id_repository(pattern_repository, id_repository, spl_iuse_reset, spl_groups_removed, spl_groups_added):
 	utils.phase_start("Generating the ids if necessary")
 	for spl in spl_iuse_reset:
-		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
 		hyportage_ids.id_repository_add_spl(id_repository, spl)
 
 	for spl_group in spl_groups_removed:

@@ -253,14 +253,21 @@ def translate_depend(depend_string):
 # TRANSLATE A EGENCACHE FILE INTO A HYPORTAGE SPL
 ######################################################################
 
+#def is_selection_required(ctx):
+#	if "default" not in ctx: return True
+#	if "suffix" in ctx:
+#		if (ctx['default'] == "-") and (ctx['suffix'] == "?"): return True
+#		else: return False
+#	if "prefix" in ctx:
+#		return (ctx['default'] == "-")
+#	return (ctx['default'] == "+")
+
 def is_selection_required(ctx):
-	if "default" not in ctx: return True
-	if "suffix" in ctx:
-		if (ctx['default'] == "-") and (ctx['suffix'] == "?"): return True
-		else: return False
-	if "prefix" in ctx:
-		return (ctx['default'] == "-")
-	return (ctx['default'] == "+")
+	if 'default' not in ctx: return True
+	if 'suffix' not in ctx:
+		if ('prefix' not in ctx) and (ctx['default'] == "-"): return True
+		if ('prefix' in ctx) and (ctx['prefix'] == "-") and (ctx['default'] == "+"): return True
+	return False
 
 
 class GETDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
@@ -281,10 +288,10 @@ class GETDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
 		hyportage_data.dependencies_add_pattern(self.res[1], self.pattern)
 		if "selection" in ctx: map(self.visitSelection, ctx['selection'])
 
-	def visitSelection(self,ctx):
+	def visitSelection(self, ctx):
 		use = ctx['use']
 		#print("CHECK ERROR: main = " + str(self.main_package_name) + ", local = " + str(self.pattern) + ", use = " + str(use) + "  ==> " + str('suffix' in ctx))
-		if is_selection_required(ctx): hyportage_data.dependencies_add_pattern_use(self.res[1], self.pattern, use)
+		hyportage_data.dependencies_add_pattern_use(self.res[1], self.pattern, use, is_selection_required(ctx))
 		if 'suffix' in ctx: self.res[0].add(use)
 
 

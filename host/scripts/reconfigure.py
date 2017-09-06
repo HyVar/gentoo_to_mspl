@@ -27,14 +27,22 @@ __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 
+# todo michael: generate constraint from use selection, as a valid alternative from preference
+
+# todo request for now just indicate packages to insall -> implement unmerge feature to remove packages
+
 ##########################################################################
 # 1. INITIALIZE THE DATA (COMPUTE REQUEST AND UPDATE THE DATABASE)
 ##########################################################################
 
 def compute_request(atoms, profile_configuration, user_configuration):
 	requested_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
-	default_patterns = set(portage_data.configuration_get_pattern_required(profile_configuration).values())
-	default_patterns.update(portage_data.configuration_get_pattern_required(user_configuration).values())
+	default_patterns = {
+		pattern
+		for pattern_set in (
+			portage_data.configuration_get_pattern_required(profile_configuration).values()
+			+ portage_data.configuration_get_pattern_required(user_configuration).values())
+		for pattern in pattern_set}
 
 	use_selection = core_data.use_selection_create_from_use_list(os.environ.get("USE", "").split())
 	return requested_patterns, default_patterns, use_selection
@@ -44,7 +52,7 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, request
 	def local_function(pattern_repository, id_repository, patterns):
 		spls = set()
 		smt_constraint = []
-		# todo: ask michael if the or works when the pattern is a conflict
+
 		for pattern in patterns:
 			local_spls = hyportage_pattern.pattern_repository_element_get_spls(
 				hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)
@@ -55,9 +63,10 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, request
 	requested_spls, smt_constraint = local_function(pattern_repository, id_repository, requested_patterns)
 	all_spls, additional_smt_constraint = local_function(pattern_repository, id_repository, default_patterns)
 	smt_constraint.extend(additional_smt_constraint)
+	# convert all smt constraint in textual form to be saved later in the hyvarrec json input format
+	txt_smt_constraint = smt_encoding.simplify_constraints("request constraint",smt_constraint,"individual")
 	all_spls.update(requested_spls)
-	# todo smt constraint need to be string - not z3 constraints
-	return smt_constraint, requested_spls, all_spls
+	return txt_smt_constraint, requested_spls, all_spls
 
 
 def extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns):
@@ -116,10 +125,10 @@ def get_smt_variables_from_spls(pattern_repository, id_repository, mspl, spl_gro
 	smt_variable_use_flags.update({  # add the use flags of the dependencies
 		smt_encoding.get_smt_variable_use_flag(id_repository, hyportage_data.spl_get_name(dep_spl), use_flag)
 		for spl in spls
-		for pattern, use_flags in hyportage_data.spl_get_dependencies(spl).iteritems()
+		for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems()
 		for dep_spl in hyportage_pattern.pattern_repository_element_get_spls(
 			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)
-		for use_flag in use_flags})
+		for use_flag in required_use.keys()})
 
 	return smt_variable_spls | smt_variable_use_flags
 
@@ -131,12 +140,13 @@ def get_preferences_from_use_selection(id_repository, spl_name, use_selection):
 				smt_encoding.get_smt_int_use_flag(id_repository, spl_name, use_flag)
 				for use_flag in use_flags])
 		else:
-			return None
-	res_positive = local_function(id_repository, spl_name, core_data.use_selection_get_positive(use_selection))
-	res_negative = local_function(id_repository, spl_name, core_data.use_selection_get_negative(use_selection))
-	if res_negative:
-		res_negative = " - (" + res_negative + ")"
-		return (res_positive + res_negative) if res_positive else res_negative
+			return "0"
+	# todo: michael it seems that there is a flag that has no id. Please check
+	# res_positive = local_function(id_repository, spl_name, core_data.use_selection_get_positive(use_selection))
+	# res_negative = local_function(id_repository, spl_name, core_data.use_selection_get_negative(use_selection))
+	return "0" # todo to remove when the previous problem is fixed
+	if res_negative != "0":
+		return res_positive + " - (" + res_negative + ")"
 	return res_positive
 
 
@@ -154,12 +164,20 @@ def get_preferences_from_spls_use_selection(id_repository, spls):
 
 
 def get_preferences_initial(id_repository, mspl, installed_spls, spls):
-	# todo: preferences needs to be written using standard hyvarrec format
-	# todo: decide the priority of preferences (remove less packages installed as possible, keep more use flags used as possible, minimize number of new packages to install, minimize number of flags install in new packages)?
+	"""
+	the priority of preferences is decided as follows:
+	 - remove less packages installed as possible,
+	 - keep more use flags used as possible,
+	 - minimize number of new packages to install
+	 - minimize number of flags install in new packages
+	"""
+
+	# preference for removing less packages installed and not deprecated as possible
 	pref_spls = " + ".join([
 		smt_encoding.get_smt_int_spl_name(id_repository, spl_name)
 		for spl_name in installed_spls.keys()
 		if not hyportage_data.spl_is_deprecated(mspl[spl_name])])
+	# preference for keeping as much as use flag as possible
 	if pref_spls != "":
 		pref_use_selection = []
 		for spl_name, use_selection in installed_spls:
@@ -169,12 +187,14 @@ def get_preferences_initial(id_repository, mspl, installed_spls, spls):
 					pref_use_selection.append(tmp)
 		res = ([pref_spls, " + ".join(pref_use_selection)] if pref_use_selection else [pref_spls])
 	else: res = []
-
+	# preference to minimize number of new packages to install
 	if spls:
 		local_sum = " + ".join([
 			smt_encoding.get_smt_int_spl_name(id_repository, hyportage_data.spl_get_name(spl))
 			for spl in installed_spls.keys()])
-		res.append(" - (" + local_sum + ")")
+		res.append("0 - (" + local_sum + ")")
+	# no need to encode preference to minimize number of flags install in new packages
+	# hyvarrec will hanlde this automatically since these use flag are not selected in the initial configuration
 	return res
 
 
@@ -229,7 +249,7 @@ def run_hyvarrec(id_repository, mspl, data, par, explain_modality):
 	with open(file_name, "w") as f:
 		json.dump(data, f)
 	cmd = ["hyvar-rec", "--features-as-boolean"]
-	if par > 1:	cmd += ["-p", unicode(par)]
+	if par > 1:    cmd += ["-p", unicode(par)]
 	if explain_modality: cmd.append("--explain")
 	cmd.append(file_name)
 
@@ -244,6 +264,7 @@ def run_hyvarrec(id_repository, mspl, data, par, explain_modality):
 	res = json.loads(out)
 	if res["result"] != "sat":
 		if explain_modality:
+			# todo handle explain modality when the answer is unsat
 			# try to print a better explanation of the constraints
 			constraints = get_better_constraint_visualization(res["constraints"], mspl, id_repository)
 			sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
@@ -284,7 +305,7 @@ def update_to_install_spls(id_repository, mspl, to_install_spls, feature_list):
 
 def next_spls(pattern_repository, mspl, spl_groups, spl):
 	res = set()
-	for pattern in hyportage_data.spl_get_dependencies(spl).keys():
+	for pattern in hyportage_data.spl_get_dependencies(spl):
 		res.update(hyportage_pattern.pattern_repository_element_get_spls_visible(
 			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups))
 	return res
@@ -333,7 +354,6 @@ def get_hyvarrec_input_monolithic(
 	data['configuration']['selectedFeatures'] = get_smt_variables_from_installed_spls(id_repository, installed_spls)
 
 	# execute hyvar-rec
-	# todo handle explain modality when the answer is unsat
 	feature_list = run_hyvarrec(id_repository, mspl, data, par, explain_modality)
 	to_install_spls = core_data.package_installed_create()
 	update_to_install_spls(id_repository, mspl, to_install_spls, feature_list)
@@ -710,7 +730,7 @@ def main(
 	#t = time.time()
 	#hyportage_file_path = os.path.abspath(input_file)
 	#pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls = \
-	#	hyportage.load_hyportage(hyportage_file_path, save_modality)
+	#    hyportage.load_hyportage(hyportage_file_path, save_modality)
 	#logging.info("Loading completed in " + unicode(time.time() - t) + " seconds.")
 
 	#logging.info("Load the request package list.")
