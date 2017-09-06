@@ -36,7 +36,7 @@ def compute_request(atoms, profile_configuration, user_configuration):
 	default_patterns = set(portage_data.configuration_get_pattern_required(profile_configuration).values())
 	default_patterns.update(portage_data.configuration_get_pattern_required(user_configuration).values())
 
-	use_selection = core_data.use_selection_create_from_uses_list(os.environ.get("USE", "").split())
+	use_selection = core_data.use_selection_create_from_use_list(os.environ.get("USE", "").split())
 	return requested_patterns, default_patterns, use_selection
 
 
@@ -78,7 +78,7 @@ def extends_id_repository_with_requested_use_flags(id_repository, installed_spls
 
 def apply_requested_use_selection(requested_spls, use_selection):
 	for spl in requested_spls:
-		new_use_selection = core_data.use_selection_apply_configuration(
+		new_use_selection = core_data.use_selection_update(
 			hyportage_data.spl_get_use_selection_user(spl),
 			use_selection)
 		hyportage_data.spl_set_use_selection_user(spl, new_use_selection)
@@ -266,8 +266,8 @@ def update_to_install_spls(id_repository, mspl, to_install_spls, feature_list):
 
 	for spl_name in spl_names:
 		if spl_name not in to_install_spls:
-			to_install_spls[spl_name] = core_data.use_selection_invert(
-				core_data.use_selection_create_from_uses_list(hyportage_data.spl_get_iuses_user(mspl[spl_name])))
+			to_install_spls[spl_name] = core_data.use_selection_create(
+				[], hyportage_data.spl_get_iuses_user(mspl[spl_name]))
 	for spl_name, use_flag in use_flags:
 		if spl_name not in to_install_spls:
 			logging.error(

@@ -1,16 +1,5 @@
 #!/usr/bin/python
 
-'''
-Module defining function to translate a egencache file into an hyportage spl
-'''
-
-__author__ = "Michael Lienhardt & Jacopo Mauro"
-__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
-__license__ = "ISC"
-__version__ = "0.5"
-__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
-__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
-__status__ = "Prototype"
 
 import string
 import os
@@ -21,6 +10,20 @@ import core_data
 import hyportage_constraint_ast
 import utils
 import logging
+
+
+"""
+Module defining function to translate a egencache file into an hyportage spl
+"""
+
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
+__license__ = "ISC"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
+
 
 ######################################################################
 # EGENCACHE FILES FUNCTIONS
@@ -298,6 +301,7 @@ def create_spl_from_egencache_file(file_path):
 		for line in f:
 			array = string.split(line, "=", 1)
 			data_tmp[array[0]] = array[1][:-1]  # remove the \n at the end of the line
+	eapi = data_tmp.get('EAPI')
 	keywords_string = data_tmp.get('KEYWORDS')
 	slots_string = data_tmp.get('SLOT')
 	iuses_string = data_tmp.get('IUSE')
@@ -313,7 +317,7 @@ def create_spl_from_egencache_file(file_path):
 	slot = slots[0]
 	subslot = slots[1] if len(slots) == 2 else "0"
 
-	iuses, use_selection = hyportage_data.use_selection_create_from_iuses_list(iuses_string.split() if iuses_string else [])
+	iuses, use_selection = core_data.extract_data_from_iuse_list(iuses_string.split() if iuses_string else [])
 
 	fm_local = utils.compact_list(translate_require(fm_local)) if fm_local else []
 	fm_external = translate_depend(fm_external) if fm_external else []
@@ -326,6 +330,7 @@ def create_spl_from_egencache_file(file_path):
 	visitor.visitDepend(fm_combined)
 	# 5. return the raw spl
 	return hyportage_data.SPL(
+			eapi,
 			package_name, package_group, deprecated,
 			version_full, version,
 			slot, subslot,

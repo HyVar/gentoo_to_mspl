@@ -1,9 +1,8 @@
 #!/usr/bin/python
 
-import re
-import logging
-
 import core_data
+from core_data import match_only_package_group, match_spl_full, match_spl_simple
+
 import hyportage_data
 
 ######################################################################
@@ -16,107 +15,12 @@ pattern_create_from_atom = core_data.pattern_create_from_atom
 pattern_to_save_format = core_data.pattern_to_save_format
 pattern_from_save_format = core_data.pattern_from_save_format
 pattern_to_atom = core_data.pattern_to_atom
-
-
-def pattern_get_package_group(pattern): return pattern[1]
+pattern_get_package_group = core_data.pattern_get_package_group
 
 
 def pattern_is_package_group_specific(pattern):
 	pattern_package_group = pattern_get_package_group(pattern)
 	return (pattern_package_group[0] != "*") and (pattern_package_group[-1] != "*")
-
-
-######################################################################
-# MATCHING FUNCTIONS
-######################################################################
-
-def compare_version(s1, s2):
-	i, len1, len2 = 0, len(s1), len(s2)
-	maximum = min(len1, len2)
-	while (i < maximum) and (s1[i] == s2[i]):
-		i = i + 1
-	if i == maximum:
-		return len1 - len2
-	else:
-		if s1[i].isdigit() and s2[i].isdigit():
-			n1 = int(re.search("\d+", s1[i:]).group(0))
-			n2 = int(re.search("\d+", s2[i:]).group(0))
-			return n1 - n2
-		else:
-			return ord(s1[i]) - ord(s2[i])
-
-
-def match_only_package_group(pattern, package_group):
-	pattern_package_group = pattern_get_package_group(pattern)
-	if pattern_package_group == "*/*":
-		return True
-	elif (pattern_package_group[0] != "*") and (pattern_package_group[-1] != "*"):
-		return pattern_package_group == package_group
-	elif pattern_package_group[0] != "*":
-		pattern_subgroup = pattern_package_group[2:]
-		els = package_group[1].split("/")
-		return pattern_subgroup == els[-1]
-	else:
-		pattern_category = pattern_package_group[:-2]
-		els = package_group[1].split("/")
-		return pattern_category == els[-2]
-
-
-def match_only_package_version(pattern, version_full, version):
-	pattern_vop, pattern_version_full, pattern_version, pattern_has_star = pattern[0], pattern[2], pattern[3], pattern[4]
-
-	if (pattern_version_full is None) or (pattern_vop is None):
-		return True
-	compare = compare_version(version_full, pattern_version_full)
-	if pattern_vop == ">=":
-		if compare < 0:
-			return False
-	elif pattern_vop == ">":
-		if compare <= 0:
-			return False
-	elif pattern_vop == "~":
-		if pattern_version != version:
-			return False
-	elif pattern_vop == "=":
-		if pattern_has_star:
-			if not version_full.startswith(pattern_version_full):
-				return False
-		else:
-			if compare != 0:
-				return False
-	elif pattern_vop == "<=":
-		if compare > 0:
-			return False
-	elif pattern_vop == "<":
-		if compare >= 0:
-			return False
-	return True
-
-
-def match_only_slot(pattern, slot, subslot):
-	# pattern_slot, pattern_subslot, pattern_sop = pattern[5], pattern[6], pattern[7]
-	pattern_slot, pattern_subslot = pattern[5], pattern[6]
-	if pattern_slot:
-		if pattern_slot != slot:
-			return False
-	if pattern_subslot:
-		if pattern_subslot != subslot:
-			return False
-	return True
-
-
-def match_package_path(pattern, package_name):
-	package_group, version_full, version = parse_package_name(package_name)
-	return match_only_package_group(pattern, package_group) and match_only_package_version(pattern, version_full, version)
-
-
-def match_spl_full(pattern, spl):
-	return match_only_package_group(pattern, hyportage_data.spl_get_group_name(spl)) and match_spl_simple(pattern, spl)
-
-
-def match_spl_simple(pattern, spl):
-	return match_only_package_version(pattern, hyportage_data.spl_get_version_full(spl), hyportage_data.spl_get_version(spl)) and match_only_slot(pattern, hyportage_data.spl_get_slot(spl), hyportage_data.spl_get_slot(spl))
-
 
 ######################################################################
 # PATTERN REPOSITORY MANIPULATION

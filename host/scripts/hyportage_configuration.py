@@ -138,7 +138,7 @@ def __spl_data_apply_configuration(spl, pattern_repository, iuses, use_selection
 	# 5. mask
 	new_mask = mask
 	for pattern, sign in conf_mask:
-		if hyportage_pattern.match_spl_full(pattern, spl):
+		if core_data.match_spl_full(pattern, spl):
 			new_mask = sign
 	# 6. bundle up the generated data
 	return keyword_visible, new_iuses, new_use_selection, new_mask

@@ -3,6 +3,8 @@
 # this file loads a make.defaults or make.conf file (following the portage specification),
 #  expands the IUSE and USE variables, and outputs the bash variable environment
 
+# This files translates the loading functions in the portage/config.py file
+#
 
 ######################################################################
 # 1. LOADS THE MAKE.CONF / MAKE.DEFAULTS FILE
@@ -43,15 +45,15 @@ expand_list() {
 contains() {
 	LIST=$1
 	EL=$2
-	[[ ${LIST} =~ (^|[[:space:]])"${EL}"($|[[:space:]]) ]] && return 0 || return 1
+	return $([[ ${LIST} =~ (^|[[:space:]])("${EL}"|"-${EL}")($|[[:space:]]) ]])
 }
 
 
 # add element to list
 extends() {
-	LIST_NAME="$1"
-	EL="$2"
-	echo "add \"${EL}\" to the list \"${LIST_NAME}\""
+	LIST_NAME="$2"
+	EL="$1"
+	#echo "add \"${EL}\" to the list \"${LIST_NAME}\""
 	eval LIST="\$${LIST_NAME}"
 	if [ -n "${LIST}" ]; then
 		eval ${LIST_NAME}="'${LIST} ${EL}'"
@@ -62,15 +64,18 @@ extends() {
 
 
 # extract the "-" sign if present from a variable
+KEEP_SIGN=true
 extract_sign() {
 	local SIGNED_LIST_NAME="$1"
 	local SIGN_NAME="$2"
 	local LIST_NAME="$3"
+	eval ${SIGN_NAME}=""
 	if [ ${SIGNED_LIST_NAME:0:1} == "-" ]; then
-		eval ${SIGN_NAME}="-"
+		if ${KEEP_SIGN} ; then
+			eval ${SIGN_NAME}="-"
+		fi
 		eval ${LIST_NAME}="'${SIGNED_LIST_NAME:1}'"
 	else
-		eval ${SIGN_NAME}=""
 		eval ${LIST_NAME}="'${SIGNED_LIST_NAME}'"
 	fi
 }
@@ -78,17 +83,17 @@ extract_sign() {
 
 # function that declares the parameter as a use flag
 declare_use_flag() {
-	extends IUSE "$1"
+	extends "$1" IUSE
 }
 
 # function to add the parameter in the use flag selection
 select_use_flag() {
-	extends USE "$1"
+	extends "$1" USE
 }
 
 # function that adds a variable to the set of profile-only variables
 set_as_profile_only() {
-	extends FLAT_PROFILE_ONLY_VARIABLES "$1"
+	extends "$1" FLAT_PROFILE_ONLY_VARIABLES
 }
 
 ######################################################################
@@ -97,33 +102,34 @@ set_as_profile_only() {
 
 
 ######################################################################
-# 3.1. USE FLAG DECLARATION
-
-# declares the use flags in any IUSE list variable
-manage_iuse_list() {
-	echo "manage list ${1} with function ${2}"
-	iter "$2" "$1"
-}
+# 3.1. USE FLAG DECLARATION EXPANSION
 
 # declare the use flags in the USE_EXPAND_IMPLICIT
 # note that these use flags may be or may not be prefixed depending if the containing variable is in USE_EXPAND OR USE_EXPAND_UNPREFIXED
-manage_use_expand_implicit_get_prefix_from_variable() {
-	$(contains "${USE_EXPAND}" "$1") && PREFIX="${1,,}_" || PREFIX=""
-}
-
-manage_use_expand_implicit_inner() {
-	local LIST_NAME="$1"
-	local FUNCTION="$2"
-	manage_use_expand_implicit_get_prefix_from_variable "${LIST_NAME}"
+manage_use_expand_implicit_inner_list() {
+	local LIST_NAME="USE_EXPAND_VALUES_${1}"
+	local PREFIX="$2"
+	local FUNCTION="$3"
+	shift 3
 	eval LIST="\$${LIST_NAME}"
 	#echo "${LIST_NAME}=${LIST}"
-	printf -v LIST "${PREFIX}%s" ${LIST}
-	iter "${FUNCTION}" "${LIST}"
+	printf -v LIST " ${PREFIX}%s" ${LIST}
+	"${FUNCTION}" "${LIST}" $@
+
 }
 
-manage_use_expand_implicit() {
-	iter manage_use_expand_implicit_inner
+manage_use_expand_implicit_el() {
+	local LIST_NAME="$1"
+	shift 1
+
+	if contains "${USE_EXPAND}" "${LIST_NAME}"; then
+		manage_use_expand_implicit_inner_list "${LIST_NAME}" "${LIST_NAME,,}_" $@
+	fi
+	if contains "${USE_EXPAND_UNPREFIXED}" "${LIST_NAME}"; then
+		manage_use_expand_implicit_inner_list "${LIST_NAME}" "" $@
+	fi
 }
+
 
 ######################################################################
 # 3.2. USE FLAG SELECTION
@@ -136,7 +142,7 @@ manage_use_expand_inner() {
 	eval local LIST="\$${LOCAL_LIST_NAME}"
 	[ -n "${LIST}" ] && printf -v LIST "${LOCAL_SIGN}${PREFIX}%s " ${LIST}
 	#echo "${SIGNED_LIST_NAME}=${LIST}"
-	iter "${FUNCTION}" "${LIST}"
+	"${FUNCTION}" "${LIST}"
 }
 
 
@@ -147,20 +153,26 @@ manage_use_expand_unprefixed_inner() {
 	eval local LIST="\$${LOCAL_LIST_NAME}"
 	[ -n "${LIST}" ] && printf -v LIST "${LOCAL_SIGN}%s " ${LIST}
 	#echo "${SIGNED_LIST_NAME}=${LIST}"
-	iter "${FUNCTION}" "${LIST}"
+	"${FUNCTION}" "${LIST}"
 }
 
 
 ######################################################################
 # 3.2. USE FLAG HIDING
 
-manage_profile_only_variables_inner() { # does not expand USE_EXPAND_IMPLICIT correctly
+manage_profile_only_variables_el() { # does not expand USE_EXPAND_IMPLICIT correctly
 	#echo "LIST_NAME=$1"
-	if contains "${USE_DECLARATION_EXPAND}" "$1"; then
-		expand_list "$1" manage_use_expand_implicit_inner set_as_profile_only
+	KEEP_SIGN=false
+	if [ "$1" == "USE_EXPAND_IMPLICIT" ]; then
+		expand_list "$1" manage_use_expand_implicit_el set_as_profile_only
+	elif [ "$1" == "USE_EXPAND" ]; then
+		expand_list "$1" manage_use_expand_inner set_as_profile_only
+	elif [ "$1" == "USE_EXPAND_UNPREFIXED" ]; then
+		expand_list "$1" manage_use_expand_unprefixed_inner set_as_profile_only
 	else
 		expand_list "$1" set_as_profile_only
 	fi
+	KEEP_SIGN=true
 }
 
 
@@ -170,29 +182,45 @@ manage_profile_only_variables_inner() { # does not expand USE_EXPAND_IMPLICIT co
 ######################################################################
 
 
-######################################################################
-# 4.1. CONFIGURE THE VARIABLE SEMANTICS
-
-USE_DECLARATION_DIRECT="IUSE_IMPLICIT USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL USE_EXPAND_VALUES_USERLAND"
-USE_DECLARATION_EXPAND="USE_EXPAND_IMPLICIT"
-
-USE_DECLARATION_HIDDEN_FROM_USER="PROFILE_ONLY_VARIABLES"
-
-USE_SELECTION_EXPAND_WITH_PREFIX="USE_EXPAND"
-USE_SELECTION_EXPAND_WITHOUT_PREFIX="USE_EXPAND_UNPREFIXED"
-
 
 ######################################################################
-# 4.2. EXPANDS THE VARIABLES
+# 4.1. USE flag declaration
 
 
-iter expand_list "${USE_DECLARATION_DIRECT}" declare_use_flag # works
-iter expand_list "${USE_DECLARATION_EXPAND}" manage_use_expand_implicit_inner declare_use_flag # works
+# FOR EAPI <= 4
 
-iter expand_list "${USE_DECLARATION_HIDDEN_FROM_USER}" manage_profile_only_variables_inner
+IUSE_EAPI_4="${IUSE}"
 
-iter expand_list "${USE_SELECTION_EXPAND_WITH_PREFIX}" manage_use_expand_inner select_use_flag
-iter expand_list "${USE_SELECTION_EXPAND_WITHOUT_PREFIX}" manage_use_expand_unprefixed_inner select_use_flag
+# flags derived from ARCH
+IUSE_EAPI_4="${IUSE_EAPI_4} ${ARCH} ${PORTAGE_ARCHLIST}"
+
+# flags from variable expansion
+for LIST_NAME in ${USE_EXPAND_HIDDEN}; do
+	extract_sign "${LIST_NAME}" "SIGN" "LIST_NAME"
+	expand_list "${LIST_NAME}" extends "IUSE_EAPI_5" # works
+done
+
+
+
+# FOR EAPI >= 5
+
+IUSE_EAPI_5="${IUSE}"
+
+# the IUSE_IMPLICIT variable is a simple list of USE flags to declare
+extends "${IUSE_IMPLICIT}" "IUSE_EAPI_5" # works
+
+# the USE_EXPAND_IMPLICIT expands USE_EXPAND_VALUES_* variables that are listed in the USE_EXPAND and USE_EXPAND_UNPREFIXED variables
+iter manage_use_expand_implicit_el "${USE_EXPAND_IMPLICIT}" extends "IUSE_EAPI_5" # works
+
+# the PROFILE_ONLY_VARIABLES lists the variables that expand into lists of USE flags that cannot be configured by the user
+iter manage_profile_only_variables_el "${PROFILE_ONLY_VARIABLES}"
+
+
+######################################################################
+# 4.2. USE flag selection
+
+iter manage_use_expand_inner "${USE_EXPAND}"  select_use_flag
+iter manage_use_expand_unprefixed_inner "${USE_EXPAND_UNPREFIXED}"  select_use_flag
 
 
 # display

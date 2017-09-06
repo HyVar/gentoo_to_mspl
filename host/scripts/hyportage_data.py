@@ -39,10 +39,9 @@ iuses_from_save_format = core_data.set_configuration_from_save_format_simple
 
 use_selection_create = core_data.use_selection_create
 use_selection_copy = core_data.use_selection_copy
-use_selection_create_from_iuses_list = core_data.use_selection_create_from_iuses_list
 use_selection_add = core_data.use_selection_add
 use_selection_remove = core_data.use_selection_remove
-use_selection_apply_configuration = core_data.use_selection_apply_configuration
+use_selection_apply_configuration = core_data.use_selection_update
 use_selection_to_save_format = core_data.use_selection_to_save_format
 use_selection_from_save_format = core_data.use_selection_from_save_format
 
@@ -86,13 +85,14 @@ def dependencies_from_save_format(save_format):
 
 class SPL(object):
 	def __init__(
-			self,
+			self, eapi,
 			name, group, deprecated,
 			version_full, version,
 			slot, subslot,
 			fm_local, fm_combined,
 			dependencies, required_iuses_local, keywords_list,
 			iuses_default, use_selection_default):
+		self.eapi                  = eapi
 		self.name                  = name
 		self.group                 = group
 		self.deprecated            = deprecated

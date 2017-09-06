@@ -1,4 +1,7 @@
 import os
+
+import core_data
+
 import utils
 import logging
 
@@ -32,7 +35,7 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 	if last_update < os.path.getmtime(path_file):
 		return True
 	for pattern in patterns:
-		if hyportage_pattern.match_package_path(pattern, path_file):
+		if core_data.match_package_path(pattern, path_file):
 			return True
 	return False
 
