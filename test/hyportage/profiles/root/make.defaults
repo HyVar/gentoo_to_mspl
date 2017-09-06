@@ -1,0 +1,29 @@
+# Copyright 2017 Michael Lienhardt
+
+####################################################
+# ARCH must be set, otherwise emerge fails
+
+ARCH="amd64"
+
+# ACCEPT_KEYWORDS must be set, otherwise no package can be installed
+ACCEPT_KEYWORDS="${ARCH}"
+
+
+####################################################
+# USE flag declaration
+
+# direct list of USE flags to declare
+IUSE_IMPLICIT="implicit_feature"
+
+# lists the USE_EXPAND_VALUES_* variables to expand into USE flag declaration
+USE_EXPAND_IMPLICIT="KERNEL"
+USE_EXPAND_VALUES_KERNEL="feature2"
+
+USE_EXPAND="KERNEL"
+USE_EXPAND_UNPREFIXED="KERNEL UNEXPANDED"
+
+#UNEXPANDED="implicit_feature"
+#KERNEL="feature2"
+
+
+#PROFILE_ONLY_VARIABLES="USE_EXPAND_VALUES_KERNEL USE_EXPAND_IMPLICIT"
