@@ -42,10 +42,8 @@ __tmp_files_lock = multiprocessing.Lock()
 def get_new_temp_file(extension):
 	global __tmp_files_lock
 	global __tmp_files
-	not_ok = False
-	while not_ok:
-		name = os.path.join(__tmp_files_directory, uuid.uuid4().hex + '.' + extension)
-		not_ok = not os.path.exists(name)
+	# probablility of picking up the same uuid is negligible
+	name = os.path.join(__tmp_files_directory, uuid.uuid4().hex + '.' + extension)
 	__tmp_files_lock.acquire()
 	__tmp_files.append(name)
 	__tmp_files_lock.release()
