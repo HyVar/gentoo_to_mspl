@@ -1,0 +1,9 @@
+#*/* ~amd64
+
+=hyportage/test-force-6.0 ~amd64
+=hyportage/test-force-7.0 ~amd64
+
+
+=hyportage/test-keywords-1.0 -*
+=hyportage/test-keywords-2.0 -* ~amd64
+=hyportage/test-keywords-3.0 -* ~ppc

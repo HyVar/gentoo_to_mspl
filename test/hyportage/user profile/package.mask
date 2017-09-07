@@ -1,0 +1,2 @@
+-=hyportage/test-mask-1.0
+=hyportage/test-mask-3.0

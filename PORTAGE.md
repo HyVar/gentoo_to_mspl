@@ -462,8 +462,36 @@ In the previous items,
 
 
 #### USE Flag Selection Combination
+TODO: structure these data in an understandable way.
+
+well, the structure of this document is not perfect, as the composition of the information is global to a profile, and thus include information about use selection, but also per package use selection and package masking.
+Any way, as I discovered, there are three layers of profiles: the root profile (/usr/portage/profiles/, non hierarchical), the default profile (/etc/portage/make.profile, hierarchical) and the user profile (/etc/portage/profile/, non hierarchical).
+
+All these profiles are combined before being applied to the packages:
+ the set construction (e.g., removal of element from package.mask) does transfer from one profile to the other.
+
+The manipulation of package.accept_keywords is quite strange, to say the least.
+Well, ok, I think I understand:
+ - `KEYWORDS` is the list of architecture that is supported by the package.
+   In principle, it can be modified by package.keywords files (which, again, works as a list manipulation file),
+    but in practice, it may be mistaken as an `package.accept_keywords` file
+ - `ACCEPT_KEYWORDS` is the list of keywords that the local architecture accepts to allow the installation of a package.
+   By default, this list is contained in the `ACCEPT_KEYWORDS` variable, and can be set per package in the files `package.accept_keywords`,
+     which, again, works as a list manipulation file (that manipulate the `ACCEPT_KEYWORDS` variable for each package independently).
+   A package is considered unstable if its `ACCEPT_KEYWORDS` list contains an unstable keyword.
+ A package can be installed if its list of keywords, intersected with its accepted keywords, is non empty.
 
 
+**Note that the list manipulation of accepted keywords accepts `-*` ** to remove all elements of the list.
+Does other list manipulation work in the same way (e.g., package.use, use.force)?
+Nope. package.\* does not accept `*/*` atoms either.
+
+I still need to check with package.keywords and package.accept_keywords:
+ - `-*` works in package.accept_keywords
+ - `-*` works in package.keywords
+
+
+package.use package.use.force package.use.mask
 
 ## Package Visibility
 

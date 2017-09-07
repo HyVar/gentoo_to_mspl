@@ -1,0 +1,6 @@
+=hyportage/test-stable-2.0 ~amd64
+
+# if a package ls listed here with a unstable keywrds,
+#  even if its base keyword is stable, it is considered unstable
+
+=hyportage/test-stable-1.0 ~amd64
