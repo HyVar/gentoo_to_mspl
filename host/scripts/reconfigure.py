@@ -99,12 +99,15 @@ def apply_requested_use_selection(requested_spls, use_selection):
 
 
 def get_smt_constraint_from_spls(spl_groups, spls):
-	res = [hyportage_data.spl_get_smt_constraint(spl) for spl in spls]
-	res.extend([
-		hyportage_data.spl_group_get_smt_constraint(spl_groups[spl_group_name])
-		for spl_group_name in {hyportage_data.spl_get_group_name(spl) for spl in spls}
-	])
-	return res
+    res = []
+    spl_group_names = set([])
+    for spl in spls:
+        res.extend(hyportage_data.spl_get_smt_constraint(spl))
+        spl_group_names.add(hyportage_data.spl_get_group_name(spl))
+
+    for spl_group_name in spl_group_names:
+       res.extend(hyportage_data.spl_group_get_smt_constraint(spl_groups[spl_group_name]))
+    return res
 
 
 def get_smt_variables_from_spls(pattern_repository, id_repository, mspl, spl_groups, spls):
@@ -156,11 +159,13 @@ def get_preferences_from_spl_use_selection(id_repository, spl):
 
 
 def get_preferences_from_spls_use_selection(id_repository, spls):
-	res = []
-	for spl in spls:
-		v = get_preferences_from_spl_use_selection(id_repository, spl)
-		if v: res.append(v)
-	return res
+    res = "0"
+    for spl in spls:
+        v = get_preferences_from_spl_use_selection(id_repository, spl)
+        if v != "0":
+            res += " + " + v
+    return res
+
 
 
 def get_preferences_initial(id_repository, mspl, installed_spls, spls):
@@ -352,6 +357,7 @@ def get_hyvarrec_input_monolithic(
 	data['preferences'].extend(get_preferences_from_spls_use_selection(id_repository, dep_spls))
 	# setup the initial configuration
 	data['configuration']['selectedFeatures'] = get_smt_variables_from_installed_spls(id_repository, installed_spls)
+	# todo ask michael why no selected features are added to data['configuration']['selectedFeatures']
 
 	# execute hyvar-rec
 	feature_list = run_hyvarrec(id_repository, mspl, data, par, explain_modality)
