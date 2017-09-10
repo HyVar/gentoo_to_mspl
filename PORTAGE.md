@@ -5,10 +5,10 @@
 
 ## Core Principles
 
-The main characteristics of portage, compared to other package manager, is that its packages are distributed as source code (when possible),
+The main characteristics of portage, compared to other package managers, is that its packages are distributed as source code (when possible),
  which can be configured by the machine's administrator, prior to compilation and installation of the package.
 Portage contains a unified interface for configuring the package, called [USE flags](https://wiki.gentoo.org/wiki/Handbook:AMD64/Working/USE).
-The documentation is a bit unclear: USE flags are *features* giving an [SPL](https://en.wikipedia.org/wiki/Software_product_line) structure to all of the portage's packages.
+In principle, USE flags are *features* giving a [Software Product Line (SPL)](https://en.wikipedia.org/wiki/Software_product_line) structure to all of the portage's packages.
 
 #### Portage's Repository Structure
 
@@ -35,7 +35,7 @@ Finally, these groups contains several `.ebuild` files, one per version of the g
 A package's *.ebuild* file follows a syntax close to a bash script file,
  and declares a set of information defining its (hybrid-dependent) SPL structure:
  * `IUSE`: this variable declares the list of USE flags (i.e., SPL's features) for this package
- * `REQUIRED_USE`: this variable declares a constraint on the package's USE flag, thus defining the local feature model of this SPL
+ * `REQUIRED_USE`: this variable declares a constraint on the package's USE flag, thus defining the local [Feature Model](https://en.wikipedia.org/wiki/Feature_model) of this SPL
  * [`DEPEND`, `RDEPEND` and `PDEPEND`](https://devmanual.gentoo.org/general-concepts/dependencies/index.html):
     these variables declare constraints stating the dependencies to other packages,
     thus giving a structure of **Dependent SPL** to the package.
@@ -50,9 +50,9 @@ A package's *.ebuild* file follows a syntax close to a bash script file,
 ###### Feature Model Syntax
 
 As discussed previously, the Feture Model of a Portage package is declared with six variables:
- * `IUSE` lists the features of the feature model
- * `REQUIRED_USE` defines the *local* part of the feature model
- * `DEPEND`, `RDEPEND` and `PDEPEND` define the *dependency* part of the feature model
+ * `IUSE` lists the features of the Feature Model
+ * `REQUIRED_USE` defines the *local* part of the Feature Model
+ * `DEPEND`, `RDEPEND` and `PDEPEND` define the *dependency* part of the Feature Model
 
 The syntax of the `REQUIRED_USE` constraint is as follows:
 ```
@@ -81,14 +81,14 @@ This syntax is similar to the one for `REQUIRED_USE`, with two core difference:
    We won't go in details into the syntax of atoms in this section,
     we just want to point out that atoms are a very low level and implicit notion of SPL Interface:
      it is a name on which an SPL can depend on, and that can be implemented by several SPLs.
-   No notion of feature model or code interface is associated to this low level notion of SPL interface.
+   No notion of Feature Model or code interface is associated to this low level notion of [SPL interface](http://fsen.ir/2017/files/Preproceedings.pdf) (page 29).
  * `SELECTION` is the portage's way to specify a *partial product* for a package's dependency.
    Like for atoms, we won't go in details into the syntax of partial product,
     we just want to point our that it can select or require unselected some features,
     with such feature selection possibly guarded by some local feature being selected or unselected.
 
 For more information about the `*DEPEND` variables, you can look at the [documentation](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
- and the full semantics of [full semantics of partial product specification](#semantics-of-use-flags-selection-in-constraints).
+ and the [full semantics of partial product specification](#semantics-of-use-flags-selection-in-constraints).
 
 
 ## Configuration
@@ -119,7 +119,121 @@ app-office/libreoffice java python_single_target_python3_4
 
 
 
-# Portage: Some Technical Information
+# Portage: Full Package Configuration
+
+The previous Section was a brief overview of the characteristics of
+ Portage that makes this package manager into a Multi-Software Product line
+ (i.e., a collection of inter-dependent Software Product Lines).
+However, Portage and its packages are far more complex than what I just presented,
+ and can be configured in many different ways.
+In this Section, I will skip the configuration of a package's compilation and installation in the system,
+ but I will try to give a complete overview of all the other configurable data related to a Portage's package,
+ and of Portage itself and the user can configure these data.
+
+## Package Configurable Data
+
+Here is the list of data that can be configured in a Portage's package.
+We will go over how these data can actually be configured in the next Section.
+
+##### USE Flags Declaration
+
+Interestingly, even if the Feature Model of a package cannot really be changed
+ (it is not possible to change the value of the `REQUIRED_USE` and `*DEPEND` variables),
+ it is possible to extend its declared USE flags (i.e., its list of features).
+
+The motivation for such extension is that many packages's Feature Model
+ have similar features that are usually configured (selected or not selected)
+ in the same way. For instance, features talking about the system's kernel,
+ or its hardware architecture.
+Such features are thus implicitly declared and configured by Portage itself
+ for all of its packages.
+And using the same mechanism, it is possible for the user to do the same.
+
+
+
+##### USE Flags Configuration
+
+Like for a classic Feature Model, a *product* for Portage's package is a set of selected USE flags (*features*),
+ and all the USE flags not in this set are considered not-selected.
+However, Portage's way to construct a product is using what I call *set manipulations*:
+ we start with the empty product (i.e., an empty set of feature),
+ and different configuration files state what to add and to remove to this set.
+For instance, consider the following set manipulation, that removes `mysql`, adds `berkdb`, removes `kde` and adds `gtk`:
+```
+-mysql berkdb -kde gtk
+```
+Applying this set manipulation on the product `mysql ssl`, we get the product `ssl berkdb gtk`.
+Note that the removal of a feature that is not present in the set (here `kde`) is silently skipped.
+
+
+A package's product in Portage is constructed using 5 different USE flag set, each of them modifiable via *set manipulations*:
+ - `use` is the base USE flag set
+ - `use.force` is the set of USE flags that are always added to the package's `use` set
+ - `use.stable.force` is the set of USE flags that are added to the package's set only if it is <a href="#def_stable">*stable*</a>
+ - `use.mask` is the set of USE flags that are always removed from the package's `use` set
+ - `use.stable.mask` is the set of USE flags that are removed from the package's set only if it is <a href="#def_stable">*stable*</a>
+Note that the sets `use.*` are applied on the `use` set in the order we described them.
+In particular, the `*.mask` sets override all the USE flags added by the `*.force` sets.
+
+**Example**
+Consider the following USE flag sets for a stable package:
+```
+use = ssl berkdb gtk multilib
+use.force = amd64 kernel-linux elibc-glibc
+use.stable.force =
+use.mask = multilib
+use.stable.mask = python_targets_pypy
+```
+This results in the product `ssl berkdb gtk amd64 kernel-linux elibc-glibc`.
+
+##### Keyword Configuration
+
+One important property of a Portage's package is if
+ it can be installed in the current hardware architecture.
+This information is given by two configurable variables:
+ - [`KEYWORDS`](https://wiki.gentoo.org/wiki/KEYWORDS) contains the set of *keywords* (similar to architecture) on which it is safe to install the package
+    (i.e., it can be compiled and run on that architecture)
+ - [`ACCEPT_KEYWORDS`](https://wiki.gentoo.org/wiki/ACCEPT_KEYWORDS/en) contains the set of keywords that the current hardware supports.
+These two sets can be changed with a *set manipulation*, like a package's product.
+Note that there are two kind of keywords:
+ a *stable keyword* is the name of an architecture, e.g., `x86` or `amd64`;
+ a *testing keyword* is the name of an architecture, prefixed with `~` to state that this package can be installed on that architecture, but isn't fully tested.
+
+
+We have the two following definition related to keywords:
+<dl>
+<dt> Installable</dt>
+<dd>A package is *installable* if the intersection of
+ its set of keywords and accept_keywords is not empty</dd>
+<dt id="def_stable"> Stable</dt>
+<dd>A package is *stable* if the intersection of
+ its set of keywords and accept_keywords only contains stable keywords</dd>
+</dl>
+
+
+
+##### Package Masking
+
+Finally, it is possible to mask a package, i.e., to make it non installable independently from its supported architecture.
+The set of masked packages is defined by two sets that can be changed via sets manipulations:
+ - [`mask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Masking_a_package) is the set of packages that are masked
+ - [`unmask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Unmasking_a_package) is the set of packages that are removed from the `mask` set.
+Note that these masking sets are not sets of packages, but sets of *atoms* that correspond to sets of packages.
+
+**Example**
+Consider the following sets:
+```
+mask: sys-fs/eudev sys-fs/udev sys-kernel/genkernel
+umask: >=sys-kernel/genkernel-3.5.0.5
+```
+Here, all packages of the groups `sys-fs/eudev` and `sys-fs/udev` are masked,
+ and so are the packages of the group `sys-kernel/genkernel` whose version is less than `3.5.0.5`.
+
+
+## Package Configuration: Many Steps
+
+
+
 
 In this section, we give a brief and precise summary of many information scattered in the portage's documentation,
  and that is essential to correctly compute a valid portage configuration.
@@ -503,7 +617,7 @@ package.unmask is applied after package.mask
 
 
 
-## Semantics of Use Flags Selection in Constraints
+# Portage: Semantics of Feature Model Constraints
 
 Consider the constraint syntax in the DEPEND variable of a package, as described in [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
 This syntax, starting from EAPI=2, allows for Use dependencies, i.e., when specifying a dependency, one can specify which use flags must be selected or unselected for that dependency.
