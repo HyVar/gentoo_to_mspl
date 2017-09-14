@@ -47,7 +47,7 @@ A package's *.ebuild* file follows a syntax close to a bash script file,
     thus giving a structure of **Hybrid SPL** to the package.
    Note that these package can be prefixed by `~` to state that this package is not thoroughly tested on that architecture.
 
-###### Feature Model Syntax
+#### Feature Model Syntax
 
 As discussed previously, the Feture Model of a Portage package is declared with six variables:
  * `IUSE` lists the features of the Feature Model
@@ -135,7 +135,7 @@ In this Section, I will skip the configuration of a package's compilation and in
 Here is the list of data that can be configured in a Portage's package.
 We will go over how these data can actually be configured in the next Section.
 
-##### USE Flags Declaration
+#### USE Flags Declaration
 
 Interestingly, even if the Feature Model of a package cannot really be changed
  (it is not possible to change the value of the `REQUIRED_USE` and `*DEPEND` variables),
@@ -151,7 +151,7 @@ And using the same mechanism, it is possible for the user to do the same.
 
 
 
-##### USE Flags Configuration
+#### USE Flags Configuration
 
 Like for a classic Feature Model, a *product* for Portage's package is a set of selected USE flags (*features*),
  and all the USE flags not in this set are considered not-selected.
@@ -186,7 +186,7 @@ use.stable.mask = python_targets_pypy
 ```
 This results in the product `ssl berkdb gtk amd64 kernel-linux elibc-glibc`.
 
-##### Keyword Configuration
+#### Keyword Configuration
 
 One important property of a Portage's package is if
  it can be installed in the current hardware architecture.
@@ -203,16 +203,16 @@ Note that there are two kind of keywords:
 We have the two following definition related to keywords:
 <dl>
 <dt> Installable</dt>
-<dd>A package is *installable* if the intersection of
+<dd>A package is <em>installable</em> if the intersection of
  its set of keywords and accept_keywords is not empty</dd>
 <dt id="def_stable"> Stable</dt>
-<dd>A package is *stable* if the intersection of
+<dd>A package is <em>stable</em> if the intersection of
  its set of keywords and accept_keywords only contains stable keywords</dd>
 </dl>
 
 
 
-##### Package Masking
+#### Package Masking
 
 Finally, it is possible to mask a package, i.e., to make it non installable independently from its supported architecture.
 The set of masked packages is defined by two sets that can be changed via sets manipulations:
