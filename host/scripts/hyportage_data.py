@@ -100,41 +100,42 @@ def dependencies_from_save_format(save_format):
 class SPL(object):
 	def __init__(
 			self, eapi,
-			name, group, deprecated,
-			version_full, version,
-			slot, subslot,
+			name, core, deprecated,
 			fm_local, fm_combined,
 			dependencies, required_iuses_local, keywords_list,
 			iuses_default, use_selection_default):
-		self.eapi                  = eapi
-		self.name                  = name
-		self.group                 = group
-		self.deprecated            = deprecated
-		self.version_full          = version_full
-		self.version               = version
-		self.slot                  = slot
-		self.subslot               = subslot
-		self.slots                 = (slot, subslot)
-		self.fm_local              = fm_local               # the part of the feature model related to local features, i.e., portage's REQUIRED_USE
-		self.fm_combined           = fm_combined            # the part of the feature model relatd to external dependencies, i.e., portage's DEPEND + RDEPEND + PDEPEND
-		self.smt_constraint        = None                   # translation of the full feature model into z3 constraints
-		self.dependencies          = dependencies           # mapping from pattern dependencies to list of features they must have declared
-		self.required_iuses_local  = required_iuses_local   # list of local features mentioned in local constraints
-		self.required_iuses        = None                   # list of features that must be declared in this spl
-		self.iuses_default         = iuses_default          # list of features declared in this spl by default
-		self.iuses_profile         = None                   # previous list extended with features implicitly declared by portage
-		self.iuses_user            = None                   # previous list extended with features implicitly declared by user
-		self.keywords_list         = keywords_list          # list of architectures valid for this spl
-		self.keywords_default      = None                   # boolean stating if this spl can be installed by default on the current architecture
-		self.keywords_profile      = None                   # boolean stating if this spl can be installed, considering the default portage information
-		self.keywords_user         = None                   # boolean stating if this spl can be installed, considering both default and user configuration
-		self.use_selection_default = use_selection_default  # default use selection
-		self.use_selection_profile = None                   # use selection considering default portage information
-		self.use_selection_user    = None                   # use selection considering both default and user configuration
-		self.mask_profile          = None                   # if portage states that this spl is masked or not
-		self.mask_user             = None                   # if this spl is masked, considering both default and user configuration
-		self.visited               = False                  # if the spl was visited in a graph traversal
+		self.eapi                    = eapi
+		self.name                    = name
+		self.core                    = core
+		self.slots                   = core_data.spl_core_get_slot(core), core_data.spl_core_get_subslot(core)
+		self.deprecated              = deprecated
+		self.fm_local                = fm_local               # the part of the feature model related to local features, i.e., portage's REQUIRED_USE
+		self.fm_combined             = fm_combined            # the part of the feature model relatd to external dependencies, i.e., portage's DEPEND + RDEPEND + PDEPEND
+		self.smt_constraint          = None                   # translation of the full feature model into z3 constraints
+		self.dependencies            = dependencies           # mapping from pattern dependencies to list of features they must have declared
+		self.required_iuses_local    = required_iuses_local   # list of local features mentioned in local constraints
+		self.required_iuses_external = {}                     # list of features that must be declared in this spl
+		self.required_iuses          = None
+		self.iuses_default           = iuses_default          # list of features declared in this spl by default
+		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
+		self.use_selection_default   = use_selection_default  # default use selection
+		self.use_selection_full      = None                   # use selection considering default portage information
+		self.unmask                  = None                   # if portage states that this spl is masked or not
+		self.keywords_list           = keywords_list          # list of architectures valid for this spl
+		self.installable             = None
+		self.is_stable               = None                   # boolean stating if this spl can be installed by default on the current architecture
+		self.visited                 = False                  # if the spl was visited in a graph traversal
 		# self.has_several_parents   = False                  # if there are two paths to access this spl during graph traversal
+
+	def update_required_iuses_external(self, features, pattern):
+		res = False
+		for feature in features:
+			if feature in self.required_iuses_external:
+				self.required_iuses_external[feature].add(pattern)
+			else:
+				self.required_iuses_external[feature] = {pattern}
+				res = True
+		return res
 
 	def __hash__(self): return hash(self.name)
 
@@ -146,12 +147,12 @@ class SPL(object):
 
 
 def spl_get_name(spl): return spl.name
-def spl_get_group_name(spl): return spl.group
-def spl_get_slot(spl): return spl.slot
-def spl_get_subslot(spl): return spl.subslot
+def spl_get_group_name(spl): return core_data.spl_core_get_spl_group_name(spl.core)
+def spl_get_slot(spl): return core_data.spl_core_get_slot(spl.core)
+def spl_get_subslot(spl): return core_data.spl_core_get_subslot(spl.core)
 def spl_get_slots(spl): return spl.slots
-def spl_get_version(spl): return spl.version
-def spl_get_version_full(spl): return spl.version_full
+def spl_get_version(spl): return core_data.spl_core_get_version(spl.core)
+def spl_get_version_full(spl): return core_data.spl_core_get_version_full(spl.core)
 def spl_get_dependencies(spl): return spl.dependencies
 def spl_is_deprecated(spl): return spl.deprecated
 
@@ -167,25 +168,16 @@ def spl_get_required_iuses(spl): return spl.required_iuses
 
 def spl_get_keywords_list(spl): return spl.keywords_list
 def spl_get_keywords_default(spl): return spl.keywords_default
-def spl_get_keywords_profile(spl): return spl.keywords_profile
-def spl_get_keywords_user(spl): return spl.keywords_user
 
 
 def spl_get_iuses_default(spl): return spl.iuses_default
-def spl_get_iuses_profile(spl): return spl.iuses_profile
-def spl_get_iuses_user(spl): return spl.iuses_user
+def spl_get_iuses_full(spl): return spl.iuses_full
 
 
 def spl_get_use_selection_default(spl): return spl.use_selection_default
-def spl_get_use_selection_profile(spl): return spl.use_selection_profile
-def spl_get_use_selection_user(spl): return spl.use_selection_user
 
 
-def spl_get_mask_profile(spl): return spl.mask_profile
-def spl_get_mask_user(spl): return spl.mask_user
-
-
-def spl_is_visible(spl): return spl_get_keywords_user(spl) and (not spl_get_mask_user(spl))
+def spl_is_installable(spl): return spl.installable
 
 
 def spl_is_visited(spl): return spl.visited
@@ -206,11 +198,11 @@ def spl_set_use_selection_user(spl, new_use_selection): spl.use_selection_user =
 def spl_set_mask_user(spl, new_mask): spl.mask_user = new_mask
 
 
-def spl_reset_required_iuses(spl, pattern_repository):
-	spl.required_iuses = list(set.intersection(spl_get_iuses_user(spl), set.union(
-		spl.required_iuses_local,
-		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl))))
-	#logging.debug("IUSE(" + spl_get_name(spl) + ") = " + str(sorted(spl.required_iuses)))
+#def spl_reset_required_iuses(spl, pattern_repository):
+#	spl.required_iuses = list(set.intersection(spl_get_iuses_user(spl), set.union(
+#		spl.required_iuses_local,
+#		hyportage_pattern.pattern_repository_get_spl_required_use(pattern_repository, spl))))
+#	#logging.debug("IUSE(" + spl_get_name(spl) + ") = " + str(sorted(spl.required_iuses)))
 
 
 def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constraint
@@ -355,6 +347,8 @@ class SPLGroup(object):
 			self.slots_mapping.pop(slots)
 		else:
 			self.slots_mapping[slots].remove(spl)
+
+	def __iter__(self): return iter(self.references)
 
 
 spl_groups_create = core_data.dict_configuration_create

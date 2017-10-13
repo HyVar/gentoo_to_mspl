@@ -42,8 +42,8 @@ def parse_package_name(package_name):
 	return package_group, version_full, version
 
 
-def spl_core_create(parsed_package_name, slot, subslot):
-	return parsed_package_name[0], parsed_package_name[1], parsed_package_name[2], slot, subslot
+def spl_core_create(package_group, version_full, version, slot, subslot):
+	return package_group, version_full, version, slot, subslot
 
 
 def spl_core_get_spl_group_name(spl_core):
@@ -273,6 +273,374 @@ def match_spl_simple(pattern, spl):
 		match_only_package_version(pattern, spl_core_get_version_full(spl), spl_core_get_version(spl))
 		and match_only_slot(pattern, spl_core_get_slot(spl), spl_core_get_subslot(spl))
 	)
+
+
+######################################################################
+# DICTIONARY TO SET BASE CLASS
+######################################################################
+
+class DictSet(object):
+	def __init__(self):
+		self.data = {}
+
+	def add(self, key, val):
+		if key in self.data:
+			self.data[key].add(val)
+		else:
+			self.data[key] = {val}
+
+	def update(self, dict_set):
+		for k, v in dict_set.data.iteritems():
+			if k in self.data:
+				self.data[k].update(v)
+			else: self.data[k] = v
+
+
+######################################################################
+# SET MANIPULATION STRUCTURE
+######################################################################
+
+class SetManipulation(object):
+	def __init__(self):
+		self.positive = set()
+		self.negative = set()
+		self.remove_all = False
+
+	def add(self, element):
+		if element[0] == "-":
+			if element[1] != "*":
+				element = element[1:]
+				self.positive.discard(element)
+				if not self.remove_all:
+					self.negative.add(element)
+			else:
+				self.positive.clear()
+				self.negative.clear()
+				self.remove_all = True
+		else:
+			self.positive.add(element)
+			self.negative.discard(element)
+
+	def add_all(self, elements):
+		for element in elements: self.add(element)
+		return self
+
+	def update(self, set_manipulation):
+		if set_manipulation.remove_all:
+			self.positive = set_manipulation.positive
+			self.negative.clear()
+			self.remove_all = True
+		else:
+			self.positive.difference_update(set_manipulation.negative)
+			self.positive.update(set_manipulation.positive)
+			if not self.remove_all:
+				self.negative.update(set_manipulation.negative)
+				self.negative.difference_update(self.positive)
+
+	def get_elements(self):	return self.positive | self.negative
+
+	def apply(self, s):
+		if self.remove_all:
+			s.clear()
+			s.update(self.positive)
+		else:
+			s.difference_update(self.negative)
+			s.update(self.positive)
+
+	def init(self):
+		return self.positive.copy()
+
+
+class SetManipulationPattern(object):
+	def __init__(self):
+		self.list = []
+
+	def add(self, pattern, set_manipulation):
+		self.list.append( (pattern, set_manipulation) )
+
+	def update(self, set_manipulation_pattern):
+		self.list.extend(set_manipulation_pattern.list)
+
+	def apply(self, spl_core, s):
+		for pattern, set_manipulation in self.list:
+			if match_spl_full(pattern, spl_core):
+				set_manipulation.apply(s)
+
+	def init(self, spl_core):
+		res = set()
+		self.apply(spl_core, res)
+		return res
+
+
+class PatternListManipulation(list):
+	def add(self, string):
+		if string[0] == "-":
+			self.append( (False, pattern_create_from_atom(string[1:])) )
+		else:
+			self.append( (True, pattern_create_from_atom(string[1:])) )
+
+	def add_all(self, elements):
+		for element in elements: self.add(element)
+		return self
+
+	update = list.extend
+
+	def contains(self, spl_core):
+		res = False
+		for add, pattern in self:
+			if match_spl_full(pattern, spl_core):
+				res = add
+		return res
+
+
+######################################################################
+# CONFIGURATION CLASS
+######################################################################
+
+
+class UseSelectionConfig(object):
+	def __init__(
+			self,
+			use=SetManipulation(), use_force=SetManipulation(), use_mask=SetManipulation(),
+			use_stable_force=SetManipulation(), use_stable_mask=SetManipulation(),
+			pattern_use=SetManipulationPattern(), pattern_use_force=SetManipulationPattern(),
+			pattern_use_mask=SetManipulationPattern(),
+			pattern_use_stable_force=SetManipulationPattern(), pattern_use_stable_mask=SetManipulationPattern()):
+		self.use = use
+		self.use_force = use_force
+		self.use_mask = use_mask
+		self.use_stable_force = use_stable_force
+		self.use_stable_mask = use_stable_mask
+
+		self.pattern_use = pattern_use
+		self.pattern_use_force = pattern_use_force
+		self.pattern_use_mask = pattern_use_mask
+		self.pattern_use_stable_force = pattern_use_stable_force
+		self.pattern_use_stable_mask = pattern_use_stable_mask
+
+	def update(self, config):
+		self.use.update(config.use)
+		self.use_force.update(config.use_force)
+		self.use_mask.update(config.use_mask)
+		self.use_stable_force.update(config.use_stable_force)
+		self.use_stable_mask.update(config.use_stable_mask)
+
+		self.pattern_use.update(config.pattern_use)
+		self.pattern_use_force.update(config.pattern_use_force)
+		self.pattern_use_mask.update(config.pattern_use_mask)
+		self.pattern_use_stable_force.update(config.pattern_use_stable_force)
+		self.pattern_use_stable_mask.update(config.pattern_use_stable_mask)
+
+	def apply(self, spl_core, is_stable, s):
+		self.use.apply(s)
+		self.pattern_use.apply(spl_core, s)
+
+		force = self.use_force.init()
+		self.pattern_use_force.apply(force)
+		if is_stable:
+			tmp = self.use_stable_force.init()
+			self.pattern_use_stable_force.apply(spl_core, tmp)
+			force.update(tmp)
+
+		mask = self.use_mask.init()
+		if is_stable:
+			tmp = self.use_stable_mask.init()
+			self.pattern_use_stable_mask.apply(spl_core, tmp)
+			mask.update(tmp)
+
+		s.update(force)
+		s.difference_update(mask)
+
+	def init(self, spl_core, is_stable):
+		res = set()
+		self.apply(spl_core, is_stable, res)
+		return res
+
+	def __eq__(self, o):
+		if isinstance(o, self.__class__):
+			return (
+				self.use == o.use and
+				self.use_force == o.use_force and
+				self.use_mask == o.use_mask and
+				self.use_stable_force == o.use_stable_force and
+				self.use_stable_mask == o.use_stable_mask and
+				self.pattern_use == o.pattern_use and
+				self.pattern_use_force == o.pattern_use_force and
+				self.pattern_use_mask == o.pattern_use_mask and
+				self.pattern_use_stable_force == o.pattern_use_stable_force and
+				self.pattern_use_stable_mask == o.pattern_use_stable_mask
+			)
+		else: return False
+
+
+# BUG: pattern_mask* is not a SetManipulation, but a list (as patterns can have a non empty intersection, even if not being equal)
+class MSPLConfig(object):
+	def __init__(
+			self, arch=None,
+			use_declaration_eapi4=set(), use_declaration_eapi5=set(), use_declaration_hidden_from_user=set(),
+			use_selection_config=UseSelectionConfig(),
+			pattern_required=DictSet(), pattern_provided=set(),
+			pattern_mask=PatternListManipulation(), pattern_unmask=PatternListManipulation(),
+			accept_keywords=SetManipulation(), pattern_keywords=SetManipulationPattern(), pattern_accept_keywords=SetManipulationPattern()):
+		self.arch = arch
+
+		# sets of USE flags
+		self.use_declaration_eapi4 = use_declaration_eapi4
+		self.use_declaration_eapi5 = use_declaration_eapi5
+		self.use_declaration_hidden_from_user = use_declaration_hidden_from_user
+
+		# set manipulation (with equivalent pattern set manipulation)
+		self.use_selection_config = use_selection_config
+		self.use_selection_config_init = None
+
+		# mapping from package set name and set of pattern
+		self.pattern_required = pattern_required
+		# sets of pattern
+		self.pattern_provided = pattern_provided
+
+		# set manipulation (with equivalent pattern set manipulation)
+		self.pattern_mask = pattern_mask
+		self.pattern_unmask = pattern_unmask
+
+		self.accept_keywords = accept_keywords
+		self.pattern_keywords = pattern_keywords
+		self.pattern_accept_keywords = pattern_accept_keywords
+
+		# form incremental updates
+		self.new_masks = True
+		self.new_use_declaration_eapi4 = True
+		self.new_use_declaration_eapi5 = True
+		self.new_keywords_config = True
+		self.new_use_flag_config = True
+
+	def update(self, config):
+		if config.arch:
+			self.arch = config.arch
+
+		self.use_declaration_eapi4.update(config.use_declaration_eapi4)
+		self.use_declaration_eapi5.update(config.use_declaration_eapi5)
+		self.use_declaration_hidden_from_user.update(config.use_declaration_hidden_from_user)
+
+		self.use_selection_config.update(config.use_selection_config)
+
+		self.pattern_required.update(config.pattern_required)
+		self.pattern_provided.update(config.pattern_provided)
+
+		self.pattern_mask.update(config.pattern_mask)
+		self.pattern_unmask.update(config.pattern_unmask)
+
+		self.accept_keywords.update(config.accept_keywords)
+		self.pattern_keywords.update(config.pattern_keywords)
+		self.pattern_accept_keywords.update(config.pattern_accept_keywords)
+
+	def update_pattern_use(self, pattern_use): self.use_selection_config.pattern_use.update(pattern_use)
+
+	def update_pattern_accept_keywords(self, pattern_accept_keywords):
+		self.pattern_accept_keywords.update(pattern_accept_keywords)
+
+	def update_pattern_keywords(self, pattern_keywords): self.pattern_keywords.update(pattern_keywords)
+	
+	def update_pattern_mask(self, pattern_mask): self.pattern_mask.update(pattern_mask)
+	
+	def update_pattern_unmask(self, pattern_unmask): self.pattern_unmask.update(pattern_unmask)
+	
+	def update_pattern_required(self, pattern_required): self.pattern_required.update(pattern_required)
+
+	def close_init_phase(self):
+		self.use_selection_config_init = self.use_selection_config
+		self.use_selection_config = UseSelectionConfig()
+
+	def get_unmasked(self, spl_core):
+		return self.pattern_unmask.contains(spl_core) and (not self.pattern_mask.contains(spl_core))
+
+	def get_stability_status(self, spl_core, unmasked, keywords_default):
+		if unmasked:
+			keywords = keywords_default.copy()
+			self.pattern_keywords.apply(spl_core, keywords)
+			accept_keywords = {self.arch} if self.arch else set()
+			self.accept_keywords.apply(accept_keywords)
+			self.pattern_accept_keywords.apply(spl_core, accept_keywords)
+			matched = keywords & accept_keywords
+			installable = bool(matched)
+			is_stable = not bool(filter(lambda x: x[0] == '~', matched))
+		else:
+			installable = False
+			is_stable = False
+		return installable, is_stable
+
+	def get_use_flags(self, spl_core, unmasked, is_stable, use_manipulation):
+		if unmasked:
+			use_flags = self.use_selection_config_init.init(spl_core, is_stable)
+			use_manipulation.apply(use_flags)
+			self.use_selection_config.apply(spl_core, is_stable, use_flags)
+		else:
+			use_flags = set()
+		return use_flags
+
+	def apply(self, spl_core, use_manipulation, keywords_default):
+		# 1. check if the package is masked
+		unmasked = self.get_unmasked(spl_core)
+		# 2. check if installable and stable
+		installable, is_stable = self.get_stability_status(spl_core, unmasked, keywords_default)
+		# 3. compute the USE flag configuration (i.e., product)
+		use_flags = self.get_use_flags(spl_core, unmasked, is_stable, use_manipulation)
+		# 4. return the result
+		return unmasked, installable, is_stable, use_flags
+
+	def set_old_config(self, old_config):
+		self.new_masks = (self.pattern_mask != old_config.pattern_mask) or (self.pattern_unmask != old_config.pattern_unmask)
+		self.new_use_declaration_eapi4 = (self.use_declaration_eapi4 != old_config.use_declaration_eapi4)
+		self.new_use_declaration_eapi5 = (self.use_declaration_eapi5 != old_config.use_declaration_eapi5)
+
+		self.new_keywords_config = (self.arch != old_config.arch)
+		if not self.new_keywords_config:
+			self.new_keywords_config = (self.accept_keywords != old_config.accept_keywords)
+		if not self.new_keywords_config:
+			self.new_keywords_config = (self.pattern_keywords != old_config.pattern_keywords)
+		if not self.new_keywords_config:
+			self.new_keywords_config = (self.pattern_accept_keywords != old_config.pattern_accept_keywords)
+
+		self.new_use_flag_config = (self.use_selection_config != old_config.use_selection_config)
+		if not self.new_use_flag_config:
+			self.new_use_flag_config = (self.use_selection_config_init != old_config.use_selection_config_init)
+
+
+
+######################################################################
+# MAIN SYSTEM CLASS
+######################################################################
+
+# we need the use before the package (use, use.force, use.mask, use.stable.force, package.use, package), and the config after
+# plus the other data: keyword list, installed packages, and world
+
+
+class Config(object):
+	def __init__(self):
+		self.mspl_config = MSPLConfig()
+		self.keyword_list = None
+		self.installed_packages = None
+		self.world = None
+
+
+	def close_init_phase(self): self.mspl_config.close_init_phase()
+
+
+
+
+
+
+
+
+
+
+
+
+######################################################################
+# DEPRECATED
+######################################################################
+
+
+
 
 
 ######################################################################
@@ -610,76 +978,6 @@ def extract_data_from_iuse_list(iuses_list):
 			iuse_list.add(iuse)
 	return iuse_list, use_selection
 
-
-######################################################################
-# MAIN CONFIG CLASS
-######################################################################
-
-class Config(object):
-	def __init__(self):
-		self._use_order = None
-		self.__env_d = None
-		self.__repo = None
-		self.__defaults = None
-		self.__conf = None
-		self.__pkg = None
-		self.__keyword_list = None
-		self.__installed_packages = None
-		self.__world = None
-
-	@property
-	def use_order(self): return self._use_order
-
-	@use_order.setter
-	def use_order(self, data): self._use_order = data
-
-	@property
-	def env_d(self): return self.__env_d
-
-	@env_d.setter
-	def env_d(self, data): self.__env_d = data
-
-	@property
-	def repo(self): return self.__repo
-
-	@repo.setter
-	def repo(self, data): self.__repo = data
-
-	@property
-	def defaults(self): return self.__defaults
-
-	@defaults.setter
-	def defaults(self, data): self.__defaults = data
-
-	@property
-	def conf(self): return self.__conf
-
-	@conf.setter
-	def conf(self, data): self.__conf = data
-
-	@property
-	def pkg(self): return self.__pkg
-
-	@pkg.setter
-	def pkg(self, data): self.__pkg = data
-
-	@property
-	def keyword_list(self): return self.__keyword_list
-
-	@keyword_list.setter
-	def keyword_list(self, data): self.__keyword_list = data
-
-	@property
-	def installed_packages(self): return self.__installed_packages
-
-	@installed_packages.setter
-	def installed_packages(self, data): self.__installed_packages = data
-
-	@property
-	def world(self): return self.__world
-
-	@world.setter
-	def world(self, data): self.__world = data
 
 
 ######################################################################

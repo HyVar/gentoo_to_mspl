@@ -37,18 +37,6 @@ def usage():
 # UTILITY FUNCTIONS
 ######################################################################
 
-def filter_egencache_file(path_file, last_update):
-	return last_update < os.path.getmtime(path_file)
-
-
-def filter_egencache_file_full(path_file, last_update, patterns):
-	if last_update < os.path.getmtime(path_file):
-		return True
-	for pattern in patterns:
-		if core_data.match_package_path(path_file):
-			return True
-	return False
-
 
 def load_hyportage(path_hyportage, save_modality):
 	if os.path.exists(path_hyportage):
@@ -61,25 +49,40 @@ def load_hyportage(path_hyportage, save_modality):
 		id_repository = hyportage_ids.id_repository_create()
 		mspl = hyportage_data.mspl_create()
 		spl_groups = hyportage_data.spl_groups_create()
-		core_configuration = hyportage_configuration.core_configuration_create()
-		installed_spls = core_data.package_installed_create()
-		return pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+		#core_configuration = hyportage_configuration.core_configuration_create()
+		#installed_spls = core_data.package_installed_create()
+		#return pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+		return pattern_repository, id_repository, mspl, spl_groups
 
 
-def load_configurations(path_profile_configuration, path_user_configuration):
-	profile = portage_data.configuration_from_save_format(utils.load_data_file(path_profile_configuration, "json"))
-	user = portage_data.configuration_from_save_format(utils.load_data_file(path_user_configuration, "json"))
-	return profile, user
+def load_configuration(path_configuration):
+	return utils.load_data_file(path_configuration, "pickle")
 
 
-def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls, save_modality):
+#def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls, save_modality):
+#	if save_modality.endswith("json"):
+#		utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
+#			pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
+#	else:
+#		data = pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+#		utils.store_data_file(path_hyportage, data, save_modality)
+
+
+def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality):
 	if save_modality.endswith("json"):
-		utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
-			pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
+		logging.error("Cannot save data with json")
 	else:
-		data = pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
+		data = pattern_repository, id_repository, mspl, spl_groups
 		utils.store_data_file(path_hyportage, data, save_modality)
 
+
+def save_configuration(path_configuration, config):
+	config.mspl_config.new_masks = False
+	config.mspl_config.new_use_declaration_eapi4 = False
+	config.mspl_config.new_use_declaration_eapi5 = False
+	config.mspl_config.new_keywords_config = False
+	config.mspl_config.new_use_flag_config = False
+	utils.store_data_file(path_configuration, config, "pickle")
 
 
 ######################################################################
@@ -102,11 +105,11 @@ def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_
 @click.option(
 	'--portage_files', '-i',
 	nargs=4,
-	default=("profile_configuration.json", "user_configuration.json", "keywords.json", "installed_packages.json", "packages"),
-	help='the five json files in which are stored the portage data, plus the folder in which the egencache portage files can be found')
+	default=("config.pickle", "packages"),
+	help='the configuration file in which are stored the portage configuration data, plus the folder in which the egencache portage files can be found')
 @click.option(
 	'--hyportage_file', '-o',
-	default="hyportage.enc",
+	default="hyportage.pickle",
 	help='the file in which are saved the hyportage data')
 @click.option(
 	'--generated_install_files', '-u',
@@ -210,11 +213,8 @@ def main(
 	dir_hyportage = os.path.abspath(dir_hyportage)
 	dir_install = os.path.abspath(dir_install)
 
-	file_profile_configuration, file_user_configuration, file_keywords, file_installed_packages, file_egencache_packages = portage_files
-	path_profile_configuration = os.path.join(dir_portage, file_profile_configuration)
-	path_user_configuration = os.path.join(dir_portage, file_user_configuration)
-	path_keywords = os.path.join(dir_portage, file_keywords)
-	path_installed_packages = os.path.join(dir_portage, file_installed_packages)
+	file_configuration, file_egencache_packages = portage_files
+	path_configuration = os.path.join(dir_portage, file_configuration)
 	path_egencache_packages = os.path.join(dir_portage, file_egencache_packages)
 
 	path_db_hyportage = os.path.join(dir_hyportage, hyportage_file)
@@ -230,22 +230,17 @@ def main(
 	if todo_update_hyportage:
 		last_db_hyportage_update = os.path.getmtime(path_db_hyportage) if os.path.exists(path_db_hyportage) else 0.0
 
-		todo_list = hyportage_translation.compute_portage_diff(
-			concurrent_map,	last_db_hyportage_update, force,
-			path_profile_configuration, path_user_configuration,
-			path_keywords, path_installed_packages, path_egencache_packages)
+		spl_name_list, loaded_spls = hyportage_translation.compute_portage_diff(
+			concurrent_map,	last_db_hyportage_update, force, path_egencache_packages)
 
-		must_apply_profile, must_apply_user, must_regenerate_keywords_ids = todo_list[0], todo_list[1], todo_list[2]
-		must_regenerate_installed_packages, spl_name_list, loaded_spls = todo_list[3], todo_list[4], todo_list[5]
 
 	##########################################################################
 	# 4. LOAD THE HYPORTAGE DATABASE
 	##########################################################################
 
 	utils.phase_start("Loading the stored hyportage data.")
-	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls =\
-		load_hyportage(path_db_hyportage, save_modality)
-	profile_configuration, user_configuration = load_configurations(path_profile_configuration, path_user_configuration)
+	pattern_repository, id_repository, mspl, spl_groups = load_hyportage(path_db_hyportage, save_modality)
+	config = load_configuration(path_configuration)
 	utils.phase_end("Loading completed")
 
 	##########################################################################
@@ -253,51 +248,90 @@ def main(
 	##########################################################################
 
 	if todo_update_hyportage:
+		unchanged_spls = set(mspl.values())
+
 		# update the hyportage spl database
 		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
-		spl_added, spl_updated, spl_removed, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
-		zipped = zip(*spl_updated)
-		spl_added_full, spl_removed_full = (list(zipped[0]), list(zipped[1])) if len(zipped) > 0 else (list(), list())
-		spl_added_full.extend(spl_added)
-		spl_removed_full.extend(spl_removed)
+		spl_added_full, spl_removed_full, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
+
+		unchanged_spls.difference_update(spl_removed_full)
+
+		# update the feature list with the implicit declarations
+		spl_updated_features = hyportage_translation.add_implicit_features(
+			unchanged_spls, spl_added_full,
+			config.mspl_config.new_use_declaration_eapi4, config.mspl_config.new_use_declaration_eapi5,
+			config.mspl_config.use_declaration_eapi4, config.mspl_config.use_declaration_eapi5)
 
 		# update the hyportage pattern repository
 		pattern_added, pattern_updated, pattern_removed = hyportage_translation.update_pattern_repository_with_spl_diff(
-			pattern_repository, mspl, spl_groups, spl_added_full, spl_removed_full)
-		pattern_added_conf, pattern_removed_conf = hyportage_translation.update_pattern_repository_with_configuration_diff(
-			pattern_repository, mspl, spl_groups, core_configuration,
-			must_apply_profile, must_apply_user, profile_configuration, user_configuration)
+			pattern_repository, spl_added_full, spl_removed_full)
 
-		# update arch, keyword id list, and initialize iuses
-		arch_changed = hyportage_translation.update_arch(
-			core_configuration, mspl, spl_added_full, must_apply_profile, profile_configuration)
-		if must_regenerate_keywords_ids: hyportage_translation.update_keywords_ids(id_repository, path_keywords)
-
-		# update the hyportage database with the configurations
-		spl_modified_data, spl_modified_visibility = hyportage_translation.apply_configurations(
-			pattern_repository, mspl, spl_added_full,
-			profile_configuration, user_configuration, must_apply_profile, must_apply_user)
-
-		# finalize iuse list for the packages
-		spl_iuse_reset = hyportage_translation.initialize_iuse_flags(
-			pattern_repository, mspl, spl_groups, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
+		# update the required feature list
+		spl_updated_required_features = hyportage_translation.update_required_feature_external(
+			pattern_repository, pattern_added, pattern_updated, pattern_removed, unchanged_spls, spl_added_full)
 
 		# update the id repository
+		spl_updated_features.update(spl_updated_required_features)
 		hyportage_translation.update_id_repository(
-			pattern_repository, id_repository, spl_iuse_reset, spl_groups_removed, spl_groups_added)
+			id_repository, spl_updated_features, spl_removed_full, spl_groups_removed, spl_groups_added)
+
+		# update the mask and keywords information
+		spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added_full, config.mspl_config)
+		spl_updated_visibility = hyportage_translation.update_keywords(mspl, spl_updated_mask, config.mspl_config)
+
+		# check if the main config of the spl must be regenerated
+		hyportage_translation.reset_use_flag_config(mspl, config.mspl_config)
 
 		# update the smt
 		hyportage_translation.update_smt_constraints(
-			pattern_repository, id_repository, mspl, spl_groups, arch_changed, simplify_mode,
+			pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
 			pattern_added, pattern_updated, pattern_removed,
-			spl_iuse_reset, spl_modified_visibility)
+			spl_updated_required_features, spl_updated_visibility)
+
 
 		# save the hypotage database
-		save_hyportage(
-			path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration,
-			installed_spls, save_modality)
+		save_hyportage(path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality)
+		save_configuration(path_configuration, config)
 
 		return
+
+		#unchanged_spls.difference_update(spl_updated_required_features)
+
+
+
+
+
+
+		# update the keywords and default feature selection
+
+
+		#pattern_added_conf, pattern_removed_conf = hyportage_translation.update_pattern_repository_with_configuration_diff(
+		#	pattern_repository, mspl, spl_groups, core_configuration,
+		#	must_apply_profile, must_apply_user, profile_configuration, user_configuration)
+
+		# update arch, keyword id list, and initialize iuses
+		#arch_changed = hyportage_translation.update_arch(
+		#	core_configuration, mspl, spl_added_full, must_apply_profile, profile_configuration)
+		#if must_regenerate_keywords_ids: hyportage_translation.update_keywords_ids(id_repository, path_keywords)
+
+		# update the hyportage database with the configurations
+		#spl_modified_data, spl_modified_visibility = hyportage_translation.apply_configurations(
+		#	pattern_repository, mspl, spl_added_full,
+		#	profile_configuration, user_configuration, must_apply_profile, must_apply_user)
+
+		# finalize iuse list for the packages
+		#spl_iuse_reset = hyportage_translation.initialize_iuse_flags(
+		#	pattern_repository, mspl, spl_groups, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
+
+
+
+
+		# save the hypotage database
+		#save_hyportage(
+		#	path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration,
+		#	installed_spls, save_modality)
+
+		#return
 
 	##########################################################################
 	# 6. RUN RECONFIGURE IF NECESSARY

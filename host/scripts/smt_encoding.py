@@ -325,7 +325,7 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 def convert_spl_group(id_repository, spl_group, simplify_mode):
 	spl_group_name = hyportage_data.spl_group_get_name(spl_group)
 	spl_group_id = get_smt_spl_name(id_repository, spl_group_name)
-	spls = filter(hyportage_data.spl_is_visible, hyportage_data.spl_group_get_references(spl_group))
+	spls = filter(hyportage_data.spl_is_installable, hyportage_data.spl_group_get_references(spl_group))
 	spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
 
 	#logging.debug("Processing spl group " + spl_group_name)
@@ -336,7 +336,7 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 
 	# 2. two installed spl should have different slots or subslots
 	for spls in hyportage_data.spl_group_get_slot_mapping(spl_group).values():
-		spls = filter(hyportage_data.spl_is_visible, spls)
+		spls = filter(hyportage_data.spl_is_installable, spls)
 		if len(spls) > 1:
 			spls_id = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
 			constraints.append(get_no_two_true_expressions(spls_id))

@@ -323,6 +323,7 @@ def create_spl_from_egencache_file(file_path):
 	slots = slots_string.split("/") if slots_string else ["0", "0"]
 	slot = slots[0]
 	subslot = slots[1] if len(slots) == 2 else "0"
+	spl_core = core_data.spl_core_create(package_group, version_full, version, slot, subslot)
 
 	iuses, use_selection = core_data.extract_data_from_iuse_list(iuses_string.split() if iuses_string else [])
 
@@ -337,16 +338,10 @@ def create_spl_from_egencache_file(file_path):
 	visitor.visitDepend(fm_combined)
 	# 5. return the raw spl
 	return hyportage_data.SPL(
-			eapi,
-			package_name, package_group, deprecated,
-			version_full, version,
-			slot, subslot,
+			eapi, package_name, spl_core, deprecated,
 			fm_local, fm_combined,
-			visitor.res[1],
-			# data that is extended by the profile_configuration and the user_configuration
-			visitor.res[0],
-			keywords,
-			iuses, use_selection
+			visitor.res[1],	visitor.res[0],
+			keywords, iuses, use_selection
 		)
 
 

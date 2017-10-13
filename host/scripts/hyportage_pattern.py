@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import core_data
-from core_data import match_only_package_group, match_spl_full, match_spl_simple
 
 import hyportage_data
 
@@ -48,6 +47,7 @@ class USEInformation(object):
 	def remove(self):
 		self.ref_count = self.ref_count - 1
 
+
 class PatternElement(object):
 	def __init__(self, pattern):
 		self.pattern = pattern
@@ -81,7 +81,7 @@ class PatternElement(object):
 
 	def add_spl(self, spl):
 		if self.matched_spls is not None: self.matched_spls.add(spl)
-		if (self.matched_spls_visible is not None) and (hyportage_data.spl_is_visible(spl)):
+		if (self.matched_spls_visible is not None) and (hyportage_data.spl_is_installable(spl)):
 			self.matched_spls_visible.add(spl)
 
 	def remove_spl(self, spl):
@@ -90,24 +90,30 @@ class PatternElement(object):
 			self.matched_spls_visible.discard(spl)
 
 	def get_required_uses(self): return self.use_mapping.keys()
+
 	def get_required_uses_required(self):
 		return {use for use, data in self.use_mapping.iteritems() if data.is_required}
 
-	def match_self_pattern_simple(self, spl): return match_spl_simple(self.pattern, spl)
-	def match_self_pattern_full(self, spl): return match_spl_full(self.pattern, spl)
+	def match_self_pattern_simple(self, spl): return core_data.match_spl_simple(self.pattern, spl.core)
 
+	def match_self_pattern_full(self, spl): return core_data.match_spl_full(self.pattern, spl.core)
+
+	def get_local_spls(self, spls, spl_groups):
+		if pattern_is_package_group_specific(self.pattern):
+			spl_group_name = pattern_get_package_group(self.pattern)
+			if spl_group_name in spl_groups:  # fill the matched pattern
+				#print("   debug: group \"" + spl_group_name + "\" is " + str(spl_groups[spl_group_name]))
+				res = set(filter(self.match_self_pattern_simple, iter(spl_groups[spl_group_name])))
+			else: res = set()
+		else:
+				res = set(filter(self.match_self_pattern_full, spls))
+		return res
 
 	def get_spls(self, mspl, spl_groups):
 		if self.matched_spls is not None:
 			return self.matched_spls
 		else:
-			if pattern_is_package_group_specific(self.pattern):
-				spl_group_name = pattern_get_package_group(self.pattern)
-				if spl_group_name in spl_groups:  # fill the matched pattern
-					res = set(filter(self.match_self_pattern_simple, hyportage_data.spl_group_get_references(spl_groups[spl_group_name])))
-				else: res = set()
-			else:
-					res = set(filter(self.match_self_pattern_full, mspl.values()))
+			res = self.get_local_spls(mspl.itervalues(), spl_groups)
 			if len(self.containing_spl) > spl_list_save_limit:
 				self.matched_spls = res
 			return res
@@ -123,7 +129,7 @@ class PatternElement(object):
 				else: res = []
 			else:
 					res = filter(self.match_self_pattern_full, mspl.values())
-			res = set(filter(hyportage_data.spl_is_visible, res))
+			res = set(filter(hyportage_data.spl_is_installable, res))
 			if len(self.containing_spl) > spl_list_save_limit:
 				self.matched_spls_visible = res
 			return res
@@ -166,8 +172,8 @@ def pattern_repository_element_get_spls(pattern_repository_element, mspl, spl_gr
 def pattern_repository_element_get_spls_visible(pattern_repository_element, mspl, spl_groups):
 	return pattern_repository_element.get_spls_visible(mspl, spl_groups)
 
-
 ##
+
 
 def pattern_repository_element_set_in_profile_configuration(pattern_repository_element, boolean):
 	pattern_repository_element.in_profile_configuration = boolean
@@ -185,6 +191,7 @@ def pattern_repository_element_contains(pattern_repository_element, spl):
 	return pattern_repository_element.contains(spl)
 
 ##
+
 
 def pattern_repository_element_to_save_format(pattern_repository_element):
 	return {
@@ -273,7 +280,11 @@ def pattern_repository_local_map_remove_spl(pattern_repository_element, spl, mat
 
 ##
 
-def pattern_repository_local_map_get(pattern_repository_element, pattern): return pattern_repository_element[pattern]
+def pattern_repository_local_map_get(pattern_repository_element, pattern):
+	res = pattern_repository_element.get(pattern)
+	if res is None:
+		res = PatternElement(pattern)
+	return res
 
 
 def pattern_repository_local_map_get_spl_required_use(pattern_repository_element, spl):
@@ -301,7 +312,7 @@ def pattern_repository_create():
 	return {}, {}
 
 
-def pattern_repository_add_pattern_from_spl(pattern_repository, mspl, spl_groups, spl):
+def pattern_repository_add_pattern_from_spl(pattern_repository, spl):
 	pattern_added = set()
 	for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems():
 		if pattern_is_package_group_specific(pattern):
@@ -384,7 +395,7 @@ def pattern_repository_remove_spl(pattern_repository, spl):
 
 ##
 
-def is_pattern_in_pattern_repository(pattern_repository, pattern):
+def is_pattern_in_pattern_repository(pattern_repository, pattern):  # not used
 	if pattern_is_package_group_specific(pattern):
 		return pattern in pattern_repository[0][pattern_get_package_group(pattern)]
 	else: return pattern in pattern_repository[1]
@@ -410,6 +421,34 @@ def pattern_repository_get_pattern_from_spl_group_name(pattern_repository, spl_g
 	for pattern in pattern_repository[1].keys():
 		if match_only_package_group(pattern, spl_group_name): res.add(pattern)
 	return res
+
+
+class PatternIterator(object):
+	def __init__(self, pattern_repository):
+		self.repo = pattern_repository
+		self.stage = 0
+		self.iter_spl_groups = pattern_repository[0].iteritems()
+		self.iter_pattern = self.iter_spl_groups.next()[1].iteritems()
+
+	def __iter__(self): return self
+
+	def next(self):
+		while True:
+			try:
+				return self.iter_pattern.next()[0]
+			except StopIteration:
+				if self.stage == 1:
+					raise StopIteration()
+				else:
+					try:
+						self.iter_pattern = self.iter_spl_groups.next()[1].iteritems()
+					except StopIteration:
+						self.stage = 1
+						self.iter_pattern = self.repo[1].iteritems()
+
+
+def pattern_repository_get_patterns(pattern_repository):
+	return PatternIterator(pattern_repository)
 
 
 ##

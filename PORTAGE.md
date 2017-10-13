@@ -230,9 +230,43 @@ Here, all packages of the groups `sys-fs/eudev` and `sys-fs/udev` are masked,
  and so are the packages of the group `sys-kernel/genkernel` whose version is less than `3.5.0.5`.
 
 
-## Package Configuration: Many Steps
 
 
+## Modular Package Configuration
+
+The different data we discussed previously are configured by portage and the user in seven steps.
+The steps are well-defined, but the order in which they are applied can be configured by setting the `USE_ORDER` variable.
+
+Let briefly overview these steps, in their default order:
+ * [**env.d**](https://wiki.gentoo.org/wiki/Handbook:X86/Working/EnvVar): this folder sets many environment variables,
+    including some that are used to configure the packages.
+   Note that these variables are loaded in any terminal by default, and completed with the terminal's own configuration.
+ * [**repo**](https://wiki.gentoo.org/wiki/Profile_(Portage)):
+    the folder `/usr/portage/profiles/` may contain several files that define some USE flag selections.
+   These files follow the structure of the rest of the portage's profile,
+    which is quite complex and will be discussed in detail in its own section.
+ * [**pkginternal**](https://devmanual.gentoo.org/ebuild-writing/eapi/index.html):
+    the IUSE defaults is the USE flag selection extracted from the package's IUSE variables
+    (from the `+` and `-` annotation on its USE flags).
+   This is the default USE flag selection of the package, specified by the package's maintainer.
+ * [**defaults**](https://wiki.gentoo.org/wiki/Profile_(Portage)): this corresponds to the user selected profile,
+    usually specified by a simlink from `/etc/portage/make.profile` to a folder in the portage's profile tree.
+   As for the **repo** location, many files are considered to construct the USE flag selection of this location,
+    which will be discussed in detail later in its own section.
+ * [**conf**](https://wiki.gentoo.org/wiki//etc/portage/make.conf):
+ * [**pkg**](https://wiki.gentoo.org/wiki//etc/portage/package.use): the `/etc/portage/package.use` path is
+    a user-defined file or folder containing several files declaring a USE flag selection for several *atoms* (i.e., sets of [packages]).
+   As this/these file/s have the same structure as some in the profile, we will present its/their structure in a dedicated Section.
+ * **env**: this corresponds to the `USE` variable available in the current environment, like in the following command line:
+   ```
+   USE="unicode -pcre" emerge -av sys-apps/less
+   ```
+
+
+
+
+
+## Profile Layer
 
 
 In this section, we give a brief and precise summary of many information scattered in the portage's documentation,

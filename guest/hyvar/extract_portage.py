@@ -62,7 +62,10 @@ input_file_user_world = os.path.realpath("/var/lib/portage/world")
 
 input_file_keyword_list = os.path.realpath("/usr/portage/profiles/arch.list")
 
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# output
 
 non_concurrent_map = map  # the different load processes must be done in sequence
 
@@ -107,12 +110,14 @@ def environment_extract_info(environment):
 	:param environment: the input environment
 	:return: the tuple containing the values of the important variables
 	"""
-	use_selection = core_data.use_selection_create_from_use_list(environment.get('USE', "").split())
+	use_selection = core_data.SetManipulation()
+	use_selection.add_all(environment.get('USE', "").split())
 	use_declaration_eapi4 = set(environment.get('IUSE_EAPI_4', "").split())
 	use_declaration_eapi5 = set(environment.get('IUSE_EAPI_5', "").split())
 	use_declaration_hidden_from_user = set(environment.get('FLAT_PROFILE_ONLY_VARIABLES', "").split())
 	arch = environment.get('ARCH')
-	accept_keywords = set(environment.get('ACCEPT_KEYWORDS', "").split())
+	accept_keywords = core_data.SetManipulation()
+	accept_keywords.add_all(environment.get('ACCEPT_KEYWORDS', "").split())
 	return (
 		use_selection, use_declaration_eapi4, use_declaration_eapi5,
 		use_declaration_hidden_from_user, arch, accept_keywords
@@ -156,52 +161,46 @@ def parse_configuration_file(filename):
 	return res
 
 
-def load_use_set(filename):
-	return core_data.use_set_construction_create_from_use_list(parse_configuration_file(filename))
+def load_use_file(filename):
+	res = core_data.SetManipulation()
+	res.add_all(parse_configuration_file(filename))
+	return res
 
 
-def load_package_use(filename):
-	res = core_data.pattern_use_selection_create()
+def load_package_use_file(filename):
+	res = core_data.SetManipulationPattern()
 	for line in parse_configuration_file(filename):
 		els = line.split()
-		uses = core_data.use_selection_create_from_use_list(els[1:])
-		core_data.pattern_use_selection_add(res, core_data.pattern_create_from_atom(els[0]), uses)
+		set_manipulation = core_data.SetManipulation()
+		set_manipulation.add_all(els[1:])
+		res.add(core_data.pattern_create_from_atom(els[0]), set_manipulation)
 	return res
 
 
-def load_package_use_set(filename):
-	res = core_data.pattern_use_selection_create()
+def load_package_mask_file(filename):
+	res = core_data.PatternListManipulation()
+	res.add_all(parse_configuration_file(filename))
+	return res
+
+
+def load_package_keywords_file(filename):
+	res = core_data.SetManipulationPattern()
 	for line in parse_configuration_file(filename):
 		els = line.split()
-		uses = core_data.use_set_construction_create_from_use_list(els[1:])
-		core_data.pattern_use_selection_add(res, core_data.pattern_create_from_atom(els[0]), uses)
+		set_manipulation = core_data.SetManipulation()
+		set_manipulation.add_all(els[1:])
+		res.add(core_data.pattern_create_from_atom(els[0]), set_manipulation)
 	return res
 
 
-def load_package_mask(filename):
-	res = core_data.pattern_set_construction_create()
-	for line in parse_configuration_file(filename):
-		core_data.pattern_set_construction_add(res, line)
-	return res
-
-
-def load_package_keywords(filename):
-	res = portage_data.pattern_accept_keywords_create()
-	for line in parse_configuration_file(filename):
-		els = line.split()
-		portage_data.pattern_accept_keywords_add(
-			res, core_data.pattern_create_from_atom(els[0]), els[1:])
-	return res
-
-
-def load_packages(filename):
-	required_pattern = portage_data.required_pattern_create()
+def load_packages_file(filename):
+	res = core_data.DictSet()
 	for line in parse_configuration_file(filename):
 		if line[0] == "*":
-			portage_data.required_pattern_add(required_pattern, "system", core_data.pattern_create_from_atom(line[1:]))
+			res.add("system", core_data.pattern_create_from_atom(line[1:]))
 		else:
-			portage_data.required_pattern_add(required_pattern, "profile", core_data.pattern_create_from_atom(line))
-	return required_pattern
+			res.add("profile", core_data.pattern_create_from_atom(line))
+	return res
 
 
 ######################################################################
@@ -209,7 +208,8 @@ def load_packages(filename):
 ######################################################################
 
 # list of use files: use.force   use.mask   use.stable.force   use.stable.mask
-# list of package.use files: package.use   package.use.force   package.use.mask   package.use.stable.force package.use.stable.mask
+# list of package.use files: package.use   package.use.force   package.use.mask
+#    package.use.stable.force   package.use.stable.mask
 # there is just one make.defaults
 
 # The use.* are global, i.e., they are merged between layers, and applied globally.
@@ -223,33 +223,33 @@ def load_profile_layer(path, environment):
 	# use* files
 	# use.force
 	path_use_force = os.path.join(path, "use.force")
-	use_force = load_use_set(path_use_force)
+	use_force = load_use_file(path_use_force)
 	# use.mask
 	path_use_mask = os.path.join(path, "use.mask")
-	use_mask = load_use_set(path_use_mask)
+	use_mask = load_use_file(path_use_mask)
 	# use.stable.force
 	path_use_stable_force = os.path.join(path, "use.stable.force")
-	use_stable_force = load_use_set(path_use_stable_force)
+	use_stable_force = load_use_file(path_use_stable_force)
 	# use.stable.mask
 	path_use_stable_mask = os.path.join(path, "use.stable.mask")
-	use_stable_mask = load_use_set(path_use_stable_mask)
+	use_stable_mask = load_use_file(path_use_stable_mask)
 	#######################
 	# package.use* files
 	# package.use
 	path_package_use = os.path.join(path, "package.use")
-	package_use = load_package_use(path_package_use)
+	package_use = load_package_use_file(path_package_use)
 	# package.use.force
 	path_package_use_force = os.path.join(path, "package.use.force")
-	package_use_force = load_package_use_set(path_package_use_force)
+	package_use_force = load_package_use_file(path_package_use_force)
 	# package.use.mask
 	path_package_use_mask = os.path.join(path, "package.use.mask")
-	package_use_mask = load_package_use_set(path_package_use_mask)
+	package_use_mask = load_package_use_file(path_package_use_mask)
 	# package.use.stable.force
 	path_package_use_stable_force = os.path.join(path, "package.use.stable.force")
-	package_use_stable_force = load_package_use_set(path_package_use_stable_force)
+	package_use_stable_force = load_package_use_file(path_package_use_stable_force)
 	# package.use.stable.mask
 	path_package_use_stable_mask = os.path.join(path, "package.use.stable.mask")
-	package_use_stable_mask = load_package_use_set(path_package_use_stable_mask)
+	package_use_stable_mask = load_package_use_file(path_package_use_stable_mask)
 	#######################
 	# make.defaults file
 	path_make_defaults = os.path.join(path, "make.defaults")
@@ -259,27 +259,26 @@ def load_profile_layer(path, environment):
 		make_defaults_use_declaration_eapi4, make_defaults_use_declaration_eapi5 = info[1], info[2]
 		make_defaults_use_declaration_hidden_from_user = info[3]
 		make_defaults_arch, make_defaults_accept_keywords = info[4], info[5]
-		make_defaults_use_declaration_eapi4.update(use_force[0])
-		make_defaults_use_declaration_eapi4.update(use_mask[0])
-		make_defaults_use_declaration_eapi4.update(
-			core_data.use_selection_get_uses(core_data.use_selection_create_from_use_list(
-				new_environment.get('BOOTSTRAP_USE', "").split())))
+		make_defaults_use_declaration_eapi4.update(use_force.get_elements())
+		make_defaults_use_declaration_eapi4.update(use_mask.get_elements())
+		make_defaults_use_declaration_eapi4.update(core_data.SetManipulation().add_all(
+				new_environment.get('BOOTSTRAP_USE', "").split()).get_elements())
 	else:
 		new_environment = environment
-		make_defaults_use_selection = core_data.use_selection_create()
+		make_defaults_use_selection = core_data.SetManipulation()
 		make_defaults_use_declaration_eapi4, make_defaults_use_declaration_eapi5 = set(), set()
 		make_defaults_use_declaration_hidden_from_user = set()
-		make_defaults_arch, make_defaults_accept_keywords = None, set()
+		make_defaults_arch, make_defaults_accept_keywords = None, core_data.SetManipulation()
 	#######################
 	# packages (required patterns)
 	path_package_required = os.path.join(path, "packages")
-	package_required = portage_data.required_pattern_create()
+	package_required = core_data.DictSet()
 	if os.path.exists(path_package_required):
 		for line in parse_configuration_file(path_package_required):
 			if line[0] == "*":
-				portage_data.required_pattern_add(package_required, "system", core_data.pattern_create_from_atom(line[1:]))
+				package_required.add("system", core_data.pattern_create_from_atom(line[1:]))
 			else:
-				portage_data.required_pattern_add(package_required, "profile", core_data.pattern_create_from_atom(line))
+				package_required.add("profile", core_data.pattern_create_from_atom(line))
 	#######################
 	# package.provided (packages implicitly provided)
 	path_package_provided = os.path.join(path, "package.provided")
@@ -290,28 +289,34 @@ def load_profile_layer(path, environment):
 	#######################
 	# package.mask and package.unmask (packages masking)
 	path_package_mask = os.path.join(path, "package.mask")
-	package_mask = load_package_mask(path_package_mask)
+	package_mask = load_package_mask_file(path_package_mask)
 	path_package_unmask = os.path.join(path, "package.unmask")
-	package_unmask = load_package_mask(path_package_unmask)
+	package_unmask = load_package_mask_file(path_package_unmask)
 	#######################
 	# package.keywords or package.accept_keywords
 	path_package_keywords = os.path.join(path, "package.keywords")
+	package_keywords = load_package_keywords_file(path_package_keywords)
 	path_package_accept_keywords = os.path.join(path, "package.accept_keywords")
-	pattern_keywords = load_package_keywords(path_package_keywords)
-	portage_data.pattern_accept_keywords_update(pattern_keywords, load_package_keywords(path_package_accept_keywords))
+	package_accept_keywords = load_package_keywords_file(path_package_accept_keywords)
 
-	return (
-		new_environment,
-		make_defaults_arch, make_defaults_accept_keywords,
-		make_defaults_use_declaration_eapi4, make_defaults_use_declaration_eapi5,
-		make_defaults_use_declaration_hidden_from_user,
+	#######################
+	# return the result
+	res_use_selection_config = core_data.UseSelectionConfig(
 		make_defaults_use_selection, use_force, use_mask, use_stable_force, use_stable_mask,
-		package_use, package_use_force, package_use_mask, package_use_stable_force, package_use_stable_mask,
-		package_required, package_provided, package_mask, package_unmask, pattern_keywords
+		package_use, package_use_force, package_use_mask, package_use_stable_force, package_use_stable_mask
 	)
+	res = core_data.MSPLConfig(
+		make_defaults_arch,
+		make_defaults_use_declaration_eapi4, make_defaults_use_declaration_eapi5, make_defaults_use_declaration_hidden_from_user,
+		res_use_selection_config,
+		package_required, package_provided,	package_mask, package_unmask,
+		make_defaults_accept_keywords, package_keywords, package_accept_keywords
+	)
+	return new_environment, res
 
 
 def combine_profile_layer_data(data1, data2):
+	"""
 	arch = data2[1] if data2[1] else data1[1]
 
 	accept_keywords = data1[2]
@@ -370,22 +375,26 @@ def combine_profile_layer_data(data1, data2):
 		package_use, package_use_force, package_use_mask, package_use_stable_force, package_use_stable_mask,
 		package_required, package_provided, package_mask, package_unmask, pattern_keywords
 	)
+	"""
+	config = data1[1]
+	config.update(data2[1])
+	return data2[0], config
 
 
 def load_profile(path, environment):
 	path_parent = os.path.join(path, "parent")
 	if os.path.exists(path_parent):
 		sub_profiles = parse_configuration_file(path_parent)
-		datas = []
+		configs = []
 		for sub_profile in sub_profiles:
-			data = load_profile(os.path.join(path, sub_profile), environment)
-			environment = data[0]
-			datas.append(data)
-		datas.append(load_profile_layer(path, environment))
-		combined_data = datas[0]
-		for data in datas[1:]:
-			combined_data = combine_profile_layer_data(combined_data, data)
-		return combined_data
+			environment, config = load_profile(os.path.join(path, sub_profile), environment)
+			configs.append(config)
+		environment, config = load_profile_layer(path, environment)
+		configs.append(config)
+		config = configs[0]
+		for data in configs[1:]:
+			config.update(data)
+		return environment, config
 	else:
 		return load_profile_layer(path, environment)
 
@@ -398,52 +407,63 @@ def get_user_configuration_files_in_path(path):
 	if os.path.isfile(path):
 		return [ path ]
 	elif os.path.isdir(path):
-		filename_list = os.listdir(path)
+		filename_list = filter(os.path.isfile, os.listdir(path))
 		filename_list.sort()
 		return [ os.path.join(path, filename) for filename in filename_list ]
 	else: return []
 
 
 def get_user_configuration(environment):
+	# first is loaded the profile, which is then updated with local definitions
 	# 1. package.use
 	files_package_use = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.use"))
-	pattern_use_selection = core_data.pattern_use_selection_create()
+	pattern_use_selection = core_data.SetManipulationPattern()
 	for filename in files_package_use:
-		core_data.list_configuration_update(pattern_use_selection, load_package_use(filename))
+		pattern_use_selection.update(load_package_use_file(filename))
 
 	# 2. package.accept_keywords / package.keywords
 	files_package_accept_keywords = get_user_configuration_files_in_path(
 		os.path.join(input_dir_user_configuration, "package.accept_keywords"))
-	files_package_accept_keywords.extend(get_user_configuration_files_in_path(
-		os.path.join(input_dir_user_configuration, "package.keywords")))
-	files_package_accept_keywords.sort()
-	pattern_keywords = portage_data.pattern_accept_keywords_create()
+	pattern_accept_keywords = core_data.SetManipulationPattern()
 	for filename in files_package_accept_keywords:
-		portage_data.pattern_accept_keywords_update(pattern_keywords, load_package_keywords(filename))
+		pattern_accept_keywords.update(load_package_keywords_file(filename))
 
-	# 3. package.mask
+	files_package_keywords = get_user_configuration_files_in_path(
+		os.path.join(input_dir_user_configuration, "package.keywords"))
+	pattern_keywords = core_data.SetManipulationPattern()
+	for filename in files_package_keywords:
+		pattern_keywords.update(load_package_keywords_file(filename))
+
+	# 3. package.mask / package.unmask
 	files_package_mask = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.mask"))
-	package_mask = core_data.pattern_set_construction_create()
+	pattern_mask = core_data.PatternListManipulation()
 	for filename in files_package_mask:
-		core_data.pattern_set_construction_update(package_mask, load_package_mask(filename))
+		pattern_mask.update(load_package_mask_file(filename))
 
-	# 4. package.unmask
 	files_package_unmask = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.unmask"))
-	package_unmask = core_data.pattern_set_construction_create()
+	pattern_unmask = core_data.PatternListManipulation()
 	for filename in files_package_unmask:
-		core_data.pattern_set_construction_update(package_unmask, load_package_mask(filename))
+		pattern_unmask.update(load_package_mask_file(filename))
 
 	# 6. sets
 	location_sets = os.path.join(input_dir_user_configuration, "sets")
-	pattern_required = portage_data.required_pattern_create()
+	pattern_required = core_data.DictSet()
 	if os.path.isdir(location_sets):
 		for filename in os.listdir(location_sets):
 			for line in parse_configuration_file(os.path.join(location_sets, filename)):
-				portage_data.required_pattern_add(pattern_required, filename, core_data.pattern_create_from_atom(line))
+				pattern_required.add(filename, core_data.pattern_create_from_atom(line))
 
 	# 7. local profile
 	location_local_profile = os.path.join(input_dir_user_configuration, "profile")
 	if os.path.isdir(location_local_profile):
+		environment, config = load_profile_layer(location_local_profile, environment)
+		config.update_pattern_use(pattern_use_selection)
+		config.update_pattern_required(pattern_required)
+		config.update_pattern_mask(pattern_mask)
+		config.update_pattern_unmask(pattern_unmask)
+		config.update_pattern_accept_keywords(pattern_accept_keywords)
+		config.update_pattern_keywords(pattern_keywords)
+		"""
 		data = load_profile_layer(location_local_profile, environment)  # parent file is not supported in local profile
 		environment = data[0]
 		arch = data[1]
@@ -471,7 +491,20 @@ def get_user_configuration(environment):
 		core_data.pattern_set_construction_update(package_unmask, data[19])
 
 		portage_data.pattern_accept_keywords_update(pattern_keywords, data[20])
+		"""
 	else:
+		use_selection_config = core_data.UseSelectionConfig(
+			pattern_use=pattern_use_selection
+		)
+		config = core_data.MSPLConfig(
+			use_selection_config=use_selection_config,
+			pattern_required=pattern_required,
+			pattern_mask=pattern_mask,
+			pattern_unmask=pattern_unmask,
+			pattern_accept_keywords=pattern_accept_keywords,
+			pattern_keywords=pattern_keywords
+		)
+		"""
 		arch = None
 		accept_keywords = set()
 		use_declaration_eapi4 = set()
@@ -490,16 +523,18 @@ def get_user_configuration(environment):
 		package_use_stable_mask = core_data.pattern_use_selection_create()
 
 		package_provided = set()
+		"""
 
-	return (
+	return environment, config
+	"""(
 		environment,
 		arch, accept_keywords,
 		use_declaration_eapi4, use_declaration_eapi5,
 		make_defaults_use_declaration_hidden_from_user,
 		use, use_force, use_mask, use_stable_force, use_stable_mask,
 		pattern_use_selection, package_use_force, package_use_mask, package_use_stable_force, package_use_stable_mask,
-		pattern_required, package_provided, package_mask, package_unmask, pattern_keywords
-	)
+		pattern_required, package_provided, pattern_mask, pattern_unmask, pattern_keywords
+	)"""
 
 
 ######################################################################
@@ -513,59 +548,71 @@ def get_user_configuration(environment):
 # 4.1. env.d
 
 # we suppose that env-update is up-to-date
-def env_d(config, environment):
+def env_d(system, environment):
 	process = subprocess.Popen(["bash", "-c", "source /etc/profile.env ; /usr/bin/env"], stdout=subprocess.PIPE, env={})
 	out, err = process.communicate()
-	config.env_d = environment_create_from_script_output(out)
-	environment.update(config.env_d)
+	environment.update(environment_create_from_script_output(out))
 	return environment
 
 
 ######################################################################
 # 4.2. repo
 
-def repo(config, environment):
-	config.repo = load_profile_layer(input_file_profile_base, environment)
-	return config.repo[0]
+def repo(system, environment):
+	new_environment, mspl_config = load_profile_layer(input_file_profile_base, environment)
+	system.mspl_config.update(mspl_config)
+	return new_environment
 
 
 ######################################################################
 # 4.3. pkginternal
 
 # dealt in the translation of each individual package
-def pkginternal(config, environment):
+def pkginternal(system, environment):
+	system.close_init_phase()
 	return environment
 
 
 ######################################################################
 # 4.4. defaults
 
-def defaults(config, environment):
-	config.defaults = load_profile(input_file_profile_selected, environment)
-	return config.defaults[0]
+def defaults(system, environment):
+	new_environment, mspl_config = load_profile(input_file_profile_selected, environment)
+	system.mspl_config.update(mspl_config)
+	return new_environment
 
 
 ######################################################################
 # 4.5. conf
 
-def conf(config, environment):
-	config.conf = load_make_defaults(input_file_make_conf, environment)
-	return config.conf[0]
+def conf(system, environment):
+	new_environment, info = load_make_defaults(input_file_make_conf, environment)
+	use_selection, use_declaration_eapi4, use_declaration_eapi5, use_declaration_hidden_from_user, arch, accept_keywords = info
+	system.mspl_config.use_selection_config.use.update(use_selection)
+	system.mspl_config.use_declaration_eapi4.update(use_declaration_eapi4)
+	system.mspl_config.use_declaration_eapi5.update(use_declaration_eapi5)
+	system.mspl_config.use_declaration_hidden_from_user.update(use_declaration_hidden_from_user)
+	system.mspl_config.accept_keywords.update(accept_keywords)
+	if arch:
+		system.mspl_config.arch = arch
+	return new_environment
 
 
 ######################################################################
 # 4.6. pkg
 
-def pkg(config, environment):
-	config.pkg = get_user_configuration(environment)
-	return config.pkg[0]
+def pkg(system, environment):
+	new_environment, mspl_config = get_user_configuration(environment)
+	system.mspl_config.update(mspl_config)
+	return new_environment
 
 
 ######################################################################
 # 4.7. env
 
 # dealt with during the execution of the emerge command
-def env(config, environment):
+# hopefully, the environment will always be at the end
+def env(system, environment):
 	return environment
 
 
@@ -596,18 +643,24 @@ def load_keyword_list():
 
 ######################################################################
 # load the installed packages
+#def load_installed_package_uses(package_path):
+#	path_iuses = os.path.join(package_path, "IUSE")
+#	if not os.path.exists(path_iuses):
+#		return core_data.use_selection_create()
+#	else:
+#		with open(path_iuses, 'r') as f:
+#			iuses = f.read().split()
+#		iuses = [ iuse[1:] if iuse[0] in "+-" else iuse for iuse in iuses ]
+#		with open(os.path.join(package_path, "USE"), 'r') as f:
+#			uses = f.read().split()
+#		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
+#		return core_data.use_selection_create(uses, nuses)
+
+
 def load_installed_package_uses(package_path):
-	path_iuses = os.path.join(package_path, "IUSE")
-	if not os.path.exists(path_iuses):
-		return core_data.use_selection_create()
-	else:
-		with open(path_iuses, 'r') as f:
-			iuses = f.read().split()
-		iuses = [ iuse[1:] if iuse[0] in "+-" else iuse for iuse in iuses ]
 		with open(os.path.join(package_path, "USE"), 'r') as f:
 			uses = f.read().split()
-		nuses = [ iuse for iuse in iuses if iuse not in set(uses) ]
-		return core_data.use_selection_create(uses, nuses)
+		return uses
 
 
 def load_installed_packages():
@@ -734,20 +787,30 @@ def load_deprecated_packages(output_file_portage_deprecated):
 # main function
 def main(output_dir):
 	# 1. construct the core configuration
-	config = core_data.Config()
+	system = core_data.Config()
 	environment = os.environ
-	config.use_order = get_loading_order(environment)
-	for stage in config.use_order:
+	use_order = get_loading_order(environment)
+	passed_env = False
+	for stage in use_order:
+		if passed_env:
+			logging.error("The USE_ORDER variable does not have 'env' at the end: " + str(use_order))
+			sys.exit(-1)
 		print("Running Stage \"" + stage + "\"")
-		environment = config_construction_mapping[stage](config, environment)
+		passed_env = stage == "env"
+		environment = config_construction_mapping[stage](system, environment)
 	# 2. add the keyword list, the installed packages and the world file
-	config.keyword_list = load_keyword_list()
-	config.installed_packages = load_installed_packages()
-	config.world = load_world_file()
+	system.keyword_list = load_keyword_list()
+	system.installed_packages = load_installed_packages()
+	system.world = load_world_file()
 
 	# 3. save the config
-	with open(os.path.join(output_dir, "config.pickle"), 'w') as f:
-		cPickle.dump(config, f)
+	save_filename = os.path.join(output_dir, "config.pickle")
+	if os.path.isfile(save_filename):
+		with open(save_filename, 'r') as f:
+			old_system = cPickle.load(f)
+			system.mspl_config.set_old_config(old_system.mspl_config)
+	with open(save_filename, 'w') as f:
+		cPickle.dump(system, f)
 	# 4. generate the egencache files for the deprecated packages
 	load_deprecated_packages(os.path.join(output_dir, "packages/deprecated"))
 
