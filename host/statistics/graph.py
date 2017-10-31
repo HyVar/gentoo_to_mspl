@@ -11,14 +11,19 @@ import db
 from tulip import tlp
 
 
-def get_graph_mspl(filter_function=db.filter_function_simple):
+
+def label_generator_simple(el):
+		return el.name
+
+
+def get_graph_mspl(filter_function=db.filter_function_simple, label_generator=label_generator_simple):
 	graph = tlp.newGraph()
 	map = {}
 	for spl in db.mspl.itervalues():
 		if filter_function(spl):
 			node = graph.addNode()
 			map[spl] = node
-			graph['viewLabel'][node] = spl.name
+			graph['viewLabel'][node] = label_generator(spl)
 
 	spls = set(map.keys())
 
@@ -35,14 +40,14 @@ def get_graph_mspl(filter_function=db.filter_function_simple):
 	return graph
 
 
-def get_graph_spl_groups(filter_function=db.filter_function_simple):
+def get_graph_spl_groups(filter_function=db.filter_function_simple, label_generator=label_generator_simple):
 	graph = tlp.newGraph()
 	map = {}
 	for group in db.spl_groups.itervalues():
 		if filter_function(group):
 			node = graph.addNode()
 			map[group] = node
-			graph['viewLabel'][node] = group.name
+			graph['viewLabel'][node] = label_generator(group)
 
 	groups = set(map.keys())
 
