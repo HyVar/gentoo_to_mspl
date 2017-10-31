@@ -213,7 +213,7 @@ def statistics_pattern(filter_function=db.filter_function_simple):
 
 def statistics_graph(filter_function=db.filter_function_simple):
 	utils.phase_start("Computing the Graph Core Statistics.")
-	graph_mspl = graph.get_graph_mspl(filter_function)
+	graph_mspl, spl_nodes = graph.get_graph_mspl(filter_function)
 	visited = graph_mspl.getBooleanProperty("visited")
 
 	for n in graph_mspl.getNodes():
