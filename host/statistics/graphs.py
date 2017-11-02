@@ -159,6 +159,9 @@ class SSCComputation(object):  # Tarjan Algorithm
 				self.branches = []
 				self.register_node(n)
 				self.strongly_connected_components_it()
+		self.graph.delLocalProperty("index")
+		self.graph.delLocalProperty("onstack")
+		self.graph.delLocalProperty("lowlink")
 		return self.sccs
 
 
@@ -189,7 +192,7 @@ def loops(graph):
 	return graph_loops
 
 
-def forest(graph):
+def forest(graph, roots=()):
 	res = tlp.newGraph()
 	equiv = {}
 	for node in graph.getNodes():
@@ -198,7 +201,7 @@ def forest(graph):
 
 	for n in graph.getNodes(): graph['visited'][n] = False
 
-	for n in graph.getNodes():
+	def visit(graph, n):
 		if not graph['visited'][n]:
 			graph['visited'][n] = True
 			path = [n]
@@ -214,6 +217,36 @@ def forest(graph):
 				else:
 					path.pop()
 					branches.pop()
+
+	for n in roots: visit(graph, n)
+	for n in graph.getNodes(): visit(graph, n)
+	return res, equiv
+
+
+def tree(graph, root):
+	res = tlp.newGraph()
+	equiv = {}
+
+	for n in graph.getNodes(): graph['visited'][n] = False
+
+	new_node = res.addNode()
+	equiv[root] = new_node
+	graph['visited'][root] = True
+	path = [new_node]
+	branches = [graph.getOutNodes(root)]
+	while branches:
+		if branches[-1].hasNext():
+			succ = branches[-1].next()
+			if not graph['visited'][succ]:
+				new_node = res.addNode()
+				equiv[succ] = new_node
+				res.addEdge(path[-1], new_node)
+				graph['visited'][succ] = True
+				path.append(new_node)
+				branches.append(graph.getOutNodes(succ))
+		else:
+			path.pop()
+			branches.pop()
 	return res, equiv
 
 
@@ -261,6 +294,34 @@ def set_node_size(graph, scale=1):
 
 	# combine the values
 	for n in graph.getNodes(): graph['size'][n] = (graph['size'][n] + graph_forest['size'][equiv[n]] - 1) * scale
+
+
+######################################################################
+# TEST
+######################################################################
+
+def set_layout(graph, root):
+	t, equiv = tree(graph, root)
+	#inv_equiv = {v: k for k, v in equiv.iteritems()}
+
+	# 1. clean the graph
+	t_nodes = t.nodes()
+	to_delete = { n for n in graph.getNodes() if n not in equiv}
+	for n in to_delete: graph.delNode(n)
+
+	# 2. compute the layout
+	layout = "Tree Radial"
+	params = tlp.getDefaultPluginParameters(layout, t)
+	t.applyLayoutAlgorithm(layout, params)
+	for n in graph.getNodes(): graph['viewLayout'][n] = t['viewLayout'][n]
+
+	# 3. compute the size
+	set_node_size(graph, scale=4)
+
+
+
+
+
 
 
 
