@@ -23,7 +23,7 @@ __status__ = "Prototype"
 # 1. INDIVIDUAL FUNCTIONS
 ##########################################################################
 
-statistics = {}
+data = {}
 
 
 ##########################################
@@ -58,7 +58,7 @@ def core():
 		'average': use_flags_sum / nb_spl,
 		'keywords': len(db.keywords)
 	}
-	global statistics
+	global data
 	statistics['core'] = res
 	utils.phase_end("Computation Completed")
 
@@ -96,7 +96,7 @@ def missing_locally():
 		'spl_number': len(data),
 		'data': data
 	}
-	global statistics
+	global data
 	statistics['missing_locally'] = res
 	utils.phase_end("Computation Completed")
 
@@ -162,7 +162,7 @@ def missing_externally():
 		'use_flag_number': len({use_flag for el in data.values() for use_flags in el['missing'].values() for use_flag in use_flags}),
 		'data': data
 	}
-	global statistics
+	global data
 	statistics['missing_externally'] = res
 	utils.phase_end("Computation Completed")
 
@@ -221,12 +221,12 @@ def main():
 	missing_externally()
 	##
 	write_init(statistics_path_md)
-	write_core(statistics_path_md, statistics['core'])
-	write_missing_locally(statistics_path_md, statistics['missing_locally'])
-	write_missing_externally(statistics_path_md, statistics['missing_externally'])
+	write_core(statistics_path_md, data['core'])
+	write_missing_locally(statistics_path_md, data['missing_locally'])
+	write_missing_externally(statistics_path_md, data['missing_externally'])
 
 	with open(statistics_path_json, 'w') as f:
-		json.dump(statistics, f)
+		json.dump(data, f)
 
 
 if __name__ == "__main__":
