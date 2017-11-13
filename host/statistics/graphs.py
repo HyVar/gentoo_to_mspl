@@ -3,6 +3,7 @@
 # This file computes several graphs from the hyportage data
 #######################################
 
+import core_data
 import hyportage_data
 import hyportage_pattern
 
@@ -43,6 +44,44 @@ def mspl(filter_function=db.filter_function_simple, label_generator=label_genera
 				graph.addEdge(spl_nodes[spl], spl_nodes[dep])
 
 	return graph, spl_nodes
+
+
+
+def mspl_full(
+		filter_spl=db.filter_function_simple, filter_pattern=db.filter_function_simple,
+		label_spl=label_generator_simple, label_pattern=core_data.pattern_to_atom):
+	graph = tlp.newGraph()
+	spl_nodes = {}
+	pattern_nodes = {}
+
+	for spl in db.mspl.itervalues():
+		if filter_spl(spl):
+			node = graph.addNode()
+			spl_nodes[spl] = node
+			graph['viewLabel'][node] = label_spl(spl)
+
+	for pattern in db.flat_pattern_repository.iterkeys():
+		if filter_pattern(pattern):
+			node = graph.addNode()
+			pattern_nodes[pattern] = node
+			graph['viewLabel'][node] = label_pattern(pattern)
+
+	spls = set(spl_nodes.keys())
+	patterns = set(pattern_nodes.keys())
+
+	for spl, node in spl_nodes.iteritems():
+		for pattern in spl.dependencies.iterkeys():
+			if pattern in patterns:
+				graph.addEdge(node, pattern_nodes[pattern])
+
+	for pattern, node in pattern_nodes.iteritems():
+		for spl in db.flat_pattern_repository[pattern].get_spls(db.mspl, db.spl_groups):
+			if spl in spls:
+				graph.addEdge(node, spl_nodes[spl])
+
+	return graph, spl_nodes, pattern_nodes
+
+
 
 
 def spl_groups(filter_function=db.filter_function_simple, label_generator=label_generator_simple, keep_self_loop=False):

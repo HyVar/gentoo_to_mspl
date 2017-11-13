@@ -120,12 +120,20 @@ class SPL(object):
 		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
 		self.use_selection_default   = use_selection_default  # default use selection
 		self.use_selection_full      = None                   # use selection considering default portage information
-		self.unmask                  = None                   # if portage states that this spl is masked or not
+		self.unmasked                = None                   # if portage states that this spl is masked or not
 		self.keywords_list           = keywords_list          # list of architectures valid for this spl
 		self.installable             = None
 		self.is_stable               = None                   # boolean stating if this spl can be installed by default on the current architecture
 		self.visited                 = False                  # if the spl was visited in a graph traversal
 		# self.has_several_parents   = False                  # if there are two paths to access this spl during graph traversal
+
+	def __hash__(self): return hash(self.name)
+
+	def __eq__(self, other):
+		if isinstance(other, SPL):
+			return self.name == other.name
+		else:
+			return False
 
 	def update_required_iuses_external(self, features, pattern):
 		res = False
@@ -137,14 +145,11 @@ class SPL(object):
 				res = True
 		return res
 
-	def __hash__(self): return hash(self.name)
-
-	def __eq__(self, other):
-		if isinstance(other, SPL):
-			return self.name == other.name
-		else:
-			return False
-
+	def configuration(self, config):
+		if self.use_selection_full is None:
+			self.unmasked, self.installable, self.is_stable, self.use_selection_full = config.mspl_config.apply(
+				self.core, self.iuses_default, self.keywords_list)
+		return self.use_selection_full
 
 def spl_get_name(spl): return spl.name
 def spl_get_group_name(spl): return core_data.spl_core_get_spl_group_name(spl.core)
