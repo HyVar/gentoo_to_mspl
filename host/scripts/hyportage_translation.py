@@ -6,12 +6,10 @@ import utils
 import logging
 import sys
 
-import portage_data
 import hyportage_from_egencache
 import hyportage_data
 import hyportage_pattern
 import hyportage_ids
-import hyportage_configuration
 import smt_encoding
 
 """
@@ -199,7 +197,7 @@ def update_required_feature_external_new(pattern_repository, spls):
 		#if pattern in test:
 		#	logging.error(" already looked at pattern "+ str(pattern))
 		#	sys.exit(1)
-		logging.debug("  looking at pattern " + str(pattern))
+		#logging.debug("  looking at pattern " + str(pattern))
 		element = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)
 		feature_required = hyportage_pattern.pattern_repository_element_get_required_use(element)
 		for spl in element.get_local_spls(spls, spl_groups):
@@ -246,13 +244,13 @@ def update_masks(mspl, spl_added_full, config):
 	if config.new_masks:
 		res = []
 		for k, spl in mspl.iteritems():
-			unmask = config.get_unmasked(spl.core)
-			if unmask != spl.unmask:
+			unmasked = config.get_unmasked(spl.core)
+			if unmasked != spl.unmasked:
 				res.append(spl)
-				spl.unmask = unmask
+				spl.unmasked = unmasked
 	else:
 		for spl in spl_added_full:
-			spl.unmask = config.get_unmasked(spl.core)
+			spl.unmasked = config.get_unmasked(spl.core)
 		res = spl_added_full
 	utils.phase_end("Generation completed")
 	return res
@@ -267,7 +265,7 @@ def update_keywords(mspl, spl_updated_mask, config):
 
 	res = []
 	for spl in iterator:
-		installable, is_stable = config.get_stability_status(spl.core, spl.unmask, spl.keywords_list)
+		installable, is_stable = config.get_stability_status(spl.core, spl.unmasked, spl.keywords_list)
 		if (installable, is_stable) != (spl.installable, spl.is_stable):
 			res.append(spl)
 			spl.installable, spl.is_stable = installable, is_stable

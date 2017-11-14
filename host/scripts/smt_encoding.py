@@ -175,7 +175,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		self.spl_name = spl_name
 
 	def visitRequired(self, ctx):
-		return z3.And(map(self.visitRequiredEL, ctx))
+		return map(self.visitRequiredEL, ctx)
 
 	def visitRequiredSIMPLE(self, ctx):
 		res = get_smt_use_flag(self.id_repository, self.spl_name, ctx["use"])
@@ -211,7 +211,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return z3.And(self.visitRequired(ctx['els']))
 
 	def visitDepend(self, ctx):
-		return z3.And(map(self.visitDependEL, ctx))
+		return map(self.visitDependEL, ctx)
 
 	def visitDependSIMPLE(self, ctx):
 		spls = hyportage_pattern.pattern_repository_element_get_spls(
@@ -291,9 +291,8 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 	# print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
 	# 1. convert feature model
 	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, mspl, spl_groups, spl_name)
-	constraints.extend(visitor.visitRequiredEL(hyportage_data.spl_get_fm_local(spl)))
-	constraints.extend(visitor.visitDependEL(hyportage_data.spl_get_fm_combined(spl)))
-	for constraint in map(visitor.visitDependEL, hyportage_data.spl_get_fm_combined(spl)):
+	constraints.extend(visitor.visitRequired(hyportage_data.spl_get_fm_local(spl)))
+	for constraint in visitor.visitDepend(hyportage_data.spl_get_fm_combined(spl)):
 		constraints.append(z3.Implies(spl_id, constraint))
 
 	# 2. constraint stating that selecting an spl also selects its group

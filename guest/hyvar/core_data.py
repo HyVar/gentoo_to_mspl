@@ -295,9 +295,9 @@ class dictSet(dict):
 		self[key] = values
 
 	def update_set(self, dict_set):
-		for k, v in dict_set.data.iteritems():
+		for k, v in dict_set.iteritems():
 			if k in self:
-				self[k].update_set(v)
+				self[k].update(v)
 			else: self[k] = v
 
 
@@ -343,7 +343,7 @@ class SetManipulation(object):
 			self.remove_all = True
 		else:
 			self.positive.difference_update(set_manipulation.negative)
-			self.positive.update_set(set_manipulation.positive)
+			self.positive.update(set_manipulation.positive)
 			if not self.remove_all:
 				self.negative.update(set_manipulation.negative)
 				self.negative.difference_update(self.positive)
@@ -353,10 +353,10 @@ class SetManipulation(object):
 	def apply(self, s):
 		if self.remove_all:
 			s.clear()
-			s.update_set(self.positive)
+			s.update(self.positive)
 		else:
 			s.difference_update(self.negative)
-			s.update_set(self.positive)
+			s.update(self.positive)
 
 	def init(self):
 		return self.positive.copy()
@@ -628,7 +628,7 @@ class MSPLConfig(object):
 		return unmasked, installable, is_stable, use_flags
 
 	def set_required_patterns(self):
-		self.pattern_required_flat = {el for k, v in self.pattern_required.data for el in v}
+		self.pattern_required_flat = {el for k, v in self.pattern_required.iteritems() for el in v}
 
 	def set_old_config(self, old_config):
 		self.new_masks = (self.pattern_mask != old_config.pattern_mask) or (self.pattern_unmask != old_config.pattern_unmask)

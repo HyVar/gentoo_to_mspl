@@ -1,5 +1,4 @@
 
-import sys
 import os
 import utils
 import logging
@@ -10,12 +9,9 @@ import click
 import hyportage_translation
 import reconfigure
 
-import core_data
-import portage_data
 import hyportage_data
 import hyportage_pattern
 import hyportage_ids
-import hyportage_configuration
 
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
@@ -57,15 +53,6 @@ def load_hyportage(path_hyportage, save_modality):
 
 def load_configuration(path_configuration):
 	return utils.load_data_file(path_configuration, "pickle")
-
-
-#def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls, save_modality):
-#	if save_modality.endswith("json"):
-#		utils.store_data_file(path_hyportage, hyportage_data.hyportage_data_to_save_format(
-#			pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls), save_modality)
-#	else:
-#		data = pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
-#		utils.store_data_file(path_hyportage, data, save_modality)
 
 
 def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality):
@@ -197,7 +184,7 @@ def main(
 	else: available_cores = 1
 	logging.info("number of available cores: " + str(available_cores))
 
-	if available_cores > 1:
+	if (available_cores > 1) and (os.name != 'nt'):
 		pool = multiprocessing.Pool(available_cores)
 		concurrent_map = pool.map
 	else: concurrent_map = map
@@ -248,11 +235,13 @@ def main(
 	##########################################################################
 
 	if todo_update_hyportage:
+		logging.info("updating hyportage...")
 		unchanged_spls = set(mspl.values())
 
 		# update the hyportage spl database
 		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
 		spl_added_full, spl_removed_full, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
+
 
 		unchanged_spls.difference_update(spl_removed_full)
 
@@ -271,7 +260,7 @@ def main(
 			pattern_repository, pattern_added, pattern_updated, pattern_removed, unchanged_spls, spl_added_full)
 
 		# update the id repository
-		spl_updated_features.update_set(spl_updated_required_features)
+		spl_updated_features.update(spl_updated_required_features)
 		hyportage_translation.update_id_repository(
 			id_repository, spl_updated_features, spl_removed_full, spl_groups_removed, spl_groups_added)
 
@@ -288,12 +277,16 @@ def main(
 			pattern_added, pattern_updated, pattern_removed,
 			spl_updated_required_features, spl_updated_visibility)
 
+		print("finished")
 
 		# save the hypotage database
 		save_hyportage(path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality)
 		save_configuration(path_configuration, config)
 
-		return
+
+		print("saved")
+
+		return None
 
 		#unchanged_spls.difference_update(spl_updated_required_features)
 
@@ -338,6 +331,7 @@ def main(
 	##########################################################################
 
 	if todo_emerge:
+		logging.info("computing a new system configuration...")
 		# compute what to install
 		#requested_patterns, default_patterns, use_selection = reconfigure.compute_request(atoms, config)
 		root_spls, request_constraint = reconfigure.process_request(
@@ -355,7 +349,6 @@ def main(
 		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
 		reconfigure.generate_package_use_file(mspl, path_use_flag_configuration, solution)
 
-		return
 		# extends the pattern repository with user-defined patterns
 		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
 
@@ -382,6 +375,8 @@ def main(
 ##
 
 if __name__ == "__main__":
+	if os.name == 'nt':
+		multiprocessing.freeze_support()
 	main()
 	print("14")
 

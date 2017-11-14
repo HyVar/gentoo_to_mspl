@@ -6,11 +6,9 @@ import os.path
 import logging
 import subprocess
 import bz2
-import json
 import cPickle
 
 import core_data
-import portage_data
 
 
 __author__ = "Michael Lienhardt"
@@ -377,7 +375,7 @@ def combine_profile_layer_data(data1, data2):
 	)
 	"""
 	config = data1[1]
-	config.update_set(data2[1])
+	config.update(data2[1])
 	return data2[0], config
 
 
@@ -393,7 +391,7 @@ def load_profile(path, environment):
 		configs.append(config)
 		config = configs[0]
 		for data in configs[1:]:
-			config.update_set(data)
+			config.update(data)
 		return environment, config
 	else:
 		return load_profile_layer(path, environment)
@@ -551,7 +549,7 @@ def get_user_configuration(environment):
 def env_d(system, environment):
 	process = subprocess.Popen(["bash", "-c", "source /etc/profile.env ; /usr/bin/env"], stdout=subprocess.PIPE, env={})
 	out, err = process.communicate()
-	environment.update_set(environment_create_from_script_output(out))
+	environment.update(environment_create_from_script_output(out))
 	return environment
 
 
@@ -560,7 +558,7 @@ def env_d(system, environment):
 
 def repo(system, environment):
 	new_environment, mspl_config = load_profile_layer(input_file_profile_base, environment)
-	system.mspl_config.update_set(mspl_config)
+	system.mspl_config.update(mspl_config)
 	return new_environment
 
 
@@ -578,7 +576,7 @@ def pkginternal(system, environment):
 
 def defaults(system, environment):
 	new_environment, mspl_config = load_profile(input_file_profile_selected, environment)
-	system.mspl_config.update_set(mspl_config)
+	system.mspl_config.update(mspl_config)
 	return new_environment
 
 
@@ -588,11 +586,11 @@ def defaults(system, environment):
 def conf(system, environment):
 	new_environment, info = load_make_defaults(input_file_make_conf, environment)
 	use_selection, use_declaration_eapi4, use_declaration_eapi5, use_declaration_hidden_from_user, arch, accept_keywords = info
-	system.mspl_config.use_selection_config.use.update_set(use_selection)
-	system.mspl_config.use_declaration_eapi4.update_set(use_declaration_eapi4)
-	system.mspl_config.use_declaration_eapi5.update_set(use_declaration_eapi5)
-	system.mspl_config.use_declaration_hidden_from_user.update_set(use_declaration_hidden_from_user)
-	system.mspl_config.accept_keywords.update_set(accept_keywords)
+	system.mspl_config.use_selection_config.use.update(use_selection)
+	system.mspl_config.use_declaration_eapi4.update(use_declaration_eapi4)
+	system.mspl_config.use_declaration_eapi5.update(use_declaration_eapi5)
+	system.mspl_config.use_declaration_hidden_from_user.update(use_declaration_hidden_from_user)
+	system.mspl_config.accept_keywords.update(accept_keywords)
 	if arch:
 		system.mspl_config.arch = arch
 	return new_environment
@@ -603,7 +601,7 @@ def conf(system, environment):
 
 def pkg(system, environment):
 	new_environment, mspl_config = get_user_configuration(environment)
-	system.mspl_config.update_set(mspl_config)
+	system.mspl_config.update(mspl_config)
 	return new_environment
 
 
@@ -679,7 +677,7 @@ def load_installed_packages():
 ######################################################################
 # load the world file
 def load_world_file():
-	return map(core_data.pattern_create_from_atom, parse_configuration_file(input_file_user_world))
+	return set(map(core_data.pattern_create_from_atom, parse_configuration_file(input_file_user_world)))
 
 
 ######################################################################

@@ -253,14 +253,6 @@ def translate_depend(depend_string):
 # TRANSLATE A EGENCACHE FILE INTO A HYPORTAGE SPL
 ######################################################################
 
-#def is_selection_required(ctx):
-#	if "default" not in ctx: return True
-#	if "suffix" in ctx:
-#		if (ctx['default'] == "-") and (ctx['suffix'] == "?"): return True
-#		else: return False
-#	if "prefix" in ctx:
-#		return (ctx['default'] == "-")
-#	return (ctx['default'] == "+")
 
 def is_selection_required(ctx):
 	if 'default' not in ctx: return True
@@ -295,6 +287,19 @@ class GETDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
 		if 'suffix' in ctx: self.res[0].add(use)
 
 
+def extract_iuse(iuse_list):
+	use_flag_set = set()
+	use_flag_manipulation = core_data.SetManipulation()
+	for iuse in iuse_list:
+		if iuse[0] == "+":
+			iuse = iuse[1:]
+			use_flag_manipulation.add(iuse)
+		elif iuse[0] == "-":
+			use_flag_manipulation.add(iuse)
+			iuse = iuse[1:]
+		use_flag_set.add(iuse)
+	return use_flag_set, use_flag_manipulation
+
 def create_spl_from_egencache_file(file_path):
 	"""
 	create the spl structure of a portage md5-cache file, and stores it in the mspl global variable
@@ -325,7 +330,7 @@ def create_spl_from_egencache_file(file_path):
 	subslot = slots[1] if len(slots) == 2 else "0"
 	spl_core = core_data.spl_core_create(package_group, version_full, version, slot, subslot)
 
-	iuses, use_selection = core_data.extract_data_from_iuse_list(iuses_string.split() if iuses_string else [])
+	iuses, use_selection = extract_iuse(iuses_string.split() if iuses_string else [])
 
 	fm_local = utils.compact_list(translate_require(fm_local)) if fm_local else []
 	fm_external = translate_depend(fm_external) if fm_external else []
