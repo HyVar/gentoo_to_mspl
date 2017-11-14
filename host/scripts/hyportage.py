@@ -331,7 +331,7 @@ def main(
 	##########################################################################
 
 	if todo_emerge:
-		logging.info("computing a new system configuration...")
+		logging.info("computing a new system configuration... " + str(atoms))
 		# compute what to install
 		#requested_patterns, default_patterns, use_selection = reconfigure.compute_request(atoms, config)
 		root_spls, request_constraint = reconfigure.process_request(
@@ -349,28 +349,6 @@ def main(
 		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
 		reconfigure.generate_package_use_file(mspl, path_use_flag_configuration, solution)
 
-		# extends the pattern repository with user-defined patterns
-		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
-
-		# translate the request into corresponding smt constraint and corresponding spls
-		smt_constraint, requested_spls, all_spls = reconfigure.process_request(
-			pattern_repository, id_repository, mspl, spl_groups, requested_patterns, default_patterns)
-
-		# adds the user required iuses to the id_repository
-		reconfigure.extends_id_repository_with_requested_use_flags(
-			id_repository, installed_spls, requested_spls, use_selection)
-
-		# apply the user-specific use selection to the mspl
-		reconfigure.apply_requested_use_selection(requested_spls, use_selection)
-
-		# compute the new configuration
-		to_install_spls = reconfigure.get_hyvarrec_input_monolithic(
-			pattern_repository, id_repository, mspl, spl_groups, installed_spls,
-			all_spls, smt_constraint, par, explain_modality)
-
-		# generate the emerge script and use configuration files
-		reconfigure.generate_emerge_script_file(path_install_script, installed_spls, to_install_spls)
-		reconfigure.generate_package_use_file(path_use_flag_configuration, to_install_spls)
 
 ##
 

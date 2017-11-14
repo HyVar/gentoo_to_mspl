@@ -251,7 +251,7 @@ def pattern_repository_local_map_remove_pattern_from_spl(pattern_repository_loca
 ##
 
 def pattern_repository_local_map_add_pattern_from_scratch(pattern_repository_local_map, pattern):
-	if not pattern in pattern_repository_local_map:
+	if pattern not in pattern_repository_local_map:
 		res = PatternElement(pattern)
 		pattern_repository_local_map[pattern] = res
 

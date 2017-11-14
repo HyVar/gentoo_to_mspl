@@ -46,10 +46,10 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, config,
 		and the config object have been updated with th USE user configuration
 	"""
 	requested_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
-	for pattern in requested_patterns:
-		hyportage_pattern.pattern_repository_local_map_add_pattern_from_scratch(pattern_repository, pattern)
-
 	requested_patterns.update(config.pattern_required_flat)
+	for pattern in requested_patterns:
+		hyportage_pattern.pattern_repository_add_pattern_from_scratch(pattern_repository, pattern)
+
 	config.set_use_manipulation_env(os.environ.get("USE", "").split())
 
 	root_spls, constraint = smt_encoding.convert_patterns(

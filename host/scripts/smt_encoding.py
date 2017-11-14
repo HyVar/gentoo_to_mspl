@@ -337,7 +337,7 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 
 def convert_use_flag_selection(id_repository, spl_name, use_flags, use_selection):
 	use_unselection = use_flags - use_selection
-	constraint = [get_smt_use_flag(use) for use in use_selection]
+	constraint = [get_smt_use_flag(id_repository, spl_name, use) for use in use_selection]
 	constraint.extend([z3.Not(get_smt_use_flag(id_repository, spl_name, use)) for use in use_unselection])
 	return smt_list_to_strings(constraint)
 
