@@ -8,6 +8,7 @@ import hyportage_constraint_ast
 import hyportage_ids
 import hyportage_pattern
 import hyportage_configuration
+import smt_encoding
 
 ######################################################################
 # KEYWORDS MANIPULATION
@@ -120,6 +121,7 @@ class SPL(object):
 		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
 		self.use_selection_default   = use_selection_default  # default use selection
 		self.use_selection_full      = None                   # use selection considering default portage information
+		self.use_selection_smt      = None
 		self.unmasked                = None                   # if portage states that this spl is masked or not
 		self.keywords_list           = keywords_list          # list of architectures valid for this spl
 		self.installable             = None
@@ -145,11 +147,21 @@ class SPL(object):
 				res = True
 		return res
 
-	def configuration(self, config):
-		if self.use_selection_full is None:
+	def smt(self):
+		if self.installable:
+			return self.smt_constraint
+		else: return smt_encoding.get_smt_not_spl_name(self.name)
+
+	def smt_use_selection(self, id_repository, config):
+		if self.use_selection_smt is None:
 			self.unmasked, self.installable, self.is_stable, self.use_selection_full = config.mspl_config.apply(
 				self.core, self.iuses_default, self.keywords_list)
-		return self.use_selection_full
+			use_selection_core = self.use_selection_full & self.required_iuses
+			self.use_selection_smt = smt_encoding.convert_use_flag_selection(
+				id_repository, self.name, self.required_iuses, use_selection_core)
+		return self.use_selection_smt
+
+
 
 def spl_get_name(spl): return spl.name
 def spl_get_group_name(spl): return core_data.spl_core_get_spl_group_name(spl.core)

@@ -279,21 +279,26 @@ def match_spl_simple(pattern, spl):
 # DICTIONARY TO SET BASE CLASS
 ######################################################################
 
-class DictSet(object):
-	def __init__(self):
-		self.data = {}
-
+class dictSet(dict):
+	"""
+	This class is used as a container for
+		- required patterns (mapping between set names to sets of patterns)
+		- installed packages (mapping between package names to use flag selection)
+	"""
 	def add(self, key, val):
-		if key in self.data:
-			self.data[key].add(val)
+		if key in self:
+			self[key].add(val)
 		else:
-			self.data[key] = {val}
+			self[key] = {val}
 
-	def update(self, dict_set):
+	def set(self, key, values):
+		self[key] = values
+
+	def update_set(self, dict_set):
 		for k, v in dict_set.data.iteritems():
-			if k in self.data:
-				self.data[k].update(v)
-			else: self.data[k] = v
+			if k in self:
+				self[k].update_set(v)
+			else: self[k] = v
 
 
 ######################################################################
@@ -301,6 +306,12 @@ class DictSet(object):
 ######################################################################
 
 class SetManipulation(object):
+	"""
+	this class is used for encoding
+		- use flag manipulation (use in make.default, use.force, use.mask, use.stable.force and use.stable.mask)
+		- keyword list manipulation
+	As checked in the tests, "-*" is a valid atom in these files, and so it is included in this class
+	"""
 	def __init__(self):
 		self.positive = set()
 		self.negative = set()
@@ -332,7 +343,7 @@ class SetManipulation(object):
 			self.remove_all = True
 		else:
 			self.positive.difference_update(set_manipulation.negative)
-			self.positive.update(set_manipulation.positive)
+			self.positive.update_set(set_manipulation.positive)
 			if not self.remove_all:
 				self.negative.update(set_manipulation.negative)
 				self.negative.difference_update(self.positive)
@@ -342,16 +353,21 @@ class SetManipulation(object):
 	def apply(self, s):
 		if self.remove_all:
 			s.clear()
-			s.update(self.positive)
+			s.update_set(self.positive)
 		else:
 			s.difference_update(self.negative)
-			s.update(self.positive)
+			s.update_set(self.positive)
 
 	def init(self):
 		return self.positive.copy()
 
 
 class SetManipulationPattern(object):
+	"""
+	this class is used for all the set manipulation files that are guarded by a specific pattern
+		- use flag manipulation for specific patterns (package.use, package.use.force, etc)
+		- keyword manipulation for specific patterns (package.keywords, package.accept_keywords)
+	"""
 	def __init__(self):
 		self.list = []
 
@@ -373,6 +389,10 @@ class SetManipulationPattern(object):
 
 
 class PatternListManipulation(list):
+	"""
+	this class is used for simple list of patterns:
+		- package masking (package.mask, package.unmask)
+	"""
 	def add(self, string):
 		if string[0] == "-":
 			self.append( (False, pattern_create_from_atom(string[1:])) )
@@ -399,6 +419,13 @@ class PatternListManipulation(list):
 
 
 class UseSelectionConfig(object):
+	"""
+	This class stores all the kind of use flag manipulation in portage:
+		- use variable in make.default
+		- use.force, use.mask, use.stable.force, use.stable.mask
+		- package.use, package.use.force, package.use.mask, package.use.stable.force and package.use.stable.mask
+	Additionally, this class have a method to apply these manipulations on a use flag selection
+	"""
 	def __init__(
 			self,
 			use=SetManipulation(), use_force=SetManipulation(), use_mask=SetManipulation(),
@@ -431,12 +458,12 @@ class UseSelectionConfig(object):
 		self.pattern_use_stable_force.update(config.pattern_use_stable_force)
 		self.pattern_use_stable_mask.update(config.pattern_use_stable_mask)
 
-	def apply(self, spl_core, is_stable, s):
-		self.use.apply(s)
-		self.pattern_use.apply(spl_core, s)
+	def apply(self, spl_core, is_stable, selection):
+		self.use.apply(selection)
+		self.pattern_use.apply(spl_core, selection)
 
 		force = self.use_force.init()
-		self.pattern_use_force.apply(force)
+		self.pattern_use_force.apply(spl_core, force)
 		if is_stable:
 			tmp = self.use_stable_force.init()
 			self.pattern_use_stable_force.apply(spl_core, tmp)
@@ -448,8 +475,8 @@ class UseSelectionConfig(object):
 			self.pattern_use_stable_mask.apply(spl_core, tmp)
 			mask.update(tmp)
 
-		s.update(force)
-		s.difference_update(mask)
+		selection.update(force)
+		selection.difference_update(mask)
 
 	def init(self, spl_core, is_stable):
 		res = set()
@@ -473,13 +500,25 @@ class UseSelectionConfig(object):
 		else: return False
 
 
-# BUG: pattern_mask* is not a SetManipulation, but a list (as patterns can have a non empty intersection, even if not being equal)
 class MSPLConfig(object):
+	"""
+	This class contains all the information related to package/spl configuration
+		- architecture for the hardware
+		- use flag implicit declaration (for eapi4 and less, and for eapi5 and more)
+		- use flags that are hidden from the user (can be useful for consistent output to the user)
+		- use flag manipulation (before and after the manipulation specified in the package itself)
+		- package requirement
+		- packages provided outside of portage
+		- keywords and visibility (mask) manipulation
+	This class also contains a method "combine" to add the information contained in another MSPLConfig object into this
+	one and is used to compute this data incrementally from the different configuration files in portage.
+	Finally, we have the "apply" method that compute relevant data (visibility and use flag selection) for a package.
+	"""
 	def __init__(
 			self, arch=None,
 			use_declaration_eapi4=set(), use_declaration_eapi5=set(), use_declaration_hidden_from_user=set(),
 			use_selection_config=UseSelectionConfig(),
-			pattern_required=DictSet(), pattern_provided=set(),
+			pattern_required=dictSet(), pattern_provided=set(),
 			pattern_mask=PatternListManipulation(), pattern_unmask=PatternListManipulation(),
 			accept_keywords=SetManipulation(), pattern_keywords=SetManipulationPattern(), pattern_accept_keywords=SetManipulationPattern()):
 		self.arch = arch
@@ -495,6 +534,7 @@ class MSPLConfig(object):
 
 		# mapping from package set name and set of pattern
 		self.pattern_required = pattern_required
+		self.pattern_required_flat = None
 		# sets of pattern
 		self.pattern_provided = pattern_provided
 
@@ -523,7 +563,7 @@ class MSPLConfig(object):
 
 		self.use_selection_config.update(config.use_selection_config)
 
-		self.pattern_required.update(config.pattern_required)
+		self.pattern_required.update_set(config.pattern_required)
 		self.pattern_provided.update(config.pattern_provided)
 
 		self.pattern_mask.update(config.pattern_mask)
@@ -544,7 +584,7 @@ class MSPLConfig(object):
 	
 	def update_pattern_unmask(self, pattern_unmask): self.pattern_unmask.update(pattern_unmask)
 	
-	def update_pattern_required(self, pattern_required): self.pattern_required.update(pattern_required)
+	def update_pattern_required(self, pattern_required): self.pattern_required.update_set(pattern_required)
 
 	def close_init_phase(self):
 		self.use_selection_config_init = self.use_selection_config
@@ -587,6 +627,9 @@ class MSPLConfig(object):
 		# 4. return the result
 		return unmasked, installable, is_stable, use_flags
 
+	def set_required_patterns(self):
+		self.pattern_required_flat = {el for k, v in self.pattern_required.data for el in v}
+
 	def set_old_config(self, old_config):
 		self.new_masks = (self.pattern_mask != old_config.pattern_mask) or (self.pattern_unmask != old_config.pattern_unmask)
 		self.new_use_declaration_eapi4 = (self.use_declaration_eapi4 != old_config.use_declaration_eapi4)
@@ -605,383 +648,49 @@ class MSPLConfig(object):
 			self.new_use_flag_config = (self.use_selection_config_init != old_config.use_selection_config_init)
 
 
-
 ######################################################################
 # MAIN SYSTEM CLASS
 ######################################################################
 
-# we need the use before the package (use, use.force, use.mask, use.stable.force, package.use, package), and the config after
-# plus the other data: keyword list, installed packages, and world
-
 
 class Config(object):
+	"""
+	This class contains the full configuration of portage.
+	In addition to the MSPL configuration, this class contains:
+		- the list of keywords declared in portage
+		- the list of installed package, with their use flag selection
+		- the world list, that lists all the patterns required by the user,
+			accumulated during his previous "emerge" calls.
+		- the use flag manipulation stated by the user in the environment
+	Consequently, this class have an "apply" wrapper method around the "apply" method of the MSPL configuration,
+	that also apply the use flag manipulation from the environment
+	"""
 	def __init__(self):
 		self.mspl_config = MSPLConfig()
 		self.keyword_list = None
 		self.installed_packages = None
 		self.world = None
+		self.use_manipulation_env = None
+		self.pattern_required_flat = None
 
+	def set_use_manipulation_env(self, use_flag_manipulation):
+		self.use_manipulation_env = SetManipulation()
+		self.use_manipulation_env.add_all(use_flag_manipulation)
+
+	def apply(self, spl_core, use_manipulation, keywords_default):
+		unmasked, installable, is_stable, use_flags = self.mspl_config.apply(spl_core, use_manipulation, keywords_default)
+		if installable:
+			use_flags = self.use_manipulation_env.apply(use_flags)
+		return unmasked, installable, is_stable, use_flags
 
 	def close_init_phase(self): self.mspl_config.close_init_phase()
 
+	def set_required_patterns(self):
+		self.mspl_config.set_required_patterns()
+		self.pattern_required_flat = self.mspl_config.pattern_required_flat | self.world
 
 
 
-
-
-
-
-
-
-
-
-######################################################################
-# DEPRECATED
-######################################################################
-
-
-
-
-
-######################################################################
-# GENERIC CONFIGURATION MANIPULATION
-######################################################################
-
-# generic set configuration
-
-
-def set_configuration_create(): return set([])
-
-
-def set_configuration_copy(set_configuration): return set(set_configuration)
-
-
-def set_configuration_add(set_configuration, el): set_configuration.add(el)
-
-
-def set_configuration_addall(set_configuration, set_configuration2):
-	set_configuration.update(set_configuration2)
-
-
-def set_configuration_remove(set_configuration, el): set_configuration.discard(el)
-
-
-def set_configuration_removeall(set_configuration, set_configuration2):
-	set_configuration.difference_update(set_configuration2)
-
-
-def set_configuration_to_save_format(set_configuration, el_to_save_format):
-	return [ el_to_save_format(el) for el in set_configuration ]
-
-
-def set_configuration_to_save_format_simple(set_configuration): return list(set_configuration)
-
-
-def set_configuration_from_save_format(save_format, el_from_save_format):
-	return set([ el_from_save_format(el) for el in save_format ])
-
-
-def set_configuration_from_save_format_simple(save_format): return set(save_format)
-
-
-# generic list configuration
-# everything with patterns must use ordered lists
-
-
-def list_configuration_create(): return list([])
-
-
-def list_configuration_add(list_configuration, el): list_configuration.append(el)
-
-
-def list_configuration_update(list_configuration, list_configuration2):
-	list_configuration.extend(list_configuration2)
-
-
-def list_configuration_to_save_format(list_configuration, el_to_save_format):
-	return [ el_to_save_format(el) for el in list_configuration ]
-
-
-def list_configuration_from_save_format(save_format, el_from_save_format):
-	return [ el_from_save_format(el) for el in save_format ]
-
-# generic dict configuration
-
-
-def dict_configuration_create(): return {}
-
-
-def dict_configuration_add_el(dict_configuration, key, value, create_function, update_function):
-	to_update = dict_configuration.get(key)
-	if not to_update:
-		to_update = create_function()
-		dict_configuration[key] = to_update
-	update_function(to_update, value)
-
-
-def dict_configuration_remove_el(dict_configuration, key, value, remove_function):
-	to_update = dict_configuration.get(key)
-	if to_update:
-		remove_function(to_update, value)
-
-
-def dict_configuration_add(dict_configuration, key, values):
-	dict_configuration[key] = values
-
-
-def dict_configuration_remove(dict_configuration, key):
-	dict_configuration.pop(key)
-
-
-def dict_configuration_to_save_format(dict_configuration, key_to_save_format, value_to_save_format):
-	return [ [ key_to_save_format(k), value_to_save_format(v) ] for k, v in dict_configuration.iteritems() ]
-
-
-def dict_configuration_from_save_format(save_format, key_from_save_format, value_from_save_format):
-	return { key_from_save_format(p[0]): value_from_save_format(p[1]) for p in save_format }
-
-
-######################################################################
-# SET MANIPULATION DATA
-#  (to manipulate list operation as in use.force, or package.mask)
-######################################################################
-
-######################################################################
-# for USE flags
-#  use.force, use.mask, use.stable.force and use.stable.mask
-def use_set_construction_create():
-	return set(), set()
-
-
-def use_set_construction_create_from_use_list(use_list):
-	res = use_set_construction_create()
-	for guarded_use_flag in use_list:
-		use_set_construction_add(res, guarded_use_flag)
-	return res
-
-
-def use_set_construction_add(use_set_construction, guarded_use_flag):
-	if guarded_use_flag[0] == "-":
-		use_set_construction[0].discard(guarded_use_flag)
-		use_set_construction[1].add(guarded_use_flag)
-	else:
-		use_set_construction[0].add(guarded_use_flag)
-		use_set_construction[1].discard(guarded_use_flag)
-
-
-def use_set_construction_update(use_set_construction, other):
-	use_set_construction[0].difference_update(other[1])  # remove the remove list
-	use_set_construction[0].update(other[0])  # add the add list
-	use_set_construction[1].difference_update(other[0])  # remove the add list
-	use_set_construction[1].update(other[1])  # add the remove list
-
-
-def use_set_construction_apply(use_set_construction, use_set):
-	use_set.difference_update(use_set_construction[1])
-	use_set.update(use_set_construction[0])
-
-
-def use_set_construction_get(use_set_construction):
-	return use_set_construction[0]
-
-
-######################################################################
-# for pattern list
-#  package.mask, package.unmask
-def pattern_set_construction_create():
-	return []
-
-
-def pattern_set_construction_add(pattern_set_construction, guarded_atom):
-	if guarded_atom[0] == "-":
-		pattern_set_construction.append( ('-', pattern_create_from_atom(guarded_atom[1:])) )
-	else:
-		pattern_set_construction.append( ('+', pattern_create_from_atom(guarded_atom)) )
-
-
-def pattern_set_construction_update(pattern_set_construction, other):
-	pattern_set_construction.extend(other)
-
-
-def pattern_set_construction_contains(pattern_set_construction, spl_core):
-	res = False
-	for sign, pattern in pattern_set_construction.iteritems():
-		if match_spl_full(pattern, spl_core):
-			res = sign == "+"
-	return res
-
-
-######################################################################
-# for per pattern USE flags
-#  package.use.force, package.use.mask, package.use.stable.force and package.use.stable.mask
-def pattern_use_set_construction_create():
-	return []
-
-
-def pattern_use_set_construction_add(pattern_use_set_construction, pattern, use_set_construction):
-	pattern_use_set_construction.append( (pattern, use_set_construction) )
-
-
-def pattern_use_set_construction_update(pattern_use_set_construction, other):
-	pattern_use_set_construction.extend(other)
-
-
-def pattern_use_set_construction_apply(pattern_use_set_construction, spl_core, use_set):
-	for pattern, use_set_construction in pattern_use_set_construction.iteritems():
-		if match_spl_full(pattern, spl_core):
-			use_set_construction_apply(use_set_construction, use_set)
-
-
-def pattern_use_set_construction_get(pattern_use_set_construction, spl_core):
-	res = set()
-	pattern_use_set_construction_apply(pattern_use_set_construction, spl_core, res)
-	return res
-
-
-######################################################################
-# BASE USE SELECTION MANIPULATION
-# base information about which use flags are selected, and which are not
-# as this information is actually operation, we need to store both positive and negative operation
-# https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html
-# https://wiki.gentoo.org/wiki//etc/portage/package.use
-######################################################################
-
-######################################################################
-# for USE flags
-#  in make.defaults, make.conf and environment's USE variable
-def use_selection_create(positive=[], negative=[]):
-	return set(positive), set(negative)
-
-
-def use_selection_create_from_use_list(uses_list):
-	res = use_selection_create()
-	for use in uses_list:
-		if use[0] == "-":
-			use_selection_remove(res, use[1:])
-		else:
-			use_selection_add(res, use)
-	return res
-
-
-def use_selection_create_for_domain(use_selection, domain):
-	return (use_selection[0] & domain), (domain - use_selection[0])
-
-
-def use_selection_copy(use_selection):
-	return set(use_selection[0]), set(use_selection[1])
-
-
-def use_selection_get_positive(use_selection):
-	return use_selection[0]
-
-
-def use_selection_get_negative(use_selection):
-	return use_selection[1]
-
-
-def use_selection_get_uses(use_selection):
-	return use_selection[0] | use_selection[1]
-
-
-def use_selection_add(use_selection, use):
-	use_selection[0].add(use)
-	use_selection[1].discard(use)
-
-
-def use_selection_remove(use_selection, use):
-	use_selection[0].discard(use)
-	use_selection[1].add(use)
-
-
-def use_selection_update(use_selection, use_configuration):
-	use_selection[0].update(use_configuration[0])
-	use_selection[1].difference_update(use_configuration[0])
-	use_selection[0].difference_update(use_configuration[1])
-	use_selection[1].update(use_configuration[1])
-
-
-def use_selection_to_save_format(use_selection):
-	return {'positive': list(use_selection[0]), 'negative': list(use_selection[1])}
-
-
-def use_selection_from_save_format(save_format):
-	return set(save_format['positive']), set(save_format['negative'])
-
-
-######################################################################
-# for per package USE flags
-#  in package.use
-
-def pattern_configuration_element_to_save_format(x):
-	return { 'pattern': pattern_to_save_format(x[0]), 'use': use_selection_to_save_format(x[1])}
-
-
-def pattern_configuration_element_from_save_format(x):
-	return pattern_from_save_format(x['pattern']), use_selection_from_save_format(x['use'])
-
-
-pattern_use_selection_create = list_configuration_create
-
-
-def pattern_use_selection_add(pattern_configuration, pattern, use_configuration):
-	list_configuration_add(pattern_configuration, (pattern, use_configuration))
-
-
-pattern_use_selection_update = list_configuration_update
-
-
-def pattern_use_selection_to_save_format(pattern_configuration):
-	return list_configuration_to_save_format(pattern_configuration, pattern_configuration_element_to_save_format)
-
-
-def pattern_use_selection_from_save_format(save_format):
-	return list_configuration_from_save_format(save_format, pattern_configuration_element_from_save_format)
-
-
-######################################################################
-# INSTALLED PACKAGE
-######################################################################
-
-package_installed_create = dict_configuration_create
-
-
-def package_installed_set(package_installed, package_name, use_selection):
-	return dict_configuration_add(package_installed, package_name, use_selection)
-
-
-def package_installed_to_save_format(package_installed):
-	return dict_configuration_to_save_format(package_installed, identity, use_selection_to_save_format)
-
-
-def package_installed_from_save_format(save_format):
-	return dict_configuration_from_save_format(save_format, identity, use_selection_from_save_format)
-
-
-######################################################################
-# UTILITY FUNCTIONS
-#  (to manipulate list operation as in use.force, or package.mask)
-######################################################################
-
-def extract_data_from_iuse_list(iuses_list):
-	iuse_list = set([])
-	use_selection = use_selection_create()
-	for iuse in iuses_list:
-		if iuse[0] == "+":
-			iuse = iuse[1:]
-			iuse_list.add(iuse)
-			use_selection_add(use_selection, iuse)
-		elif iuse[0] == "-":
-			iuse = iuse[1:]
-			iuse_list.add(iuse)
-			use_selection_remove(use_selection, iuse)
-		else:
-			iuse_list.add(iuse)
-	return iuse_list, use_selection
-
-
-
-######################################################################
-# GETTERS
 
 
 

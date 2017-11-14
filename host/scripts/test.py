@@ -87,7 +87,7 @@ def load_hyportage_db():
 	pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls = hyportage.load_hyportage(path_db_hyportage, save_modality)
 	flat_pattern_repository = pattern_repository[1]
 	for local_map in pattern_repository[0].values():
-		flat_pattern_repository.update(local_map)
+		flat_pattern_repository.update_set(local_map)
 	keywords = set(hyportage_ids.id_repository_get_keywords(id_repository)[0])
 
 

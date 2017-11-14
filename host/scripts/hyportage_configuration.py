@@ -43,19 +43,19 @@ def core_configuration_get_arch(core_configuration): return core_configuration[3
 def core_configuration_set_profile_patterns(core_configuration, patterns):
 	data = core_configuration_get_profile_patterns(core_configuration)
 	data.clear()
-	data.update(patterns)
+	data.update_set(patterns)
 
 
 def core_configuration_set_user_patterns(core_configuration, patterns):
 	data = core_configuration_get_user_patterns(core_configuration)
 	data.clear()
-	data.update(patterns)
+	data.update_set(patterns)
 
 
 def core_configuration_set_implicit_iuse(core_configuration, iuses):
 	data = core_configuration_get_implicit_iuse(core_configuration)
 	data.clear()
-	data.update(iuses)
+	data.update_set(iuses)
 
 
 def core_configuration_set_arch(core_configuration, arch): core_configuration[3][0] = arch
@@ -207,7 +207,7 @@ def configuration_update_pattern(pattern_repository, mspl, spl_groups, core_conf
 			pattern_repository, pattern, setter)
 		if removed: pattern_removed.add(pattern)
 	core_conf_patterns.clear()
-	core_conf_patterns.update(conf_patterns)
+	core_conf_patterns.update_set(conf_patterns)
 	return pattern_added, pattern_removed
 
 

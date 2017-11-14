@@ -57,7 +57,7 @@ def load_hyportage():
 		pattern_repository, id_repository, mspl, spl_groups = utils.load_data_file(db_hyportage_path, db_hyportage_save_modality)
 		flat_pattern_repository = pattern_repository[1].copy()
 		for local_map in pattern_repository[0].values():
-			flat_pattern_repository.update(local_map)
+			flat_pattern_repository.update_set(local_map)
 		config = utils.load_data_file(db_configuration_path, db_configuration_save_modality)
 		mspl_config = config.mspl_config
 		keyword_list = config.keyword_list

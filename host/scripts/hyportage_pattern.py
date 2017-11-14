@@ -17,6 +17,18 @@ pattern_to_atom = core_data.pattern_to_atom
 pattern_get_package_group = core_data.pattern_get_package_group
 
 
+def match_only_package_group(pattern, spl):
+	return core_data.match_only_package_group(pattern, core_data.spl_core_get_spl_group_name(spl.core))
+
+
+def match_spl_simple(pattern, spl):
+	return core_data.match_spl_simple(pattern, spl.core)
+
+
+def match_spl_full(pattern, spl):
+	return core_data.match_spl_full(pattern, spl.core)
+
+
 def pattern_is_package_group_specific(pattern):
 	pattern_package_group = pattern_get_package_group(pattern)
 	return (pattern_package_group[0] != "*") and (pattern_package_group[-1] != "*")
@@ -238,24 +250,10 @@ def pattern_repository_local_map_remove_pattern_from_spl(pattern_repository_loca
 
 ##
 
-def pattern_repository_local_map_add_pattern_from_configuration(pattern_repository_local_map, pattern, setter):
-	if pattern in pattern_repository_local_map:
-		setter(pattern_repository_local_map[pattern], True)
-		return False
-	else:
+def pattern_repository_local_map_add_pattern_from_scratch(pattern_repository_local_map, pattern):
+	if not pattern in pattern_repository_local_map:
 		res = PatternElement(pattern)
-		setter(res, True)
 		pattern_repository_local_map[pattern] = res
-		return True
-
-
-def pattern_repository_local_map_remove_pattern_from_configuration(pattern_repository_local_map, spl, pattern, setter):
-	pattern_repository_element = pattern_repository_local_map[pattern]
-	setter(pattern_repository_element, False)
-	if not pattern_repository_element_is_useful(pattern_repository_element):
-		pattern_repository_local_map.pop(pattern)
-		return True
-	else: return False
 
 
 ##
@@ -346,29 +344,17 @@ def pattern_repository_remove_pattern_from_spl(pattern_repository, spl):
 	return pattern_removed
 
 
-def pattern_repository_add_pattern_from_configuration(pattern_repository, mspl, spl_groups, pattern, setter):
-	added = False
+def pattern_repository_add_pattern_from_scratch(pattern_repository, pattern):
 	if pattern_is_package_group_specific(pattern):
 		spl_group_name = pattern_get_package_group(pattern)
 		if spl_group_name in pattern_repository[0]:
-			added = pattern_repository_local_map_add_pattern_from_configuration(
-				pattern_repository[0][spl_group_name], pattern, setter)
+			pattern_repository_local_map_add_pattern_from_scratch(pattern_repository[0][spl_group_name], pattern)
 		else:
 			res = {}
-			added = pattern_repository_local_map_add_pattern_from_configuration(res, pattern, setter)
+			pattern_repository_local_map_add_pattern_from_scratch(res, pattern)
 			pattern_repository[0][spl_group_name] = res
 	else:
-		added = pattern_repository_local_map_add_pattern_from_configuration(pattern_repository[1], pattern, setter)
-	return added
-
-
-def pattern_repository_remove_pattern_from_configuration(pattern_repository, pattern, setter):
-	if pattern_is_package_group_specific(pattern):
-		removed = pattern_repository_local_map_remove_pattern_from_configuration(
-			pattern_repository[0][pattern_get_package_group(pattern)], pattern, setter)
-	else:
-		removed = pattern_repository_local_map_remove_pattern_from_spl(pattern_repository[1], pattern, setter)
-	return removed
+		pattern_repository_local_map_add_pattern_from_scratch(pattern_repository[1], pattern)
 
 
 ##

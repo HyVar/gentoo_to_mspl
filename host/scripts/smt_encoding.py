@@ -11,20 +11,49 @@ import hyportage_pattern
 
 
 """
-This file
+This file contains the functions that computes the constraints for spls, spl_groups and use flag selection
 
 """
 
 
-# function to encode SMT expression into SMTLIB
-def toSMT2(f, status="unknown", name="benchmark", logic=""):
+######################################################################
+# 1. SMT UTILITY FUNCTIONS
+######################################################################
+
+
+smt_false = z3.BoolVal(False)
+smt_true  = z3.BoolVal(True)
+
+smt_or  = z3.Or
+smt_and = z3.And
+smt_not = z3.Not
+smt_implies = z3.Implies
+
+
+def get_int_from_bool_list(fs): return z3.Sum([z3.If(b, 1, 0) for b in fs])
+
+
+def get_no_two_true_expressions(fs):
+	return get_int_from_bool_list(fs) <= 1
+
+
+def get_extactly_one_true_expressions(fs):
+	return get_int_from_bool_list(fs) == 1
+
+
+def smt_to_string(constraint, status="unknown", name="benchmark", logic=""):
 	v = (z3.Ast * 0)()
-	return z3.Z3_benchmark_to_smtlib_string(f.ctx_ref(), name, logic, status, "", 0, v, f.as_ast()).replace(
+	return z3.Z3_benchmark_to_smtlib_string(
+		constraint.ctx_ref(), name, logic, status, "", 0, v, constraint.as_ast()).replace(
 		"\n", " ").replace("(check-sat)", "").replace("; benchmark (set-info :status unknown)", "").strip()
 
 
+def smt_list_to_strings(constraints, status="unknown", name="benchmark", logic=""):
+	return map(lambda c: smt_to_string(c, status, name, logic), constraints)
+
+
 ######################################################################
-# 1. SMT VARIABLE MANIPULATION
+# 2. SMT VARIABLE MANIPULATION
 ######################################################################
 
 def get_smt_variable_spl_name(id_repository, spl_name):
@@ -35,6 +64,11 @@ def get_smt_variable_spl_name(id_repository, spl_name):
 def get_smt_spl_name(id_repository, spl_name):
 	"""returns the variable corresponding to the spl name in input"""
 	return z3.Bool(get_smt_variable_spl_name(id_repository, spl_name))
+
+
+def get_smt_not_spl_name(id_repository, spl_name):
+	"""returns the constraint forbidding to install the spl in input"""
+	return smt_not(get_smt_spl_name(id_repository, spl_name))
 
 
 def get_smt_variable_use_flag(id_repository, spl_name, use_flag):
@@ -67,30 +101,6 @@ def get_smt_int_spl_name(id_repository, spl_name):
 
 def get_smt_int_use_flag(id_repository, spl_name, use_flag):
 	return "feature[" + get_smt_variable_use_flag(id_repository, spl_name, use_flag) + "]"
-
-
-######################################################################
-# 2. SMT UTILITY FUNCTIONS
-######################################################################
-
-
-smt_false = z3.BoolVal(False)
-smt_true  = z3.BoolVal(True)
-
-smt_or  = z3.Or
-smt_and = z3.And
-smt_not = z3.Not
-
-
-def get_int_from_bool_list(fs): return z3.Sum([z3.If(b, 1, 0) for b in fs])
-
-
-def get_no_two_true_expressions(fs):
-	return get_int_from_bool_list(fs) <= 1
-
-
-def get_extactly_one_true_expressions(fs):
-	return get_int_from_bool_list(fs) == 1
 
 
 ######################################################################
@@ -251,7 +261,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
 
 ######################################################################
-# 4. SMT CONSTRAINT GENERATION FOR SPLs AND SPL GROUPs
+# 4. SMT CONSTRAINT GENERATION FOR SPLs, SPL GROUPs, USE FLAG LIST AND PATTERN LIST
 ######################################################################
 
 
@@ -260,7 +270,7 @@ def simplify_constraints(spl_name, constraints, simplify_mode):
 		formula = z3.simplify(z3.And(constraints))
 		if z3.is_false(formula):
 			logging.warning("Dependencies in package " + spl_name + " make it uninstallable.")
-		return formula
+		return [formula]
 	elif simplify_mode == "individual":
 		formulas = []
 		for i in constraints:
@@ -270,7 +280,7 @@ def simplify_constraints(spl_name, constraints, simplify_mode):
 					"Dependency " + unicode(i) + " in package " + spl_name + " is false."
 					+ "Package can not be installed")
 			formulas.append(formula)
-		return z3.And(formulas)
+		return formulas
 
 
 def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simplify_mode):
@@ -300,7 +310,8 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 	## 4. if flag is selected then its package is selected too
 	#constraints.append(z3.Implies(z3.Or(spl_uses_id), spl_id))
 
-	return spl_name, toSMT2(z3.Implies(spl_id, simplify_constraints(spl_name, constraints, simplify_mode)))
+	return spl_name, smt_list_to_strings(
+		map(lambda c: z3.Implies(spl_id, c), simplify_constraints(spl_name, constraints, simplify_mode)))
 
 
 def convert_spl_group(id_repository, spl_group, simplify_mode):
@@ -322,7 +333,22 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 			spl_vars = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
 			constraints.append(get_no_two_true_expressions(spl_vars))
 
-	return spl_group_name, toSMT2(simplify_constraints(spl_group_name, constraints, simplify_mode))
+	return spl_group_name, smt_list_to_strings(simplify_constraints(spl_group_name, constraints, simplify_mode))
 
 
+def convert_use_flag_selection(id_repository, spl_name, use_flags, use_selection):
+	use_unselection = use_flags - use_selection
+	constraint = [get_smt_use_flag(use) for use in use_selection]
+	constraint.extend([z3.Not(get_smt_use_flag(id_repository, spl_name, use)) for use in use_unselection])
+	return smt_list_to_strings(constraint)
+
+
+def convert_patterns(pattern_repository, id_repository, mspl, spl_groups, patterns):
+	spls = set()
+	constraints = []
+	for pattern in patterns:
+		new_spls = hyportage_pattern.pattern_repository_get(pattern_repository, pattern).get_spls(mspl, spl_groups)
+		spls.update(new_spls)
+		constraints.append(smt_or([get_smt_spl_name(id_repository, spl.name) for spl in new_spls]))
+	return spls, smt_list_to_strings(constraints)
 

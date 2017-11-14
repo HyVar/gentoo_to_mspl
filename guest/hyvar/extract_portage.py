@@ -194,7 +194,7 @@ def load_package_keywords_file(filename):
 
 
 def load_packages_file(filename):
-	res = core_data.DictSet()
+	res = core_data.dictSet()
 	for line in parse_configuration_file(filename):
 		if line[0] == "*":
 			res.add("system", core_data.pattern_create_from_atom(line[1:]))
@@ -272,7 +272,7 @@ def load_profile_layer(path, environment):
 	#######################
 	# packages (required patterns)
 	path_package_required = os.path.join(path, "packages")
-	package_required = core_data.DictSet()
+	package_required = core_data.dictSet()
 	if os.path.exists(path_package_required):
 		for line in parse_configuration_file(path_package_required):
 			if line[0] == "*":
@@ -377,7 +377,7 @@ def combine_profile_layer_data(data1, data2):
 	)
 	"""
 	config = data1[1]
-	config.update(data2[1])
+	config.update_set(data2[1])
 	return data2[0], config
 
 
@@ -393,7 +393,7 @@ def load_profile(path, environment):
 		configs.append(config)
 		config = configs[0]
 		for data in configs[1:]:
-			config.update(data)
+			config.update_set(data)
 		return environment, config
 	else:
 		return load_profile_layer(path, environment)
@@ -447,7 +447,7 @@ def get_user_configuration(environment):
 
 	# 6. sets
 	location_sets = os.path.join(input_dir_user_configuration, "sets")
-	pattern_required = core_data.DictSet()
+	pattern_required = core_data.dictSet()
 	if os.path.isdir(location_sets):
 		for filename in os.listdir(location_sets):
 			for line in parse_configuration_file(os.path.join(location_sets, filename)):
@@ -551,7 +551,7 @@ def get_user_configuration(environment):
 def env_d(system, environment):
 	process = subprocess.Popen(["bash", "-c", "source /etc/profile.env ; /usr/bin/env"], stdout=subprocess.PIPE, env={})
 	out, err = process.communicate()
-	environment.update(environment_create_from_script_output(out))
+	environment.update_set(environment_create_from_script_output(out))
 	return environment
 
 
@@ -560,7 +560,7 @@ def env_d(system, environment):
 
 def repo(system, environment):
 	new_environment, mspl_config = load_profile_layer(input_file_profile_base, environment)
-	system.mspl_config.update(mspl_config)
+	system.mspl_config.update_set(mspl_config)
 	return new_environment
 
 
@@ -578,7 +578,7 @@ def pkginternal(system, environment):
 
 def defaults(system, environment):
 	new_environment, mspl_config = load_profile(input_file_profile_selected, environment)
-	system.mspl_config.update(mspl_config)
+	system.mspl_config.update_set(mspl_config)
 	return new_environment
 
 
@@ -588,11 +588,11 @@ def defaults(system, environment):
 def conf(system, environment):
 	new_environment, info = load_make_defaults(input_file_make_conf, environment)
 	use_selection, use_declaration_eapi4, use_declaration_eapi5, use_declaration_hidden_from_user, arch, accept_keywords = info
-	system.mspl_config.use_selection_config.use.update(use_selection)
-	system.mspl_config.use_declaration_eapi4.update(use_declaration_eapi4)
-	system.mspl_config.use_declaration_eapi5.update(use_declaration_eapi5)
-	system.mspl_config.use_declaration_hidden_from_user.update(use_declaration_hidden_from_user)
-	system.mspl_config.accept_keywords.update(accept_keywords)
+	system.mspl_config.use_selection_config.use.update_set(use_selection)
+	system.mspl_config.use_declaration_eapi4.update_set(use_declaration_eapi4)
+	system.mspl_config.use_declaration_eapi5.update_set(use_declaration_eapi5)
+	system.mspl_config.use_declaration_hidden_from_user.update_set(use_declaration_hidden_from_user)
+	system.mspl_config.accept_keywords.update_set(accept_keywords)
 	if arch:
 		system.mspl_config.arch = arch
 	return new_environment
@@ -603,7 +603,7 @@ def conf(system, environment):
 
 def pkg(system, environment):
 	new_environment, mspl_config = get_user_configuration(environment)
-	system.mspl_config.update(mspl_config)
+	system.mspl_config.update_set(mspl_config)
 	return new_environment
 
 
@@ -664,7 +664,7 @@ def load_installed_package_uses(package_path):
 
 
 def load_installed_packages():
-	data = core_data.package_installed_create()
+	data = core_data.dictSet()
 	for directory in os.listdir(input_dir_portage_installed):
 		path = os.path.join(input_dir_portage_installed, directory)
 		for package in os.listdir(path):
@@ -672,7 +672,7 @@ def load_installed_packages():
 			#print("looking at " + package_name)
 			complete_path = os.path.join(path, package)
 			uses = load_installed_package_uses(complete_path)
-			core_data.package_installed_set(data, package_name, uses)
+			data.set(package_name, uses)
 	return data
 
 
@@ -802,6 +802,7 @@ def main(output_dir):
 	system.keyword_list = load_keyword_list()
 	system.installed_packages = load_installed_packages()
 	system.world = load_world_file()
+	system.set_required_patterns()
 
 	# 3. save the config
 	save_filename = os.path.join(output_dir, "config.pickle")

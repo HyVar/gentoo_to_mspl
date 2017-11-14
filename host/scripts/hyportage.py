@@ -271,7 +271,7 @@ def main(
 			pattern_repository, pattern_added, pattern_updated, pattern_removed, unchanged_spls, spl_added_full)
 
 		# update the id repository
-		spl_updated_features.update(spl_updated_required_features)
+		spl_updated_features.update_set(spl_updated_required_features)
 		hyportage_translation.update_id_repository(
 			id_repository, spl_updated_features, spl_removed_full, spl_groups_removed, spl_groups_added)
 
@@ -339,9 +339,23 @@ def main(
 
 	if todo_emerge:
 		# compute what to install
-		requested_patterns, default_patterns, use_selection = reconfigure.compute_request(
-			atoms, profile_configuration, user_configuration)
+		#requested_patterns, default_patterns, use_selection = reconfigure.compute_request(atoms, config)
+		root_spls, request_constraint = reconfigure.process_request(
+			pattern_repository, id_repository, mspl, spl_groups, config, atoms)
 
+		# get the transitive closure of the spls
+		all_spls = reconfigure.get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, root_spls)
+
+		# solve these spl, with the request constraint
+		solution = reconfigure.solve_spls(
+			id_repository, config, mspl, spl_groups, config.installed_packages,
+			all_spls, request_constraint)
+
+		# write the installation files
+		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
+		reconfigure.generate_package_use_file(mspl, path_use_flag_configuration, solution)
+
+		return
 		# extends the pattern repository with user-defined patterns
 		reconfigure.extends_pattern_repository_with_request(pattern_repository, mspl, spl_groups, requested_patterns)
 

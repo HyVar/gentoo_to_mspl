@@ -14,6 +14,10 @@ import hyportage_ids
 import hyportage_configuration
 import smt_encoding
 
+"""
+This file contains all the function for translating the portage data to our hyportage representation.
+"""
+
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"

@@ -66,7 +66,7 @@ def required_pattern_remove(required_package, package_set, pattern):
 def required_pattern_update(required_pattern, update):
 	for k, v in update.iteritems():
 		if k in required_pattern:
-			required_pattern[k].update(v)
+			required_pattern[k].update_set(v)
 		else:
 			required_pattern[k] = v
 
