@@ -55,7 +55,7 @@ class SPL(object):
 			name, core, deprecated,
 			fm_local, fm_combined,
 			dependencies, required_iuses_local, keywords_list,
-			iuses_default, use_selection_default):
+			iuses_default, use_manipulation):
 		self.eapi                    = eapi
 		self.name                    = name
 		self.core                    = core
@@ -70,7 +70,7 @@ class SPL(object):
 		self.required_iuses          = None
 		self.iuses_default           = iuses_default          # list of features declared in this spl by default
 		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
-		self.use_selection_default   = use_selection_default  # default use selection
+		self.use_manipulation        = use_manipulation  # default use selection
 		self.use_selection_full      = None                   # use selection considering default portage information
 		self.use_selection_smt      = None
 		self.unmasked                = None                   # if portage states that this spl is masked or not
@@ -106,7 +106,7 @@ class SPL(object):
 	def smt_use_selection(self, id_repository, config):
 		if self.use_selection_smt is None:
 			self.unmasked, self.installable, self.is_stable, self.use_selection_full = config.mspl_config.apply(
-				self.core, self.iuses_default, self.keywords_list)
+				self.core, self.use_manipulation, self.keywords_list)
 			use_selection_core = self.use_selection_full & self.required_iuses
 			self.use_selection_smt = smt_encoding.convert_use_flag_selection(
 				id_repository, self.name, self.required_iuses, use_selection_core)

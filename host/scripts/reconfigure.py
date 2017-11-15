@@ -115,17 +115,17 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 		#     formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
 		# translate packages
 		where_declared = "user-required: "
-		pkgs = set(re.findall('p([0-9]+)', formula))
-		for pkg in pkgs:
-			name = id_repository.ids[pkg][1]
-			formula = re.sub('p' + pkg,name,formula)
+		spl_ids = set(re.findall('p([0-9]+)', formula))
+		for spl_id in spl_ids:
+			name = id_repository.ids[spl_id][1]
+			formula = re.sub('p' + spl_id, name, formula)
 			if i in hyportage_data.spl_get_smt_constraint(mspl[name]):
 				where_declared = name + ": "
 
 		# translate uses
-		uses = set(re.findall('u([0-9]+)', formula))
-		for use in uses:
-			formula = re.sub('u' + use, id_repository.ids[pkg][2] + "[[" + id_repository.ids[pkg][1] + "]]", formula)
+		use_ids = set(re.findall('u([0-9]+)', formula))
+		for use_id in use_ids:
+			formula = re.sub('u' + use_id, id_repository.ids[use_id][2] + "#" + id_repository.ids[use_id][1], formula)
 		ls.append(where_declared + formula)
 	return ls
 
@@ -204,7 +204,7 @@ def solve_spls(
 		"constraints": [], # constraints to fill in hyvarrec format (empty in our case for efficiency)
 		"preferences": preferences, # preferences in hyvarrec format
 		"smt_constraints": data_smt_constraints,
-		"hyvar_options": ["--features-as-boolean"]
+		"hyvar_options": ["--features-as-boolean", "--constraints-minimization"]
 	}
 
 	# 2. generate the input file for the solver and the command line
@@ -238,7 +238,7 @@ def solve_spls(
 		if explain_modality:
 			# todo handle explain modality when the answer is unsat
 			# try to print a better explanation of the constraints
-			constraints = get_better_constraint_visualization(res["constraints"], mspl, id_repository)
+			constraints = get_better_constraint_visualization(id_repository, mspl, res["constraints"])
 			sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
 		logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
 		sys.exit(1)

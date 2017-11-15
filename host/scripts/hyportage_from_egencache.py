@@ -323,14 +323,14 @@ def create_spl_from_egencache_file(file_path):
 	fm_unloop = data_tmp.get('PDEPEND')
 	del data_tmp
 	# 3. create the base data
-	keywords = keywords_string.split() if keywords_string else ["*"]
+	keywords = set(keywords_string.split()) if keywords_string else {"*"}
 
 	slots = slots_string.split("/") if slots_string else ["0", "0"]
 	slot = slots[0]
 	subslot = slots[1] if len(slots) == 2 else "0"
 	spl_core = core_data.spl_core_create(package_group, version_full, version, slot, subslot)
 
-	iuses, use_selection = extract_iuse(iuses_string.split() if iuses_string else [])
+	iuses, use_manipulation = extract_iuse(iuses_string.split() if iuses_string else [])
 
 	fm_local = utils.compact_list(translate_require(fm_local)) if fm_local else []
 	fm_external = translate_depend(fm_external) if fm_external else []
@@ -346,7 +346,7 @@ def create_spl_from_egencache_file(file_path):
 			eapi, package_name, spl_core, deprecated,
 			fm_local, fm_combined,
 			visitor.res[1],	visitor.res[0],
-			keywords, iuses, use_selection
+			keywords, iuses, use_manipulation
 		)
 
 

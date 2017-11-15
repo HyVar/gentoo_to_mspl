@@ -397,7 +397,7 @@ class PatternListManipulation(list):
 		if string[0] == "-":
 			self.append( (False, pattern_create_from_atom(string[1:])) )
 		else:
-			self.append( (True, pattern_create_from_atom(string[1:])) )
+			self.append( (True, pattern_create_from_atom(string)) )
 
 	def add_all(self, elements):
 		for element in elements: self.add(element)
@@ -591,7 +591,9 @@ class MSPLConfig(object):
 		self.use_selection_config = UseSelectionConfig()
 
 	def get_unmasked(self, spl_core):
-		return self.pattern_unmask.contains(spl_core) and (not self.pattern_mask.contains(spl_core))
+		if self.pattern_mask.contains(spl_core):
+			return self.pattern_unmask.contains(spl_core)
+		else: return True
 
 	def get_stability_status(self, spl_core, unmasked, keywords_default):
 		if unmasked:

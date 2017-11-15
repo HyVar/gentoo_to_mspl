@@ -37,9 +37,11 @@ def get_no_two_true_expressions(fs):
 	return get_int_from_bool_list(fs) <= 1
 
 
-def get_extactly_one_true_expressions(fs):
+def get_exactly_one_true_expressions(fs):
 	return get_int_from_bool_list(fs) == 1
 
+
+##
 
 def smt_to_string(constraint, status="unknown", name="benchmark", logic=""):
 	v = (z3.Ast * 0)()
@@ -202,7 +204,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 				return smt_true
 		elif ctx["choice"] == "^^":  # xor
 			if len(formulas) > 1:
-				return get_extactly_one_true_expressions(formulas)
+				return get_exactly_one_true_expressions(formulas)
 			elif len(formulas) == 1:
 				return formulas[0]
 			return smt_false  # no formula to be satisfied
@@ -251,7 +253,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 				return smt_true
 		elif ctx["choice"] == "^^":  # xor
 			if len(formulas) > 1:
-				return get_extactly_one_true_expressions(formulas)
+				return get_exactly_one_true_expressions(formulas)
 			elif len(formulas) == 1:
 				return formulas[0]
 			return smt_false # no formula to be satisfied
@@ -296,8 +298,8 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 		constraints.append(z3.Implies(spl_id, constraint))
 
 	# 2. constraint stating that selecting an spl also selects its group
-	spl_group_name = hyportage_data.spl_get_group_name(spl)
-	constraints.append(get_smt_spl_name(id_repository, spl_group_name))
+	#spl_group_name = hyportage_data.spl_get_group_name(spl)
+	#constraints.append(get_smt_spl_name(id_repository, spl_group_name))
 
 	## no need to constraint the use flags: they are set in the constraint by the configuration
 	#spl_uses_id = get_smt_uses(
@@ -323,8 +325,8 @@ def convert_spl_group(id_repository, spl_group, simplify_mode):
 	constraints = []
 
 	# 1. if installed then one of its version should be installed as well, and reciprocally
-	constraints.append(z3.Implies(spl_group_var, z3.Or(spl_vars)))
-	constraints.append(z3.Implies(z3.Or(spl_vars), spl_group_var))
+	#constraints.append(z3.Implies(spl_group_var, z3.Or(spl_vars)))
+	#constraints.append(z3.Implies(z3.Or(spl_vars), spl_group_var))
 
 	# 2. two installed spl should have different slots or subslots
 	for spls in hyportage_data.spl_group_get_slot_mapping(spl_group).values():
