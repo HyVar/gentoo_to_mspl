@@ -78,7 +78,8 @@ def get_preferences_core(id_repository, mspl, installed_spls, spls):
 	pref_less_add = " + ".join([
 		smt_encoding.get_smt_int_spl_name(id_repository, hyportage_data.spl_get_name(spl))
 		for spl in spls if spl not in installed_spls])
-	return pref_less_remove + " - (" + pref_less_add + ")"
+	if not pref_less_remove: pref_less_remove = "0"
+	return pref_less_remove + (" - (" + pref_less_add + ")" if pref_less_add else "")
 
 
 def get_better_constraint_visualization(id_repository, mspl, constraints):
@@ -154,6 +155,7 @@ def solve_spls(
 	:param id_repository: the id repository of hyportage
 	:param config: the config of hyportage
 	:param mspl: the mspl of hyportage
+	:param spl_groups: the spl groups of hyportage
 	:param installed_spls: the mapping stating the use flag selection for all installed spls
 	:param spls: the spls to solve
 	:param annex_constraint: the additional constraint to add in the solver input
