@@ -62,25 +62,32 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, config,
 ##########################################################################
 
 
-def get_preferences_core(id_repository, mspl, installed_spls, spls):
+def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 	"""
 	the priority of preferences is decided as follows:
 		- remove less packages installed as possible,
 		- minimize number of new packages to install
 	"""
-	installed_spls = set(installed_spls.keys()) & spls
+	installed_spls = set(installed_spls.keys()) & spl_names
 	# preference for removing less packages installed and not deprecated as possible
 	pref_less_remove = " + ".join([
-		smt_encoding.get_smt_int_spl_name(id_repository, spl_name)
+		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
 		for spl_name in installed_spls
 		if not hyportage_data.spl_is_deprecated(mspl[spl_name])])
 	# preference to minimize number of new packages to install
 	pref_less_add = " + ".join([
-		smt_encoding.get_smt_int_spl_name(id_repository, hyportage_data.spl_get_name(spl))
-		for spl in spls if spl not in installed_spls])
+		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
+		for spl_name in spl_names if spl_name not in installed_spls])
 	if not pref_less_remove: pref_less_remove = "0"
 	return pref_less_remove + (" - (" + pref_less_add + ")" if pref_less_add else "")
 
+
+def installed_spls_to_solver(id_repository, installed_spls, spl_names):
+	res = []
+	for spl_name, use_selection in installed_spls.iteritems():
+		if spl_name in spl_names:
+			res.append(smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name))
+	return res
 
 def get_better_constraint_visualization(id_repository, mspl, constraints):
 	"""
@@ -164,7 +171,9 @@ def solve_spls(
 	:param explain_modality: boolean saying if a problem should be explained (by default: False)
 	:return: the solution found by the solver, if it exists
 	"""
+	spl_names = {spl.name for spl in spls}
 	# 1. construct the input data for the solver
+	# 1.1. construct the constraint
 	constraint = annex_constraint[:]
 	spl_group_names = core_data.dictSet()
 	for spl in spls:
@@ -182,8 +191,11 @@ def solve_spls(
 		for spl in spl_group.references:
 			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, spl.name)))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
-	preferences = get_preferences_core(id_repository, mspl, installed_spls, spls)
-	data_configuration = {"selectedFeatures": [], "attribute_values": [], "context_values": []} # current configuration
+	# 1.2. construct the preferences
+	preferences = [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
+	# 1.3. construct the current system
+	current_system = installed_spls_to_solver(id_repository, installed_spls, spl_names)
+	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration
 	data_smt_constraints = {"formulas": constraint, "features": [], "other_int_symbols": []}
 	data = {
 		"attributes": [],  # attributes of the features (empty in our case)
@@ -191,17 +203,24 @@ def solve_spls(
 		"configuration": data_configuration,
 		"constraints": [], # constraints to fill in hyvarrec format (empty in our case for efficiency)
 		"preferences": preferences, # preferences in hyvarrec format
-		"smt_constraints": data_smt_constraints
+		"smt_constraints": data_smt_constraints,
+		"hyvar_options": ["--features-as-boolean"]
 	}
 
 	# 2. generate the input file for the solver and the command line
 	file_name = utils.get_new_temp_file(".json")
 	with open(file_name, "w") as f:
 		json.dump(data, f)
-	cmd = ["hyvar-rec", "--features-as-boolean"]
-	if par > 1:    cmd += ["-p", unicode(par)]
-	if explain_modality: cmd.append("--explain")
-	cmd.append(file_name)
+	#cmd = ["hyvar-rec", "--features-as-boolean"]
+	#if par > 1:    cmd += ["-p", unicode(par)]
+	#if explain_modality: cmd.append("--explain")
+	#cmd.append(file_name)
+	cmd = [
+		"curl.exe",
+		"-H", "acccept:application/json",
+		"-H", "Content-type:application/json",
+		"-d@" + file_name,
+		"http://vm-simone.di.unito.it/" + ("explain" if explain_modality else "process")]
 
 	# 3. executing the solver
 	utils.phase_start("Running " + unicode(cmd))
@@ -212,10 +231,8 @@ def solve_spls(
 	logging.debug('Return code of ' + unicode(cmd) + ': ' + str(process.returncode))
 	utils.phase_end("Execution ended")
 
-	sys.stdout.flush()
-	sys.exit(0)
-
 	# 4. managing the solver output
+	print(out)
 	res = json.loads(out)
 	if res["result"] != "sat":
 		if explain_modality:

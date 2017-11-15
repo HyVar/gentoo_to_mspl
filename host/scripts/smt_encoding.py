@@ -95,7 +95,7 @@ def get_smt_uses(id_repository, spl_name, use_flags):
 
 ##
 
-def get_smt_int_spl_name(id_repository, spl_name):
+def get_smt_variable_full_spl_name(id_repository, spl_name):
 	return "feature[" + get_smt_variable_spl_name(id_repository, spl_name) + "]"
 
 

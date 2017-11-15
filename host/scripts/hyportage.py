@@ -299,7 +299,7 @@ def main(
 		# solve these spl, with the request constraint
 		solution = reconfigure.solve_spls(
 			id_repository, config, mspl, spl_groups, config.installed_packages,
-			all_spls, request_constraint)
+			all_spls, request_constraint, explain_modality=explain_modality)
 
 		# write the installation files
 		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
