@@ -167,18 +167,18 @@ def solve_spls(
 	spl_group_names = core_data.dictSet()
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
-		constraint.append(spl.smt(id_repository))
+		constraint.extend(spl.smt(id_repository))
 		if spl.installable and fixed_use_flags:
 			if spl in installed_spls:
-				constraint.append(smt_encoding.convert_use_flag_selection(
+				constraint.extend(smt_encoding.convert_use_flag_selection(
 					id_repository, spl.name, spl.required_iuses, installed_spls[spl]))
 			else:
-				constraint.append(spl.smt_use_selection(id_repository, config))
+				constraint.extend(spl.smt_use_selection(id_repository, config))
 	for spl_group_name, spls_tmp in spl_group_names.iteritems():
 		spl_group = spl_groups[spl_group_name]
-		constraint.append(spl_group.smt_constraint)
+		constraint.extend(spl_group.smt_constraint)
 		for spl in spl_group.references:
-			if spl not in spls_tmp: constraint.append(smt_encoding.get_smt_not_spl_name(id_repository, spl.name))
+			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, spl.name)))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	preferences = get_preferences_core(id_repository, mspl, installed_spls, spls)
 	data_configuration = {"selectedFeatures": [], "attribute_values": [], "context_values": []} # current configuration
@@ -209,6 +209,9 @@ def solve_spls(
 	logging.debug(err)
 	logging.debug('Return code of ' + unicode(cmd) + ': ' + str(process.returncode))
 	utils.phase_end("Execution ended")
+
+	sys.stdout.flush()
+	sys.exit(0)
 
 	# 4. managing the solver output
 	res = json.loads(out)

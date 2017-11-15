@@ -101,7 +101,7 @@ class SPL(object):
 	def smt(self, id_repository):
 		if self.installable:
 			return self.smt_constraint
-		else: return smt_encoding.get_smt_not_spl_name(id_repository, self.name)
+		else: return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
 
 	def smt_use_selection(self, id_repository, config):
 		if self.use_selection_smt is None:
