@@ -66,9 +66,7 @@ def get_preferences_core(id_repository, mspl, installed_spls, spls):
 	"""
 	the priority of preferences is decided as follows:
 		- remove less packages installed as possible,
-		- keep more use flags used as possible,
 		- minimize number of new packages to install
-		- minimize number of flags install in new packages
 	"""
 	installed_spls = set(installed_spls.keys()) & spls
 	# preference for removing less packages installed and not deprecated as possible

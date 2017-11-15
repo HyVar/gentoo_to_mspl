@@ -242,7 +242,6 @@ def main(
 		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
 		spl_added_full, spl_removed_full, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
 
-
 		unchanged_spls.difference_update(spl_removed_full)
 
 		# update the feature list with the implicit declarations
@@ -277,54 +276,11 @@ def main(
 			pattern_added, pattern_updated, pattern_removed,
 			spl_updated_required_features, spl_updated_visibility)
 
-		print("finished")
-
 		# save the hypotage database
 		save_hyportage(path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality)
 		save_configuration(path_configuration, config)
 
-
-		print("saved")
-
 		return None
-
-		#unchanged_spls.difference_update(spl_updated_required_features)
-
-
-
-
-
-
-		# update the keywords and default feature selection
-
-
-		#pattern_added_conf, pattern_removed_conf = hyportage_translation.update_pattern_repository_with_configuration_diff(
-		#	pattern_repository, mspl, spl_groups, core_configuration,
-		#	must_apply_profile, must_apply_user, profile_configuration, user_configuration)
-
-		# update arch, keyword id list, and initialize iuses
-		#arch_changed = hyportage_translation.update_arch(
-		#	core_configuration, mspl, spl_added_full, must_apply_profile, profile_configuration)
-		#if must_regenerate_keywords_ids: hyportage_translation.update_keywords_ids(id_repository, path_keywords)
-
-		# update the hyportage database with the configurations
-		#spl_modified_data, spl_modified_visibility = hyportage_translation.apply_configurations(
-		#	pattern_repository, mspl, spl_added_full,
-		#	profile_configuration, user_configuration, must_apply_profile, must_apply_user)
-
-		# finalize iuse list for the packages
-		#spl_iuse_reset = hyportage_translation.initialize_iuse_flags(
-		#	pattern_repository, mspl, spl_groups, spl_modified_data, pattern_added, pattern_updated, pattern_removed)
-
-
-
-
-		# save the hypotage database
-		#save_hyportage(
-		#	path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, core_configuration,
-		#	installed_spls, save_modality)
-
-		#return
 
 	##########################################################################
 	# 6. RUN RECONFIGURE IF NECESSARY
