@@ -181,6 +181,7 @@ def solve_spls(
 		constraint.append(spl_group.smt_constraint)
 		for spl in spl_group.references:
 			if spl not in spls_tmp: constraint.append(smt_encoding.get_smt_not_spl_name(id_repository, spl.name))
+	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	preferences = get_preferences_core(id_repository, mspl, installed_spls, spls)
 	data_configuration = {"selectedFeatures": [], "attribute_values": [], "context_values": []} # current configuration
 	data_smt_constraints = {"formulas": constraint, "features": [], "other_int_symbols": []}
@@ -194,7 +195,7 @@ def solve_spls(
 	}
 
 	# 2. generate the input file for the solver and the command line
-	file_name = utils.get_new_temp_file("json")
+	file_name = utils.get_new_temp_file(".json")
 	with open(file_name, "w") as f:
 		json.dump(data, f)
 	cmd = ["hyvar-rec", "--features-as-boolean"]
@@ -294,12 +295,14 @@ def generate_package_use_file(mspl, path_use_flag_configuration, to_install_spls
 def next_spls(pattern_repository, mspl, spl_groups, spl):
 	res = set()
 	for pattern in hyportage_data.spl_get_dependencies(spl):
-		res.update(hyportage_pattern.pattern_repository_element_get_spls_visible(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups))
+		res.update(
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern).get_spls(mspl, spl_groups))
 	return res
 
 
 def get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, spls):
+	for spl in mspl.itervalues():
+		spl.visited = False
 	nexts = spls
 	res = set()
 	while len(nexts) > 0:
@@ -308,7 +311,8 @@ def get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, spls
 			spl.visited = True
 			res.add(spl)
 			accu.update(next_spls(pattern_repository, mspl, spl_groups, spl))
-		nexts = filter(lambda spl: not hyportage_data.spl_is_visited(spl), accu)
+		nexts = filter(lambda spl: not spl.visited, accu)
+
 	return res
 
 

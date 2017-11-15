@@ -7,7 +7,7 @@ import uuid
 import time
 
 import multiprocessing
-import threading
+import tempfile
 
 import logging
 
@@ -43,7 +43,8 @@ def get_new_temp_file(extension):
 	global __tmp_files_lock
 	global __tmp_files
 	# probablility of picking up the same uuid is negligible
-	name = os.path.join(__tmp_files_directory, uuid.uuid4().hex + '.' + extension)
+	file_id, name = tempfile.mkstemp(suffix=extension, text=True)
+	os.close(file_id)
 	__tmp_files_lock.acquire()
 	__tmp_files.append(name)
 	__tmp_files_lock.release()
