@@ -58,7 +58,7 @@ def id_repository_add_spl(id_repository, spl):
 	spl_name = hyportage_data.spl_get_name(spl)
 	slot = hyportage_data.spl_get_slot(spl)
 	subslot = hyportage_data.spl_get_subslot(spl)
-	iuses = hyportage_data.spl_get_required_iuses(spl)
+	iuses = spl.iuses_full
 	id_list = utils.new_ids(id_repository, 3 + len(iuses))
 
 	#print("id updating for " + package_name + ": " + str(iuses) + ", " + str(id_list))

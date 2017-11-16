@@ -105,11 +105,12 @@ class SPL(object):
 
 	def smt_use_selection(self, id_repository, config):
 		if self.use_selection_smt is None:
-			self.unmasked, self.installable, self.is_stable, self.use_selection_full = config.mspl_config.apply(
-				self.core, self.use_manipulation, self.keywords_list)
-			use_selection_core = self.use_selection_full & self.required_iuses
+			use_useful = self.required_iuses & self.iuses_full
+			self.use_selection_full = config.mspl_config.get_use_flags(
+				self.core, self.unmasked, self.is_stable, self.use_manipulation)
+			use_selection_core = self.use_selection_full & use_useful
 			self.use_selection_smt = smt_encoding.convert_use_flag_selection(
-				id_repository, self.name, self.required_iuses, use_selection_core)
+				id_repository, self.name, use_useful, use_selection_core)
 		return self.use_selection_smt
 
 
