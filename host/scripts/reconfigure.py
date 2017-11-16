@@ -133,7 +133,7 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 def generate_to_install_spls(id_repository, feature_list):
 	"""
 	translate the output of the solver into a system to install (mapping from spl names to use flag selection)
-	:param id_repository: the id repository  of hyportage
+	:param id_repository: the id repository of hyportage
 	:param mspl: the mspl of hyportage
 	:param feature_list: the solution found by the solver
 	:return: a dictionary spl_name -> use flag selection
@@ -148,7 +148,7 @@ def generate_to_install_spls(id_repository, feature_list):
 			use_flags.append((el[1], el[2]))
 
 	res = core_data.dictSet()
-	for spl_name, use_flag in use_flags:
+	for use_flag, spl_name in use_flags:
 		if spl_name in spl_names:
 			res.add(spl_name, use_flag)
 	return res
@@ -226,22 +226,23 @@ def solve_spls(
 	utils.phase_start("Running " + unicode(cmd))
 	process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	out, err = process.communicate()
+	if process.returncode != 0:
+		logging.error("command ended with an error code: " + str(process.returncode))
+		return None
 	logging.debug("Stderr of the command")
 	logging.debug(err)
 	logging.debug("Return code of the command: " + str(process.returncode))
 	utils.phase_end("Execution ended")
 
 	# 4. managing the solver output
-	print(out)
 	res = json.loads(out)
 	if res["result"] != "sat":
 		if explain_modality:
 			# todo handle explain modality when the answer is unsat
 			# try to print a better explanation of the constraints
 			constraints = get_better_constraint_visualization(id_repository, mspl, res["constraints"])
-			sys.stderr.write("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
-		logging.error("Conflict detected. Impossible to satisfy the request. Exiting.")
-		sys.exit(1)
+			logging.error("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
+		return None
 	logging.debug("HyVarRec output: " + unicode(res))
 
 	return generate_to_install_spls(id_repository, res['features'])

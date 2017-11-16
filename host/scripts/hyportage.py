@@ -168,16 +168,13 @@ def main(
 	##########################################################################
 
 	# 1.1. verbose option
-	if verbose != 0:
-		if verbose == 1:
-			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.WARNING)
-		elif verbose == 2:
-			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
-		elif verbose >= 3:
-			logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-		logging.warning("Verbose (" + str(verbose) + ") output.")
-	else:
-		logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.ERROR)
+	log_level = logging.ERROR
+	if verbose == 1: log_level = logging.WARNING
+	elif verbose == 2: log_level = logging.INFO
+	elif verbose >= 3: log_level = logging.DEBUG
+	logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+	logging.info("Verbose Level: " + unicode(verbose))
+	logging.basicConfig(level=log_level)
 
 	# 1.2. parallel process option
 	if par != -1: available_cores = min(par, multiprocessing.cpu_count())
@@ -300,6 +297,11 @@ def main(
 		solution = reconfigure.solve_spls(
 			id_repository, config, mspl, spl_groups, config.installed_packages,
 			all_spls, request_constraint, explain_modality=explain_modality)
+
+		if solution is None:
+			logging.error("Non valid configuration found")
+			logging.error("exiting")
+			return
 
 		# write the installation files
 		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
