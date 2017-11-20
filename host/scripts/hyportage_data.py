@@ -26,6 +26,13 @@ def keywords_get_core_set(keywords):
 # DEPENDENCIES MANIPULATION
 ######################################################################
 
+"""
+The SPL dependency is the list of pattern used in the SPL's DEPEND, RDEPEND and PDEPEND.
+For efficiency, in the "dependencies" structure, we store also information about the use flags used with these patterns
+Hence, our dependencies structure is a mapping from patterns to use flag data,
+	which is itself a mapping from use flags used with the pattern to
+	a boolean stating if the use flag is required to also be declared locally.
+"""
 
 def dependencies_create(): return {}
 
@@ -46,16 +53,34 @@ def dependencies_get_patterns(raw_dependencies): return raw_dependencies.keys()
 
 
 ######################################################################
-# SPL AND MSPL MANIPULATION
+# SPL AND MPL MANIPULATION
 ######################################################################
 
 class SPL(object):
+	"""
+	This class contains all the information related to a package/SPL.
+	Moreover, it contains some method to construct important data, like the smt constraint for the use default selection
+	"""
 	def __init__(
 			self, eapi,
 			name, core, deprecated,
 			fm_local, fm_combined,
-			dependencies, required_iuses_local, keywords_list,
+			dependencies, required_iuses_local, keyword_set,
 			iuses_default, use_manipulation):
+		"""
+		The constructor of the class
+		:param eapi: the EAPI of the spl/package. This information is necessary to compute the full list of use flags of the package
+		:param name: the full name of the package, including its category, version and revision if present
+		:param core: the core data of the package, as defined in core_data.py. it's the split of the package name into relevant information for pattern matching
+		:param deprecated: boolean stating if the package is deprecated (i.e., is installed but not part of the portage tree anymore)
+		:param fm_local: the AST corresponding to the USE_REQUIRED variable
+		:param fm_combined: the AST corresponding to the conjunction of the DEPEND, RDEPEND and PDEPEND variables
+		:param dependencies: the dependencies extracted from fm_combined
+		:param required_iuses_local: the list of use flags used in fm_local
+		:param keyword_set: the keywords of the package
+		:param iuses_default: the use flags declared in the IUSE variable (without the implicit ones from the profile)
+		:param use_manipulation: the use manipulation declared in the IUSE variable
+		"""
 		self.eapi                    = eapi
 		self.name                    = name
 		self.core                    = core
@@ -72,9 +97,10 @@ class SPL(object):
 		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
 		self.use_manipulation        = use_manipulation  # default use selection
 		self.use_selection_full      = None                   # use selection considering default portage information
-		self.use_selection_smt      = None
+		self.use_selection_smt       = None
 		self.unmasked                = None                   # if portage states that this spl is masked or not
-		self.keywords_list           = keywords_list          # list of architectures valid for this spl
+		self.keywords_list           = keyword_set          # list of architectures valid for this spl
+		self.keyword_mask            = None                   # if the keyword configuration of this package masks it
 		self.installable             = None
 		self.is_stable               = None                   # boolean stating if this spl can be installed by default on the current architecture
 		self.visited                 = False                  # if the spl was visited in a graph traversal
@@ -98,12 +124,18 @@ class SPL(object):
 				res = True
 		return res
 
-	def smt(self, id_repository):
-		if self.installable:
-			return self.smt_constraint
-		else: return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
+	def smt(self): return self.smt_constraint
+
+	def smt_false(self, id_repository):
+		return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
 
 	def smt_use_selection(self, id_repository, config):
+		"""
+		Returns (and possibly compute) the SMT constraint corresponding to the default use flag selection of this package
+		:param id_repository: the id_repository of hyportage
+		:param config: the config of hyportage
+		:return: the SMT constraint corresponding to the default use flag selection of this package
+		"""
 		if self.use_selection_smt is None:
 			use_useful = self.required_iuses & self.iuses_full
 			self.use_selection_full = config.mspl_config.get_use_flags(
@@ -193,13 +225,27 @@ def mspl_update_spl(mspl, old_spl, new_spl):
 
 
 class SPLGroup(object):
+	"""
+	This class stores all the information related to an spl group,
+	i.e., the "software" folder containing the .ebuild files for all the software's version.
+	"""
 	def __init__(self, group_name, spl):
+		"""
+		The constructor of the class
+		:param group_name: the name of the group
+		:param spl: the first spl known to be part of this group
+		"""
 		self.name = group_name                            # name of the group
 		self.references = [spl]                           # list of spls contained in this group
 		self.slots_mapping = {spl_get_slots(spl): [spl]}  # mapping listings all spls stored in one slot
 		self.smt_constraint = None                        # z3 constraint encoding this group
 
 	def add_spl(self, spl):
+		"""
+		adds an spl to this group
+		:param spl: the added spl
+		:return: None
+		"""
 		self.references.append(spl)
 		slots = spl_get_slots(spl)
 		if slots in self.slots_mapping:
@@ -220,6 +266,12 @@ class SPLGroup(object):
 			self.slots_mapping[slots].remove(spl)
 
 	def __iter__(self): return iter(self.references)
+
+
+"""
+Finally, the spl_groups structure lists all the spl groups in the hyportage structure,
+and is a simple mapping from spl group names to the corresponding spl group.
+"""
 
 
 def spl_groups_create(): return {}

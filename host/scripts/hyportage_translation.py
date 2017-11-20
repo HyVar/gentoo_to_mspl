@@ -1,10 +1,9 @@
 import os
+import logging
 
 import core_data
 
 import utils
-import logging
-import sys
 
 import hyportage_from_egencache
 import hyportage_data
@@ -43,8 +42,7 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 	return False
 
 
-def compute_portage_diff(
-		concurrent_map, last_update, force, path_egencache_packages):
+def compute_portage_diff(concurrent_map, last_update, force, path_egencache_packages):
 	utils.phase_start("Computing what to do.")
 
 	egencache_files = hyportage_from_egencache.get_egencache_files(path_egencache_packages)
@@ -63,7 +61,6 @@ def compute_portage_diff(
 	if nb_egencache_files_to_load > 0:  # load new hyportage spls  from egencache files
 		utils.phase_start("Loading the " + str(nb_egencache_files_to_load) + " egencache files.")
 		loaded_spls = concurrent_map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
-		#loaded_spls = map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
 		utils.phase_end("Loading completed")
 	else: loaded_spls = []
 
@@ -122,12 +119,6 @@ def update_pattern_repository_with_spl_diff(pattern_repository, spl_added_full, 
 	for old_spl in spl_removed_full:
 		pattern_removed.update(hyportage_pattern.pattern_repository_remove_pattern_from_spl(pattern_repository, old_spl))
 
-	#for new_spl in spl_added_full:
-	#	pattern_updated.update(hyportage_pattern.pattern_repository_add_spl(pattern_repository, new_spl))
-	#for old_spl in spl_removed_full:
-	#	pattern_updated.update(hyportage_pattern.pattern_repository_remove_spl(pattern_repository, old_spl))
-	#pattern_updated.difference_update(pattern_added)
-
 	utils.phase_end("Updating completed")
 	return pattern_added, pattern_updated, pattern_removed
 
@@ -165,6 +156,7 @@ def spls_to_groups(spls):
 		else: res[spl_group_name] = {spl}
 	return res
 
+
 def update_required_feature_external_update(pattern_repository, spls, pattern_added, pattern_updated, pattern_removed):
 	updated_spl = set()
 	for spl in spls:
@@ -192,12 +184,7 @@ def update_required_feature_external_update(pattern_repository, spls, pattern_ad
 def update_required_feature_external_new(pattern_repository, spls):
 	spl_groups = spls_to_groups(spls)
 
-	#test = set()
 	for pattern in hyportage_pattern.pattern_repository_get_patterns(pattern_repository):
-		#if pattern in test:
-		#	logging.error(" already looked at pattern "+ str(pattern))
-		#	sys.exit(1)
-		#logging.debug("  looking at pattern " + str(pattern))
 		element = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)
 		feature_required = hyportage_pattern.pattern_repository_element_get_required_use(element)
 		for spl in element.get_local_spls(spls, spl_groups):
@@ -260,15 +247,15 @@ def update_masks(mspl, spl_added_full, config):
 
 def update_keywords(mspl, spl_updated_mask, config):
 	utils.phase_start("Updating the SPL Keywords")
-	if config.new_keywords_config: iterator  = mspl.itervalues()
+	if config.new_keywords_config: iterator = mspl.itervalues()
 	else: iterator = iter(spl_updated_mask)
 
 	res = []
 	for spl in iterator:
-		installable, is_stable = config.get_stability_status(spl.core, spl.unmasked, spl.keywords_list)
-		if (installable, is_stable) != (spl.installable, spl.is_stable):
+		keyword_mask, installable, is_stable = config.get_stability_status(spl.core, spl.unmasked, spl.keywords_list)
+		if (keyword_mask, is_stable) != (spl.keyword_mask, spl.is_stable):
 			res.append(spl)
-			spl.installable, spl.is_stable = installable, is_stable
+			spl.keyword_mask, spl.installable, spl.is_stable = keyword_mask, installable, is_stable
 	utils.phase_end("Generation completed")
 	return res
 
@@ -317,104 +304,6 @@ def update_smt_constraints(
 	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
 	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
 	utils.phase_end("Updating completed")
-
-
-
-
-
-
-
-#####################################################
-#####################################################
-#####################################################
-
-# DEPRECATED
-
-
-
-
-
-
-
-def update_pattern_repository_with_configuration_diff(
-		pattern_repository, mspl, spl_groups, core_configuration,
-		must_apply_profile, must_apply_user, profile_configuration, user_configuration):
-	pattern_added = set()
-	pattern_removed = set()
-	utils.phase_start("Updating the pattern hyportage data (pattern_repository -- 2/2).")
-
-	if must_apply_profile:
-		core_conf_patterns = hyportage_configuration.core_configuration_get_profile_patterns(core_configuration)
-		pattern_diff = hyportage_configuration.configuration_update_pattern(
-			pattern_repository, mspl, spl_groups, core_conf_patterns, profile_configuration,
-			hyportage_pattern.pattern_repository_element_set_in_profile_configuration)
-		pattern_added.update(pattern_diff[0])
-		pattern_removed.update(pattern_diff[1])
-	if must_apply_user:
-		core_conf_patterns = hyportage_configuration.core_configuration_get_user_patterns(core_configuration)
-		pattern_diff = hyportage_configuration.configuration_update_pattern(
-			pattern_repository, mspl, spl_groups, core_conf_patterns, user_configuration,
-			hyportage_pattern.pattern_repository_element_set_in_user_configuration)
-		pattern_added.update(pattern_diff[0])
-		pattern_removed.update(pattern_diff[1])
-
-	utils.phase_end("Updating completed")
-	return pattern_added, pattern_removed
-
-
-def update_arch(core_configuration, mspl, spl_added_full, must_apply_profile, profile_configuration):
-	utils.phase_start("Updating the arch.")
-	arch_changed = False
-	if must_apply_profile:
-		arch = portage_data.configuration_get_arch(profile_configuration)
-		if arch != hyportage_configuration.core_configuration_get_arch(core_configuration):
-			arch_changed = True
-			hyportage_configuration.core_configuration_set_arch(core_configuration, arch)
-			for spl in mspl.values():
-				hyportage_configuration.keywords_initialize(spl, arch)
-	else:
-		arch = hyportage_configuration.core_configuration_get_arch(core_configuration)
-		for spl in spl_added_full:
-			hyportage_configuration.keywords_initialize(spl, arch)
-	utils.phase_end("Updating completed")
-	return arch_changed
-
-
-def update_keywords_ids(id_repository, path_keywords):
-	utils.phase_start("Regenerating the keyword list")
-	keywords_list = portage_data.keyword_set_from_save_format(utils.load_data_file(path_keywords, "json"))
-	hyportage_ids.id_repository_set_keywords(id_repository, keywords_list)
-	utils.phase_end("Regeneration completed")
-
-
-def apply_configurations(
-		pattern_repository, mspl, spl_iuse_reset,
-		profile_configuration, user_configuration, must_apply_profile, must_apply_user):
-	utils.phase_start("Applying the configuration on the hyportage database.")
-	spl_modified_data, spl_modified_visibility = hyportage_configuration.apply_configurations(
-			pattern_repository, mspl, spl_iuse_reset,
-			profile_configuration, user_configuration, must_apply_profile, must_apply_user)
-
-	utils.phase_end("Application completed")
-	return spl_modified_data, spl_modified_visibility
-
-
-def initialize_iuse_flags(
-		pattern_repository, mspl, spl_groups,
-		spl_added_full, pattern_added, pattern_updated, pattern_removed):
-	utils.phase_start("Resetting the spls' use flag list.")
-	spl_iuse_to_update = set(spl_added_full)
-	spl_iuse_to_update.update([
-		spl
-		for pattern in pattern_added | pattern_updated | pattern_removed
-		for spl in hyportage_pattern.pattern_repository_element_get_spls(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)])
-	for spl in spl_iuse_to_update:
-		hyportage_data.spl_reset_required_iuses(spl, pattern_repository)
-
-	utils.phase_end("Resetting completed")
-	return spl_iuse_to_update
-
 
 
 

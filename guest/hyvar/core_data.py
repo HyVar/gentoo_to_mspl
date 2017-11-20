@@ -545,6 +545,7 @@ class MSPLConfig(object):
 		self.accept_keywords = accept_keywords
 		self.pattern_keywords = pattern_keywords
 		self.pattern_accept_keywords = pattern_accept_keywords
+		self.accept_keywords_full = None
 
 		# form incremental updates
 		self.new_masks = True
@@ -596,19 +597,19 @@ class MSPLConfig(object):
 		else: return True
 
 	def get_stability_status(self, spl_core, unmasked, keywords_default):
+		keywords = keywords_default.copy()
+		self.pattern_keywords.apply(spl_core, keywords)
+		accept_keywords = self.accept_keywords_full.copy()
+		self.pattern_accept_keywords.apply(spl_core, accept_keywords)
+		matched = keywords & accept_keywords
+		keyword_mask = bool(matched)
 		if unmasked:
-			keywords = keywords_default.copy()
-			self.pattern_keywords.apply(spl_core, keywords)
-			accept_keywords = {self.arch} if self.arch else set()
-			self.accept_keywords.apply(accept_keywords)
-			self.pattern_accept_keywords.apply(spl_core, accept_keywords)
-			matched = keywords & accept_keywords
-			installable = bool(matched)
+			installable = keyword_mask
 			is_stable = not bool(filter(lambda x: x[0] == '~', matched))
 		else:
 			installable = False
 			is_stable = False
-		return installable, is_stable
+		return keyword_mask, installable, is_stable
 
 	def get_use_flags(self, spl_core, unmasked, is_stable, use_manipulation):
 		if unmasked:
@@ -629,8 +630,11 @@ class MSPLConfig(object):
 		# 4. return the result
 		return unmasked, installable, is_stable, use_flags
 
-	def set_required_patterns(self):
+	def close(self):
 		self.pattern_required_flat = {el for k, v in self.pattern_required.iteritems() for el in v}
+		self.accept_keywords_full = {self.arch} if self.arch else set()
+		self.accept_keywords.apply(self.accept_keywords_full)
+
 
 	def set_old_config(self, old_config):
 		self.new_masks = (self.pattern_mask != old_config.pattern_mask) or (self.pattern_unmask != old_config.pattern_unmask)
@@ -687,8 +691,8 @@ class Config(object):
 
 	def close_init_phase(self): self.mspl_config.close_init_phase()
 
-	def set_required_patterns(self):
-		self.mspl_config.set_required_patterns()
+	def close(self):
+		self.mspl_config.close()
 		self.pattern_required_flat = self.mspl_config.pattern_required_flat | self.world
 
 

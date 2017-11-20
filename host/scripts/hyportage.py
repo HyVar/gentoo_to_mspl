@@ -91,7 +91,7 @@ def save_configuration(path_configuration, config):
 	type=click.Path(exists=False, file_okay=False, dir_okay=True, writable=True, readable=True, resolve_path=True))
 @click.option(
 	'--portage_files', '-i',
-	nargs=4,
+	nargs=2,
 	default=("config.pickle", "packages"),
 	help='the configuration file in which are stored the portage configuration data, plus the folder in which the egencache portage files can be found')
 @click.option(
@@ -117,11 +117,11 @@ def save_configuration(path_configuration, config):
 @click.option(
 	'--simplify_mode',
 	type=click.Choice(["default","individual"]), default="default",
-	help='Simplify the dependencies togheter of just one by one (useful for getting explanations.')
+	help='Simplify the dependencies together of just one by one (useful for getting explanations.')
 @click.option(
 	'--save-modality',
 	type=click.Choice(["json", "gzjson", "marshal", "pickle"]), default="pickle",
-	help='Saving modality. Marshal is supposed to be faster but python version specific.')
+	help='Saving modality. Currently, only pickle is supported, as "marshal does not support objects, and json is simply not efficient')
 @click.option(
 	'--mode',
 	type=click.Choice(["update", "emerge"]), default="update",
@@ -130,6 +130,10 @@ def save_configuration(path_configuration, config):
 	'--explain-modality',
 	is_flag=True,
 	help='Execution modality that tried to explain why a request can not be satisfied.')
+@click.option(
+	'--exploration',
+	default="",
+	help='enable the exploration mode of the tool. Valid values are lists of exploration modes, separated by commas. Valid exploration mode are "use", "mask" and "keywords"')
 @click.argument(
 	'atoms',
 	nargs=-1)
@@ -147,6 +151,7 @@ def main(
 		save_modality,
 		mode,
 		explain_modality,
+		exploration,
 		atoms):
 	"""
 	Tool that converts the gentoo files
@@ -188,6 +193,11 @@ def main(
 
 	todo_update_hyportage = mode == "update"
 	todo_emerge = mode == "emerge"
+
+	# 1.3. Exploration mode:
+	exploration_use = "use" in exploration
+	exploration_mask = "mask" in exploration
+	exploration_keywords = "keywords" in exploration
 
 	##########################################################################
 	# 2. SET THE FILE PATHS
@@ -296,7 +306,8 @@ def main(
 		# solve these spl, with the request constraint
 		solution = reconfigure.solve_spls(
 			id_repository, config, mspl, spl_groups, config.installed_packages,
-			all_spls, request_constraint, explain_modality=explain_modality)
+			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords,
+			explain_modality=explain_modality)
 
 		if solution is None:
 			logging.error("Non valid configuration found")

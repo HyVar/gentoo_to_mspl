@@ -156,7 +156,7 @@ def generate_to_install_spls(id_repository, feature_list):
 
 def solve_spls(
 		id_repository, config, mspl, spl_groups, installed_spls,
-		spls, annex_constraint, fixed_use_flags=True, par=1, explain_modality=False):
+		spls, annex_constraint, exploration_use, exploration_mask, exploration_keywords, par=1, explain_modality=False):
 	"""
 	Solves the spls in input locally assuming that there is a command hyvar-rec
 	:param id_repository: the id repository of hyportage
@@ -166,7 +166,9 @@ def solve_spls(
 	:param installed_spls: the mapping stating the use flag selection for all installed spls
 	:param spls: the spls to solve
 	:param annex_constraint: the additional constraint to add in the solver input
-	:param fixed_use_flags: boolean saying if the solver can change the use flag default selection
+	:param exploration_use: boolean saying if the solver can change the use flag default selection
+	:param exploration_mask: boolean saying if the solver can change the use mask status of the packages
+	:param exploration_keywords: boolean saying if the solver can change the keywords of the packages
 	:param par: the number of threads to use for resolution (by default: 1)
 	:param explain_modality: boolean saying if a problem should be explained (by default: False)
 	:return: the solution found by the solver, if it exists
@@ -178,13 +180,17 @@ def solve_spls(
 	spl_group_names = core_data.dictSet()
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
-		constraint.extend(spl.smt(id_repository))
-		if spl.installable and fixed_use_flags:
-			if spl in installed_spls:
-				constraint.extend(smt_encoding.convert_use_flag_selection(
-					id_repository, spl.name, spl.required_iuses, installed_spls[spl]))
-			else:
-				constraint.extend(spl.smt_use_selection(id_repository, config))
+		included = (spl.unmasked or exploration_mask) and (spl.keyword_mask or exploration_keywords)
+		if included:
+			constraint.extend(spl.smt(id_repository, exploration_mask, exploration_keywords))
+			if not exploration_use:
+				if spl in installed_spls:
+					constraint.extend(smt_encoding.convert_use_flag_selection(
+						id_repository, spl.name, spl.required_iuses, installed_spls[spl]))
+				else:
+					constraint.extend(spl.smt_use_selection(id_repository, config))
+		else:
+			constraint.extend(spl.smt_false(id_repository))
 	for spl_group_name, spls_tmp in spl_group_names.iteritems():
 		spl_group = spl_groups[spl_group_name]
 		constraint.extend(spl_group.smt_constraint)
@@ -192,7 +198,7 @@ def solve_spls(
 			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, spl.name)))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
-	preferences = [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
+	preferences = [] # [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
 	# 1.3. construct the current system
 	current_system = installed_spls_to_solver(id_repository, installed_spls, spl_names)
 	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration

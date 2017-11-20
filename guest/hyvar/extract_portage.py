@@ -674,7 +674,7 @@ def main(output_dir):
 	system.keyword_list = load_keyword_list()
 	system.installed_packages = load_installed_packages()
 	system.world = load_world_file()
-	system.set_required_patterns()
+	system.close()
 
 	# 3. save the config
 	save_filename = os.path.join(output_dir, "config.pickle")

@@ -33,13 +33,16 @@ smt_implies = z3.Implies
 def get_int_from_bool_list(fs): return z3.Sum([z3.If(b, 1, 0) for b in fs])
 
 
-def get_no_two_true_expressions(fs):
+def get_no_two_true_expressions_num(fs):
 	return get_int_from_bool_list(fs) <= 1
 
 
-def get_exactly_one_true_expressions(fs):
+def get_exactly_one_true_expressions_num(fs):
 	return get_int_from_bool_list(fs) == 1
 
+
+get_no_two_true_expressions = get_no_two_true_expressions_num
+get_exactly_one_true_expressions = get_exactly_one_true_expressions_num
 
 ##
 
@@ -167,8 +170,19 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 ##############################################
 
 class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
+	"""
+	This class implements a translator from the fm_local and fm_combined AST to SMT constraints
+	"""
 
 	def __init__(self, pattern_repository, id_repository, mspl, spl_groups, spl_name):
+		"""
+		The constructor of this class
+		:param pattern_repository: the pattern_repository of hyportage
+		:param id_repository: the id_repository of hyportage
+		:param mspl: the mspl of hyportage
+		:param spl_groups: the spl_groups of hyportage
+		:param spl_name: the name of the spl whose constraints will be translated
+		"""
 		super(hyportage_constraint_ast.ASTVisitor, self).__init__()
 		self.id_repository = id_repository
 		self.pattern_repository = pattern_repository
@@ -268,6 +282,14 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 
 
 def simplify_constraints(spl_name, constraints, simplify_mode):
+	"""
+	This function simplifies the SMT constraint in input following the simplify_mode
+	:param spl_name: the name of the spl from which the constraint has been extracted
+	:param constraints: the extracted constraint (actually, a list of constraints)
+	:param simplify_mode: mode of simplification.
+		"default" means that
+	:return:
+	"""
 	if simplify_mode == "default":
 		formula = z3.simplify(z3.And(constraints))
 		if z3.is_false(formula):
