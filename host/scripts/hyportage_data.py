@@ -97,6 +97,7 @@ class SPL(object):
 		self.iuses_full              = None                   # previous list extended with features implicitly declared by portage
 		self.use_manipulation        = use_manipulation  # default use selection
 		self.use_selection_full      = None                   # use selection considering default portage information
+		self.use_selection_core      = None                   # use selection considering only the use flags used in the constraints
 		self.use_selection_smt       = None
 		self.unmasked                = None                   # if portage states that this spl is masked or not
 		self.keywords_list           = keyword_set          # list of architectures valid for this spl
@@ -129,6 +130,14 @@ class SPL(object):
 	def smt_false(self, id_repository):
 		return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
 
+	def use_selection(self, config):
+		if self.use_selection_core is None:
+			use_useful = self.required_iuses & self.iuses_full
+			self.use_selection_full = config.mspl_config.get_use_flags(
+				self.core, self.unmasked, self.is_stable, self.use_manipulation)
+			self.use_selection_core = self.use_selection_full & use_useful
+		return self.use_selection_core
+
 	def smt_use_selection(self, id_repository, config):
 		"""
 		Returns (and possibly compute) the SMT constraint corresponding to the default use flag selection of this package
@@ -140,7 +149,7 @@ class SPL(object):
 			use_useful = self.required_iuses & self.iuses_full
 			self.use_selection_full = config.mspl_config.get_use_flags(
 				self.core, self.unmasked, self.is_stable, self.use_manipulation)
-			use_selection_core = self.use_selection_full & use_useful
+			use_selection_core = self.use_selection(config)
 			self.use_selection_smt = smt_encoding.convert_use_flag_selection(
 				id_repository, self.name, use_useful, use_selection_core)
 		return self.use_selection_smt

@@ -198,6 +198,10 @@ def main(
 	exploration_use = "use" in exploration
 	exploration_mask = "mask" in exploration
 	exploration_keywords = "keywords" in exploration
+	if exploration_use: logging.info("  USE exploration enabled")
+	if exploration_mask: logging.info("  MASK exploration enabled")
+	if exploration_keywords: logging.info("  KEYWORDS exploration enabled")
+
 
 	##########################################################################
 	# 2. SET THE FILE PATHS

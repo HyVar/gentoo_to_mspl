@@ -67,6 +67,11 @@ def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 	the priority of preferences is decided as follows:
 		- remove less packages installed as possible,
 		- minimize number of new packages to install
+	:param id_repository: the repository of hyportage
+	:param mspl: the mspl of hyportage
+	:param installed_spls: the currently installed spls with their configuration
+	:param spl_names: the names of the spls considered in the reconfiguration process
+	:return: an equation encoding the preference as described previously
 	"""
 	installed_spls = set(installed_spls.keys()) & spl_names
 	# preference for removing less packages installed and not deprecated as possible
@@ -80,6 +85,20 @@ def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 		for spl_name in spl_names if spl_name not in installed_spls])
 	if not pref_less_remove: pref_less_remove = "0"
 	return pref_less_remove + (" - (" + pref_less_add + ")" if pref_less_add else "")
+
+
+def get_preferences_use_flags(id_repository, mspl, spl_names):
+	"""
+	This function translates the use flag default selection of the spl in parameter into a preferences
+	TODO: implement this function. It requires an API change in the SPL class to do it efficiently.
+	:param id_repository: the id repository of hyportage
+	:param mspl: the mspl of hyportage
+	:param spl_names: the names of the spls to include in the preferences construction
+	:return: an equation encoding the default configuration of the spls in parameter
+	"""
+	use_flags_positive = set()
+	use_flag_negative = set()
+	return 0
 
 
 def installed_spls_to_solver(id_repository, installed_spls, spl_names):
@@ -178,11 +197,13 @@ def solve_spls(
 	# 1.1. construct the constraint
 	constraint = annex_constraint[:]
 	spl_group_names = core_data.dictSet()
+	#tmp = 0
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
 		included = (spl.unmasked or exploration_mask) and (spl.keyword_mask or exploration_keywords)
 		if included:
-			constraint.extend(spl.smt(id_repository, exploration_mask, exploration_keywords))
+			#tmp = tmp + 1
+			constraint.extend(spl.smt())
 			if not exploration_use:
 				if spl in installed_spls:
 					constraint.extend(smt_encoding.convert_use_flag_selection(
@@ -190,12 +211,14 @@ def solve_spls(
 				else:
 					constraint.extend(spl.smt_use_selection(id_repository, config))
 		else:
+			#logging.info("spl \"" + spl.name + "\" is not scheduled for possible installation")
 			constraint.extend(spl.smt_false(id_repository))
 	for spl_group_name, spls_tmp in spl_group_names.iteritems():
 		spl_group = spl_groups[spl_group_name]
 		constraint.extend(spl_group.smt_constraint)
 		for spl in spl_group.references:
 			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, spl.name)))
+	#logging.info("included spl: " + str(tmp))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
 	preferences = [] # [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
@@ -288,7 +311,7 @@ def generate_emerge_script_file(mspl, path_install_script, installed_spls, to_in
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		if added_spl_names:
-			f.write("emerge -a --newuse -u" + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
+			f.write("emerge -a --newuse -u " + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
 		if removed_spl_names:
 			f.write("emerge --unmerge " + " ".join(["=" + spl_name for spl_name in removed_spl_names]) + "\n")
 		f.write("\n")

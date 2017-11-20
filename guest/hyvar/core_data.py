@@ -624,7 +624,7 @@ class MSPLConfig(object):
 		# 1. check if the package is masked
 		unmasked = self.get_unmasked(spl_core)
 		# 2. check if installable and stable
-		installable, is_stable = self.get_stability_status(spl_core, unmasked, keywords_default)
+		keyword_mask, installable, is_stable = self.get_stability_status(spl_core, unmasked, keywords_default)
 		# 3. compute the USE flag configuration (i.e., product)
 		use_flags = self.get_use_flags(spl_core, unmasked, is_stable, use_manipulation)
 		# 4. return the result
