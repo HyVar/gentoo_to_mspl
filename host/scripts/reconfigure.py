@@ -200,7 +200,7 @@ def solve_spls(
 	#tmp = 0
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
-		included = (spl.unmasked or exploration_mask) and (spl.keyword_mask or exploration_keywords)
+		included = (spl.unmasked or exploration_mask) and ((spl.is_stable and spl.keyword_mask) or exploration_keywords)
 		if included:
 			#tmp = tmp + 1
 			constraint.extend(spl.smt())
@@ -332,7 +332,9 @@ def generate_package_use_file(mspl, path_use_flag_configuration, to_install_spls
 		for spl_name, use_selection in to_install_spls.iteritems():
 			string = "=" + spl_name + " "
 			string = string + " ".join(use_selection)
-			string = string + " -".join(mspl[spl_name].required_iuses - use_selection) + "\n"
+			use_unselection = mspl[spl_name].iuses_full - use_selection
+			if use_unselection:
+				string = string + " -" + " -".join(use_unselection) + "\n"
 			f.write(string)
 		f.write("\n")
 
