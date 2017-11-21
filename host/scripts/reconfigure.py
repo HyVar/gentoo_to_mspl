@@ -240,16 +240,16 @@ def solve_spls(
 	file_name = utils.get_new_temp_file(".json")
 	with open(file_name, "w") as f:
 		json.dump(data, f)
-	#cmd = ["hyvar-rec", "--features-as-boolean"]
-	#if par > 1:    cmd += ["-p", unicode(par)]
-	#if explain_modality: cmd.append("--explain")
-	#cmd.append(file_name)
-	cmd = [
-		"curl.exe",
-		"-H", "acccept:application/json",
-		"-H", "Content-type:application/json",
-		"-d@" + file_name,
-		"http://vm-simone.di.unito.it/" + ("explain" if explain_modality else "process")]
+	cmd = ["hyvar-rec", "--features-as-boolean"]
+	if par > 1:    cmd += ["-p", unicode(par)]
+	if explain_modality: cmd.append("--explain")
+	cmd.append(file_name)
+	# cmd = [
+	# 	"curl.exe",
+	# 	"-H", "acccept:application/json",
+	# 	"-H", "Content-type:application/json",
+	# 	"-d@" + file_name,
+	# 	"http://vm-simone.di.unito.it/" + ("explain" if explain_modality else "process")]
 
 	# 3. executing the solver
 	utils.phase_start("Running " + unicode(cmd))
