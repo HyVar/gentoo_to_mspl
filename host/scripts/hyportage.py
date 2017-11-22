@@ -115,7 +115,7 @@ def save_configuration(path_configuration, config):
 	default=False,
 	help='force the translation of the given packages.')
 @click.option(
-	'--simplify_mode',
+	'--simplify-mode',
 	type=click.Choice(["default","individual"]), default="default",
 	help='Simplify the dependencies together of just one by one (useful for getting explanations.')
 @click.option(
@@ -134,6 +134,11 @@ def save_configuration(path_configuration, config):
 	'--exploration',
 	default="",
 	help='enable the exploration mode of the tool. Valid values are lists of exploration modes, separated by commas. Valid exploration mode are "use", "mask" and "keywords"')
+@click.option(
+	'--hyvarrec-url',
+	default="",
+	help='Speficies the url (e.g., http://localhost:9000) to reach an instance of hyvar-rec. If not specified it is assumed that hyvar-rec is installed locally."')
+
 @click.argument(
 	'atoms',
 	nargs=-1)
@@ -152,6 +157,7 @@ def main(
 		mode,
 		explain_modality,
 		exploration,
+		hyvarrec_url,
 		atoms):
 	"""
 	Tool that converts the gentoo files
@@ -177,7 +183,7 @@ def main(
 	if verbose == 1: log_level = logging.WARNING
 	elif verbose == 2: log_level = logging.INFO
 	elif verbose >= 3: log_level = logging.DEBUG
-	logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+	logging.basicConfig(format="%(levelname)s: %(message)s", level=log_level)
 	logging.info("Verbose Level: " + unicode(verbose))
 	logging.basicConfig(level=log_level)
 
@@ -310,7 +316,7 @@ def main(
 		# solve these spl, with the request constraint
 		solution = reconfigure.solve_spls(
 			id_repository, config, mspl, spl_groups, config.installed_packages,
-			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords,
+			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords, hyvarrec_url,
 			explain_modality=explain_modality)
 
 		if solution is None:
@@ -322,6 +328,7 @@ def main(
 		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
 		reconfigure.generate_package_use_file(mspl, path_use_flag_configuration, solution)
 
+	logging.info("Execution succesfully termianted")
 
 ##
 
