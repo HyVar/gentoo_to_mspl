@@ -458,10 +458,7 @@ class UseSelectionConfig(object):
 		self.pattern_use_stable_force.update(config.pattern_use_stable_force)
 		self.pattern_use_stable_mask.update(config.pattern_use_stable_mask)
 
-	def apply(self, spl_core, is_stable, selection):
-		self.use.apply(selection)
-		self.pattern_use.apply(spl_core, selection)
-
+	def get_use_force_mask(self, spl_core, is_stable):
 		force = self.use_force.init()
 		self.pattern_use_force.apply(spl_core, force)
 		if is_stable:
@@ -474,7 +471,15 @@ class UseSelectionConfig(object):
 			tmp = self.use_stable_mask.init()
 			self.pattern_use_stable_mask.apply(spl_core, tmp)
 			mask.update(tmp)
+		return force, mask
 
+	def apply(self, spl_core, is_stable, selection):
+		self.use.apply(selection)
+		self.pattern_use.apply(spl_core, selection)
+
+		force = self.use_force.init()
+		self.pattern_use_force.apply(spl_core, force)
+		force, mask = self.get_use_force_mask(spl_core, is_stable)
 		selection.update(force)
 		selection.difference_update(mask)
 
@@ -588,8 +593,11 @@ class MSPLConfig(object):
 	def update_pattern_required(self, pattern_required): self.pattern_required.update_set(pattern_required)
 
 	def close_init_phase(self):
-		self.use_selection_config_init = self.use_selection_config
-		self.use_selection_config = UseSelectionConfig()
+		self.use_selection_config_init = UseSelectionConfig()
+		self.use_selection_config_init.use = self.use_selection_config.use
+		self.use_selection_config.use = SetManipulation()
+		self.use_selection_config_init.pattern_use = self.use_selection_config.pattern_use
+		self.use_selection_config.pattern_use = SetManipulationPattern()
 
 	def get_unmasked(self, spl_core):
 		if self.pattern_mask.contains(spl_core):
@@ -610,6 +618,9 @@ class MSPLConfig(object):
 			installable = False
 			is_stable = False
 		return keyword_mask, installable, is_stable
+
+	def get_use_force_mask(self, spl_core, is_stable):
+		return self.use_selection_config.get_use_force_mask(spl_core, is_stable)
 
 	def get_use_flags(self, spl_core, unmasked, is_stable, use_manipulation):
 		if unmasked:

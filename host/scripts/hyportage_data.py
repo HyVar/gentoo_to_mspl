@@ -84,7 +84,6 @@ class SPL(object):
 		self.eapi                    = eapi
 		self.name                    = name
 		self.core                    = core
-		self.slots                   = core_data.spl_core_get_slot(core), core_data.spl_core_get_subslot(core)
 		self.deprecated              = deprecated
 		self.fm_local                = fm_local               # the part of the feature model related to local features, i.e., portage's REQUIRED_USE
 		self.fm_combined             = fm_combined            # the part of the feature model relatd to external dependencies, i.e., portage's DEPEND + RDEPEND + PDEPEND
@@ -115,6 +114,9 @@ class SPL(object):
 		else:
 			return False
 
+	@property
+	def slot(self): return core_data.spl_core_get_slot(self.core)
+
 	def update_required_iuses_external(self, features, pattern):
 		res = False
 		for feature in features:
@@ -130,9 +132,18 @@ class SPL(object):
 	def smt_false(self, id_repository):
 		return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
 
+	def iuses_useful(self): return self.required_iuses & self.iuses_full
+
+	def smt_use_exploration(self, id_repository, config):
+		use_useful = self.iuses_useful()
+		force, mask = config.mspl_config.get_use_force_mask(self.core, self.is_stable)
+		force.intersection_update(use_useful)
+		mask.intersection_update(use_useful)
+		return smt_encoding.convert_use_flag_selection(id_repository, self.name, force | mask, force)
+
 	def use_selection(self, config):
 		if self.use_selection_core is None:
-			use_useful = self.required_iuses & self.iuses_full
+			use_useful = self.iuses_useful()
 			self.use_selection_full = config.mspl_config.get_use_flags(
 				self.core, self.unmasked, self.is_stable, self.use_manipulation)
 			self.use_selection_core = self.use_selection_full & use_useful
@@ -246,7 +257,7 @@ class SPLGroup(object):
 		"""
 		self.name = group_name                            # name of the group
 		self.references = [spl]                           # list of spls contained in this group
-		self.slots_mapping = {spl_get_slots(spl): [spl]}  # mapping listings all spls stored in one slot
+		self.slots_mapping = {spl.slot: {spl}}  # mapping listings all spls stored in one slot
 		self.smt_constraint = None                        # z3 constraint encoding this group
 
 	def add_spl(self, spl):
@@ -256,11 +267,9 @@ class SPLGroup(object):
 		:return: None
 		"""
 		self.references.append(spl)
-		slots = spl_get_slots(spl)
-		if slots in self.slots_mapping:
-			self.slots_mapping[slots].append(spl)
-		else:
-			self.slots_mapping[slots] = [spl]
+		slot = spl.slot
+		if slot in self.slots_mapping: self.slots_mapping[slot].add(spl)
+		else: self.slots_mapping[slot] = {spl}
 
 	def replace_spl(self, old_spl, new_spl):
 		self.add_spl(new_spl)
@@ -268,11 +277,9 @@ class SPLGroup(object):
 
 	def remove_spl(self, spl):
 		self.references.remove(spl)
-		slots = spl_get_slots(spl)
-		if len(self.slots_mapping[slots]) == 1:
-			self.slots_mapping.pop(slots)
-		else:
-			self.slots_mapping[slots].remove(spl)
+		slot = spl.slot
+		if len(self.slots_mapping[slot]) == 1: self.slots_mapping.pop(slot)
+		else: self.slots_mapping[slot].remove(spl)
 
 	def __iter__(self): return iter(self.references)
 

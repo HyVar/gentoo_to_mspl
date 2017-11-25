@@ -1,6 +1,7 @@
 
 import re
 import logging
+import itertools
 import z3
 
 
@@ -41,8 +42,29 @@ def get_exactly_one_true_expressions_num(fs):
 	return get_int_from_bool_list(fs) == 1
 
 
-get_no_two_true_expressions = get_no_two_true_expressions_num
-get_exactly_one_true_expressions = get_exactly_one_true_expressions_num
+##
+
+def get_no_two_true_expressions_bool_core(fs):
+	constraints = []
+	for f1, f2 in itertools.combinations(fs, 2):
+		constraints.append(smt_not(smt_and([f1, f2])))
+	return constraints
+
+
+def get_no_two_true_expressions_bool(fs):
+	return smt_and(get_no_two_true_expressions_bool_core(fs))
+
+
+def get_exactly_one_true_expressions_bool(fs):
+	constraints = get_no_two_true_expressions_bool_core(fs)
+	constraints.append(smt_or(fs))
+	return smt_and(constraints)
+
+
+##
+
+get_no_two_true_expressions = get_no_two_true_expressions_bool
+get_exactly_one_true_expressions = get_exactly_one_true_expressions_bool
 
 ##
 
@@ -212,7 +234,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		if ctx["choice"] == "||":  # or
 			return z3.Or(formulas)
 		elif ctx["choice"] == "??":  # one-max
-			if len(formulas) > 2:
+			if len(formulas) > 1:
 				return get_no_two_true_expressions(formulas)
 			else:
 				return smt_true
@@ -261,7 +283,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		if ctx["choice"] == "||":  # or
 			return z3.Or(formulas)
 		elif ctx["choice"] == "??":  # one-max
-			if len(formulas) > 2:
+			if len(formulas) > 1:
 				return get_no_two_true_expressions(formulas)
 			else:
 				return smt_true

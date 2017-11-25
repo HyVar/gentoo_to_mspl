@@ -327,7 +327,8 @@ def create_spl_from_egencache_file(file_path):
 
 	slots = slots_string.split("/") if slots_string else ["0", "0"]
 	slot = slots[0]
-	subslot = slots[1] if len(slots) == 2 else "0"
+	subslot = slots[1] if len(slots) == 2 else slot
+	# see https://devmanual.gentoo.org/general-concepts/slotting/index.html
 	spl_core = core_data.spl_core_create(package_group, version_full, version, slot, subslot)
 
 	iuses, use_manipulation = extract_iuse(iuses_string.split() if iuses_string else [])

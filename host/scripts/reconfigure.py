@@ -1,5 +1,5 @@
+#!/usr/bin/python
 import json
-import sys
 import utils
 import logging
 import os
@@ -27,7 +27,7 @@ __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 ##########################################################################
-# UTILITIES TO CALL HYVAR-REC
+# UTILITIES TO CALL THE HYVAR-REC SOLVER
 ##########################################################################
 
 
@@ -71,9 +71,11 @@ def run_remote_hyvar(json_data, explain_modality, url):
 		return None
 	return response.json()
 
+
 ##########################################################################
 # 1. INITIALIZE THE DATA (COMPUTE REQUEST AND UPDATE THE DATABASE)
 ##########################################################################
+
 
 def process_request(pattern_repository, id_repository, mspl, spl_groups, config, atoms):
 	"""
@@ -250,7 +252,9 @@ def solve_spls(
 		if included:
 			#tmp = tmp + 1
 			constraint.extend(spl.smt())
-			if not exploration_use:
+			if exploration_use:
+				constraint.extend(spl.smt_use_exploration(id_repository, config))
+			else:
 				if spl in installed_spls:
 					constraint.extend(smt_encoding.convert_use_flag_selection(
 						id_repository, spl.name, spl.required_iuses, installed_spls[spl]))
@@ -267,7 +271,7 @@ def solve_spls(
 	#logging.info("included spl: " + str(tmp))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
-	preferences = [] # [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
+	preferences = [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
 	# 1.3. construct the current system
 	current_system = installed_spls_to_solver(id_repository, installed_spls, spl_names)
 	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration
