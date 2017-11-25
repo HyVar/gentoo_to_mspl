@@ -325,8 +325,8 @@ def main(
 			return
 
 		# write the installation files
-		reconfigure.generate_emerge_script_file(mspl, path_install_script, config.installed_packages, solution)
-		reconfigure.generate_package_use_file(mspl, path_use_flag_configuration, solution)
+		reconfigure.generate_installation_files(
+			mspl, path_install_script, path_use_flag_configuration, config.installed_packages, solution)
 
 	logging.info("Execution succesfully termianted")
 

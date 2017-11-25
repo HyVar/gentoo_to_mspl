@@ -17,11 +17,11 @@ These files are structured in a folder structure of the following form:
 ```
 /usr/portage/ +
               |
-              +-> category / +
-                             |
-                             +-> group / +
-                                         |
-                                         +-> group-version.ebuild
+              +-> <category> / +
+                               |
+                               +-> <group> / +
+                                             |
+                                             +-> <group>-<version>.ebuild
 ```
 
 The folder `/usr/portage` is the root directory of the portage tree.

@@ -1,5 +1,4 @@
 
-import re
 import logging
 import itertools
 import z3
