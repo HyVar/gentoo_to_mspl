@@ -119,7 +119,125 @@ app-office/libreoffice java python_single_target_python3_4
 
 
 
-# Portage: Full Package Configuration
+# Portage: in Depth Documentation
+
+In this section, we discuss more in details most of the aspects of portage, and in particular
+ the ones related to package structure, package configuration, and the semantics of the dependency solver
+  (which are necessary information to design a solver that computes a configuration from a user request).
+
+
+## Portage Directory Structure
+
+We already presented in the [Repository Structure Section](#Portage's-Repository-Structure)
+ the part of the folder structure of portage where packages are declared.
+Additionally, portage contains other folders containing configuration or annex data that can be very important.
+The folders [md5-cache](#/usr/portage/metadata/md5-cache) and [profiles](#/usr/portage/profiles) are indeed central in portage.
+
+### /usr/portage/distfiles
+
+This folder is where portage stores all the source code of the installed packages:
+ when a package is pulled to be installed, portage downloads its source code (storing the archive in `/usr/portage/distfiles`),
+ compiles and install it.
+Note that portage never cleans this folder (to avoid downloading the same archive several time),
+ and so the administrator should remove by hand some of the archives stored there
+ to avoid filling the disk space with useless data.
+
+### /usr/portage/eclass
+
+This folder contains the [eclasses](https://devmanual.gentoo.org/eclass-reference/) of portage.
+An [eclass](https://devmanual.gentoo.org/eclass-writing/) is a bash file defining several functions and data
+ that can be used by packages in their definition.
+Indeed, an `.ebuild` file (which is a bash script) can use the `inherit` function to import several of these files,
+ and thus import all the data and functions they contain and use them in its definition.
+For instance, [eutils.class](https://devmanual.gentoo.org/eclass-reference/eutils.eclass/index.html)
+ declares many utility functions for package installation,
+ while [python-single-r1.class](https://devmanual.gentoo.org/eclass-reference/python-single-r1.eclass/index.html)
+ declares python related functions and variable for feature model construction specifically for python related packages.
+
+### /usr/portage/header.txt
+
+This file contains the header of all the `.ebuild` files in the portage package repository.
+In particular, if someone wants to write a portage package a software,
+ he must put the content of this file as header of his `.ebuild` file.
+
+### /usr/portage/licenses
+
+This folder contains all the licences of all the packages in the portage repository.
+That way, if an administrator needs to install a package bound by a licence he does not know,
+ he can read it before accepting it and installing the package, or not.
+We will discuss Licenses more in details in the Section about the [package's data](#Definition-of-a-Package).
+
+### /usr/portage/metadata
+
+This folder contains several data about the repository management,
+ like the [`layout.conf`](https://wiki.gentoo.org/wiki/Repository_format/metadata/layout.conf) file,
+ or the `news` folder that contains all the messages from the portage package developpers to the system administrators.
+Moreover, this folder contains the `md5-cache` folder that needs to be discussed in detail.
+
+#### /usr/portage/metadata/md5-cache
+
+We previously discussed the fact that the `.ebuild` files that define a package are bash scripts
+ that may include definitions from many other files (with the `inherit` function).
+Consequently, knowing the feature model and the dependencies of a package can require some long computation
+ which must be performed every time the portage `emerge` tool is called.
+To avoid computing this information many time,
+ the [`egencache`](https://wiki.gentoo.org/wiki/Egencache) tool extract them from a `.ebuild` file and store them in a file
+ in the `/usr/portage/metadata/md5-cache` folder:
+ that folder thus contains all packages' raw information related to feature model, dependencies and visibility
+ (we will discuss this information more in detail in the Section about the [package's data](#Definition-of-a-Package)).
+The structure of the `md5-cache` folder is as follows:
+
+```
+/usr/portage/metadata/md5-cache +
+                                |
+                                +-> <category> / +
+                                                 |
+                                                 +-> <group>-<version>
+```
+each `<category>/<group>/<group>-<version>.ebuild` file is abstracted in a `<category>/<group>-<version>` egencache file.
+Per default, the `emerge` tool uses these files in its computation,
+ as discussed in [here](https://wiki.gentoo.org/wiki//usr/portage/metadata/md5-cache).
+
+### /usr/portage/profiles
+
+This folder contains all data used by portage to compute a default configuration for its package.
+This data is structure w.r.t. the architecture considered,
+ so a package installed on MacOS will not be configured in the same way as a package installed on Linux
+ (e.g., a package on MacOS will use `aqua` for its GUI toolkit, while on Linux `aqua` is not available).
+The content of this folder is central in how packages are configured, and will be discussed more in details in the Section
+ about [package configuration](#Package-Configuration).
+
+### /usr/portage/scripts
+
+This folder contains one sh script,
+ [`bootstrap.sh`](https://wiki.gentoo.org/wiki/FAQ#How_do_I_install_Gentoo_using_a_stage1_or_stage2_tarball.3F)
+ that can be called to recompile all the base portage package from scratch during the initial installation of the gentoo system.
+
+## Definition of a Package
+
+### Feature Model
+
+ - **IUSE**
+ - **IUSE_REQUIRED**
+ - **DEPEND**
+ - **RDEPEND**
+ - **PDEPEND**
+ - **SLOT** and **SUBSLOT**
+
+### Visibility
+
+ - **KEYWORDS**
+ - **ACCEPT_KEYWORDS**
+ - **STABLE**
+ - **MASK**
+ - **LICENSE**
+ - **ACCEPT_LICENSE**
+
+### Installation scripts
+
+
+
+## Package Configuration
 
 The previous Section was a brief overview of the characteristics of
  Portage that makes this package manager into a Multi-Software Product line
