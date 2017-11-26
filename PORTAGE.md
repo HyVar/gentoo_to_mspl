@@ -128,10 +128,10 @@ In this section, we discuss more in details most of the aspects of portage, and 
 
 ## Portage Directory Structure
 
-We already presented in the [Repository Structure Section](#Portage's-Repository-Structure)
+We already presented in the [Repository Structure Section](#portages-repository-structure)
  the part of the folder structure of portage where packages are declared.
 Additionally, portage contains other folders containing configuration or annex data that can be very important.
-The folders [md5-cache](#/usr/portage/metadata/md5-cache) and [profiles](#/usr/portage/profiles) are indeed central in portage.
+The folders [md5-cache](#usrportagemetadatamd5-cache) and [profiles](#usrportageprofiles) are indeed central in portage.
 
 ### /usr/portage/distfiles
 
@@ -165,7 +165,7 @@ In particular, if someone wants to write a portage package a software,
 This folder contains all the licences of all the packages in the portage repository.
 That way, if an administrator needs to install a package bound by a licence he does not know,
  he can read it before accepting it and installing the package, or not.
-We will discuss Licenses more in details in the Section about the [package's data](#Definition-of-a-Package).
+We will discuss Licenses more in details in the Section about the [package's data](#definition-of-a-package).
 
 ### /usr/portage/metadata
 
@@ -184,7 +184,7 @@ To avoid computing this information many time,
  the [`egencache`](https://wiki.gentoo.org/wiki/Egencache) tool extract them from a `.ebuild` file and store them in a file
  in the `/usr/portage/metadata/md5-cache` folder:
  that folder thus contains all packages' raw information related to feature model, dependencies and visibility
- (we will discuss this information more in detail in the Section about the [package's data](#Definition-of-a-Package)).
+ (we will discuss this information more in detail in the Section about the [package's data](#definition-of-a-package)).
 The structure of the `md5-cache` folder is as follows:
 
 ```
@@ -205,7 +205,7 @@ This data is structure w.r.t. the architecture considered,
  so a package installed on MacOS will not be configured in the same way as a package installed on Linux
  (e.g., a package on MacOS will use `aqua` for its GUI toolkit, while on Linux `aqua` is not available).
 The content of this folder is central in how packages are configured, and will be discussed more in details in the Section
- about [package configuration](#Package-Configuration).
+ about [package configuration](#package-configuration).
 
 ### /usr/portage/scripts
 
