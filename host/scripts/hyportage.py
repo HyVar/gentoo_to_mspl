@@ -1,4 +1,4 @@
-
+import sys
 import os
 import utils
 import logging
@@ -137,7 +137,12 @@ def save_configuration(path_configuration, config):
 @click.option(
 	'--hyvarrec-url',
 	default="",
-	help='Speficies the url (e.g., http://localhost:9000) to reach an instance of hyvar-rec. If not specified it is assumed that hyvar-rec is installed locally."')
+	help='Speficies the url (e.g., http://localhost:9000) to reach an instance of hyvar-rec. If not specified it is assumed that hyvar-rec is installed locally.')
+@click.option(
+	'--local-solver',
+	type=click.UNPROCESSED,
+	default="",
+	help='Specifies the command to call the solver on the local computer')
 
 @click.argument(
 	'atoms',
@@ -158,6 +163,7 @@ def main(
 		explain_modality,
 		exploration,
 		hyvarrec_url,
+		local_solver,
 		atoms):
 	"""
 	Tool that converts the gentoo files
@@ -208,6 +214,16 @@ def main(
 	if exploration_mask: logging.info("  MASK exploration enabled")
 	if exploration_keywords: logging.info("  KEYWORDS exploration enabled")
 
+	# 1.4. Solver selection
+	if local_solver:
+		reconfigure.run_hyvar = lambda json_data: reconfigure.run_local_hyvar(
+			json_data, explain_modality, local_solver.split(), par)
+		logging.info(str(local_solver))
+		logging.info(str(local_solver.split()))
+	elif hyvarrec_url: reconfigure.run_hyvar = lambda json_data: reconfigure.run_remote_hyvar(
+			json_data, explain_modality, hyvarrec_url)
+	else: reconfigure.run_hyvar = lambda json_data: reconfigure.run_local_hyvar(
+			json_data, explain_modality, ["hyvar-rec"], par)
 
 	##########################################################################
 	# 2. SET THE FILE PATHS
@@ -316,7 +332,7 @@ def main(
 		# solve these spl, with the request constraint
 		solution = reconfigure.solve_spls(
 			id_repository, config, mspl, spl_groups, config.installed_packages,
-			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords, hyvarrec_url,
+			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords,
 			explain_modality=explain_modality)
 
 		if solution is None:
@@ -324,15 +340,21 @@ def main(
 			logging.error("exiting")
 			return
 
+		if verbose >= 3:
+			path_new_configuration = os.path.join(dir_install, "new_configuration.pickle")
+			logging.debug("Saving the generated configuration in \"" + path_new_configuration + "\"")
+			utils.store_data_file(path_new_configuration, solution)
+
 		# write the installation files
 		reconfigure.generate_installation_files(
 			mspl, path_install_script, path_use_flag_configuration, config.installed_packages, solution)
 
-	logging.info("Execution succesfully termianted")
+	logging.info("Execution succesfully terminated")
 
 ##
 
 if __name__ == "__main__":
+	logging.error(str(sys.argv))
 	if os.name == 'nt':
 		multiprocessing.freeze_support()
 	main()

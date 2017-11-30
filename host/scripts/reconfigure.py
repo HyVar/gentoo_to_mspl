@@ -31,14 +31,14 @@ __status__ = "Prototype"
 ##########################################################################
 
 
-def run_hyvar(json_data, explain_modality, par_cores):
+def run_local_hyvar(json_data, explain_modality, cmd, par_cores):
 	"""
 	Run hyvar locally assuming that there is a command hyvar-rec
 	"""
 	file_name = utils.get_new_temp_file(".json")
 	with open(file_name, "w") as f:
 		json.dump(json_data, f)
-	cmd = ["hyvar-rec", "--constraints-minimization", "--features-as-boolean"]
+	cmd.extend(["--constraints-minimization", "--features-as-boolean"])
 	if explain_modality: cmd.append("--explain")
 	if par_cores > 1: cmd.extend(["-p", unicode(par_cores)])
 	cmd.append(file_name)
@@ -71,6 +71,8 @@ def run_remote_hyvar(json_data, explain_modality, url):
 		return None
 	return response.json()
 
+
+run_hyvar = None
 
 ##########################################################################
 # 1. INITIALIZE THE DATA (COMPUTE REQUEST AND UPDATE THE DATABASE)
@@ -155,6 +157,7 @@ def installed_spls_to_solver(id_repository, installed_spls, spl_names):
 			res.append(smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name))
 	return res
 
+
 def get_better_constraint_visualization(id_repository, mspl, constraints):
 	"""
 	function that manipulates the constraints in a more readable form for analysing them.
@@ -204,26 +207,24 @@ def generate_to_install_spls(id_repository, feature_list):
 	:param feature_list: the solution found by the solver
 	:return: a dictionary spl_name -> use flag selection
 	"""
-	spl_names = set()
+	res = core_data.dictSet()
 	use_flags = []
 	for feature in feature_list:
 		el = hyportage_ids.id_repository_get_ids(id_repository)[smt_encoding.get_id_from_smt_variable(feature)]
 		if el[0] == "package":  # el = ("package", spl_name)
-			spl_names.add(el[1])
+			res.set(el[1], set())
 		else:  # el = ("use", use, spl_name)
 			use_flags.append((el[1], el[2]))
 
-	res = core_data.dictSet()
 	for use_flag, spl_name in use_flags:
-		if spl_name in spl_names:
+		if spl_name in res:
 			res.add(spl_name, use_flag)
 	return res
 
 
 def solve_spls(
 		id_repository, config, mspl, spl_groups, installed_spls,
-		spls, annex_constraint, exploration_use, exploration_mask, exploration_keywords, hyvarrec_url, par=1,
-		explain_modality=False):
+		spls, annex_constraint, exploration_use, exploration_mask, exploration_keywords, explain_modality=False):
 	"""
 	Solves the spls in input locally assuming that there is a command hyvar-rec
 	:param id_repository: the id repository of hyportage
@@ -236,7 +237,6 @@ def solve_spls(
 	:param exploration_use: boolean saying if the solver can change the use flag default selection
 	:param exploration_mask: boolean saying if the solver can change the use mask status of the packages
 	:param exploration_keywords: boolean saying if the solver can change the keywords of the packages
-	:param par: the number of threads to use for resolution (by default: 1)
 	:param explain_modality: boolean saying if a problem should be explained (by default: False)
 	:return: the solution found by the solver, if it exists
 	"""
@@ -271,9 +271,9 @@ def solve_spls(
 	#logging.info("included spl: " + str(tmp))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
-	preferences = [] #[get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
+	preferences = [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
 	# 1.3. construct the current system
-	current_system = installed_spls_to_solver(id_repository, installed_spls, spl_names)
+	current_system = [] #installed_spls_to_solver(id_repository, installed_spls, spl_names)
 	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration
 	data_smt_constraints = {"formulas": constraint, "features": [], "other_int_symbols": []}
 	data = {
@@ -287,11 +287,10 @@ def solve_spls(
 	}
 
 	# 2. run hyvar-rec
-	if hyvarrec_url:
-		res = run_remote_hyvar(data, explain_modality, hyvarrec_url)
-	else:
-		res = run_hyvar(data, explain_modality, par)
+	res = run_hyvar(data)
 	if res is None: return None
+
+	print(str(res))
 
 	# 4. managing the solver output
 	if res["result"] != "sat":
@@ -318,24 +317,35 @@ def generate_installation_files(mspl, path_emerge_script, path_use_flag_configur
 	:param new_installation: the spls to install, found by the solver
 	:return: None (but the script file has been generated)
 	"""
-	installed_spl_names = old_installation.keys()
-	to_install_spl_names = new_installation.keys()
 
-	installed_spl_groups_dict = core_data.dictSet()
-	for spl_name in installed_spl_names:
-		installed_spl_groups_dict.add(core_data.spl_core_get_spl_group_name(mspl[spl_name].core), spl_name)
-	to_install_spl_groups_dict = core_data.dictSet()
-	for spl_name in to_install_spl_names:
-		to_install_spl_groups_dict.add(core_data.spl_core_get_spl_group_name(mspl[spl_name].core), spl_name)
+	# the spls to emerge are the ones that are not present in the old installation, or that have a new configuration
+	added_spl_names = []
+	for spl_name, product in new_installation.iteritems():
+		if spl_name in old_installation:
+			if old_installation[spl_name] != product:
+				added_spl_names.append(spl_name)
+		else: added_spl_names.append(spl_name)
 
-	installed_spl_groups = set(installed_spl_groups_dict.keys())
-	to_install_spl_groups = set(to_install_spl_groups_dict.keys())
-	removed_spl_groups = installed_spl_groups - to_install_spl_groups
+	# the spls to remove are the ones that are not in the new configuration and that are not replaced by a new version
+	removed_spl_names = []
+	new_spl_goups_info = core_data.dictSet()
+	for spl_name in new_installation.iterkeys():
+		spl = mspl[spl_name]
+		new_spl_goups_info.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
+	for spl_name in old_installation.iterkeys():
+		spl = mspl[spl_name]
+		new_versions = new_spl_goups_info.get(core_data.spl_core_get_spl_group_name(spl.core))
+		if new_versions is None:
+			removed_spl_names.append(spl_name)
+		else:
+			replaced = False
+			for new_spl in new_versions:
+				if (spl.slot == new_spl.slot) and (spl.name != new_spl.name):
+					replaced = True
+					break
+			if replaced: removed_spl_names.append(spl_name)
 
-	added_spl_names = [spl_name for spl_name in to_install_spl_names if spl_name not in set(installed_spl_names)]
-	removed_spl_names = [
-		spl_name for spl_group_name in removed_spl_groups for spl_name in installed_spl_groups_dict[spl_group_name]]
-
+	# write the files
 	added_spl_names.sort()
 	with open(path_emerge_script, 'w') as f:
 		f.write("#!/bin/bash\n")

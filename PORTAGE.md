@@ -195,7 +195,7 @@ The structure of the `md5-cache` folder is as follows:
                                                  +-> <group>-<version>
 ```
 each `<category>/<group>/<group>-<version>.ebuild` file is abstracted in a `<category>/<group>-<version>` egencache file.
-Per default, the `emerge` tool uses these files in its computation,
+By default, the `emerge` tool uses these files in its computation,
  as discussed in [here](https://wiki.gentoo.org/wiki//usr/portage/metadata/md5-cache).
 
 ### /usr/portage/profiles
@@ -222,7 +222,7 @@ This folder contains one sh script,
  - **DEPEND**
  - **RDEPEND**
  - **PDEPEND**
- - **SLOT** and **SUBSLOT**
+ - [**SLOT**](https://devmanual.gentoo.org/general-concepts/slotting/index.html)
 
 ### Visibility
 
