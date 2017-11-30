@@ -119,13 +119,13 @@ function clean_host {
 function translate {
 	shift 1
 	export PYTHONPATH="${LOCAL_PYTHONPATH}"
-	python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update $@
+	python "${HOST_SCRIPT_TRANSLATE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=update "$@"
 }
 
 function emerge {
 	shift 1
 	export PYTHONPATH="${LOCAL_PYTHONPATH}"
-	nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge  $@
+	nice -n 20 python "${HOST_SCRIPT_EMERGE}" "${HOST_HOST_INSTALL_DIR}" "${HOST_HOST_GEN_DIR}" "${HOST_EMERGE_SCRIPT_DIR}" --mode=emerge  "$@"
 	#python scripts/portage2hyvarrec/gentoo_rec.py "$@" portage/json portage/json/hyvarrec
 }
 

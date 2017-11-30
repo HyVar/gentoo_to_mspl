@@ -38,7 +38,7 @@ def run_local_hyvar(json_data, explain_modality, cmd, par_cores):
 	file_name = utils.get_new_temp_file(".json")
 	with open(file_name, "w") as f:
 		json.dump(json_data, f)
-	cmd.extend(["--constraints-minimization", "--features-as-boolean"])
+	cmd.extend(["--constraints-minimization", "--features-as-boolean", "--no-default-preferences"])
 	if explain_modality: cmd.append("--explain")
 	if par_cores > 1: cmd.extend(["-p", unicode(par_cores)])
 	cmd.append(file_name)
@@ -283,14 +283,13 @@ def solve_spls(
 		"constraints": [], # constraints to fill in hyvarrec format (empty in our case for efficiency)
 		"preferences": preferences, # preferences in hyvarrec format
 		"smt_constraints": data_smt_constraints,
-		"hyvar_options": ["--features-as-boolean", "--constraints-minimization"]
+		"hyvar_options": ["--features-as-boolean", "--constraints-minimization", "--no-default-preferences"]
 	}
 
 	# 2. run hyvar-rec
 	res = run_hyvar(data)
 	if res is None: return None
-
-	print(str(res))
+	logging.debug("HyVarRec output: " + unicode(res))
 
 	# 4. managing the solver output
 	if res["result"] != "sat":
@@ -300,7 +299,6 @@ def solve_spls(
 			constraints = get_better_constraint_visualization(id_repository, mspl, res["constraints"])
 			logging.error("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
 		return None
-	logging.debug("HyVarRec output: " + unicode(res))
 
 	return generate_to_install_spls(id_repository, res['features'])
 
