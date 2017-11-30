@@ -69,7 +69,11 @@ def run_remote_hyvar(json_data, explain_modality, url):
 	if response.status_code != requests.codes.ok:
 		logging.error("server answered with an error code: " + str(response.status_code))
 		return None
-	return response.json()
+	res = response.json()
+	if 'error' in res:
+		logging.error("server answered with an error message: " + json.dumps(res))
+		return None
+	return res
 
 
 run_hyvar = None
@@ -289,7 +293,7 @@ def solve_spls(
 	# 2. run hyvar-rec
 	res = run_hyvar(data)
 	if res is None: return None
-	logging.debug("HyVarRec output: " + unicode(res))
+	logging.debug("HyVarRec output: " + json.dumps(res))
 
 	# 4. managing the solver output
 	if res["result"] != "sat":
