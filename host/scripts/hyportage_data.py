@@ -117,6 +117,10 @@ class SPL(object):
 	@property
 	def slot(self): return core_data.spl_core_get_slot(self.core)
 
+	@property
+	def iuses_useful(self): return self.required_iuses & self.iuses_full
+
+
 	def update_required_iuses_external(self, features, pattern):
 		res = False
 		for feature in features:
@@ -132,18 +136,17 @@ class SPL(object):
 	def smt_false(self, id_repository):
 		return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, self.name))]
 
-	def iuses_useful(self): return self.required_iuses & self.iuses_full
-
 	def smt_use_exploration(self, id_repository, config):
-		use_useful = self.iuses_useful()
+		use_useful = self.iuses_useful
 		force, mask = config.mspl_config.get_use_force_mask(self.core, self.is_stable)
 		force.intersection_update(use_useful)
+		force.update(self.use_selection(config).intersection(config.mspl_config.use_declaration_hidden_from_user))
 		mask.intersection_update(use_useful)
 		return smt_encoding.convert_use_flag_selection(id_repository, self.name, force | mask, force)
 
 	def use_selection(self, config):
 		if self.use_selection_core is None:
-			use_useful = self.iuses_useful()
+			use_useful = self.iuses_useful
 			self.use_selection_full = config.mspl_config.get_use_flags(
 				self.core, self.unmasked, self.is_stable, self.use_manipulation)
 			self.use_selection_core = self.use_selection_full & use_useful

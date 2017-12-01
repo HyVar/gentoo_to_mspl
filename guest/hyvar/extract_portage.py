@@ -524,7 +524,7 @@ def load_keyword_list():
 
 def load_installed_package_uses(package_path):
 		with open(os.path.join(package_path, "USE"), 'r') as f:
-			uses = f.read().split()
+			uses = set(f.read().split())
 		return uses
 
 

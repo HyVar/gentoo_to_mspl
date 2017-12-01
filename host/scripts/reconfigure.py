@@ -203,26 +203,34 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 	return ls
 
 
-def generate_to_install_spls(id_repository, feature_list):
+def generate_to_install_spls(id_repository, config, mspl, exploration_use, feature_list):
 	"""
 	translate the output of the solver into a system to install (mapping from spl names to use flag selection)
 	:param id_repository: the id repository of hyportage
+	:param config: the config of hyportage
 	:param mspl: the mspl of hyportage
+	:param exploration_use: boolean saying if the solver can change the use flag default selection
 	:param feature_list: the solution found by the solver
 	:return: a dictionary spl_name -> use flag selection
 	"""
-	res = core_data.dictSet()
+	res_core = core_data.dictSet()
 	use_flags = []
 	for feature in feature_list:
 		el = hyportage_ids.id_repository_get_ids(id_repository)[smt_encoding.get_id_from_smt_variable(feature)]
 		if el[0] == "package":  # el = ("package", spl_name)
-			res.set(el[1], set())
+			res_core.set(el[1], set())
 		else:  # el = ("use", use, spl_name)
 			use_flags.append((el[1], el[2]))
 
 	for use_flag, spl_name in use_flags:
-		if spl_name in res:
-			res.add(spl_name, use_flag)
+		if spl_name in res_core:
+			res_core.add(spl_name, use_flag)
+
+	res = core_data.dictSet()
+	for spl_name, use_selection_core in res_core.iteritems():
+		spl = mspl[spl_name]
+		spl.use_selection(config)
+		res[spl_name] = use_selection_core | (spl.use_selection_full - spl.iuses_useful - config.mspl_config.use_declaration_hidden_from_user)
 	return res
 
 
@@ -259,9 +267,10 @@ def solve_spls(
 			if exploration_use:
 				constraint.extend(spl.smt_use_exploration(id_repository, config))
 			else:
-				if spl in installed_spls:
+				if spl.name in installed_spls:
+					logging.debug(spl.name + " => " + unicode(installed_spls[spl.name]))
 					constraint.extend(smt_encoding.convert_use_flag_selection(
-						id_repository, spl.name, spl.required_iuses, installed_spls[spl]))
+						id_repository, spl.name, spl.iuses_useful, set(installed_spls[spl.name]) & spl.iuses_useful))
 				else:
 					constraint.extend(spl.smt_use_selection(id_repository, config))
 		else:
@@ -304,7 +313,7 @@ def solve_spls(
 			logging.error("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
 		return None
 
-	return generate_to_install_spls(id_repository, res['features'])
+	return generate_to_install_spls(id_repository, config, mspl, res['features'])
 
 
 def generate_installation_files(mspl, path_emerge_script, path_use_flag_configuration, old_installation, new_installation):
