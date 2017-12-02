@@ -1,4 +1,6 @@
 #!/usr/bin/python
+
+
 import json
 import utils
 import logging
@@ -20,8 +22,8 @@ import cStringIO
 
 __author__ = "Michael Lienhardt and Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt and Jacopo Mauro"
-__license__ = "ISC"
-__version__ = "0.1"
+__license__ = "GPL3"
+__version__ = "0.5"
 __maintainer__ = "Michael Lienhardt and Jacopo Mauro"
 __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
@@ -179,13 +181,6 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 		f.close()
 		formula = script.get_last_formula()
 		formula = pysmt.shortcuts.to_smtlib(formula, daggify=False)
-		# # translate contexts
-		# nums = re.findall('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s*([0-9]+)\)',formula)
-		# for i in nums:
-		#     num = int(i)
-		#     env = [ x for x in map_name_id['context_int'] if map_name_id['context_int'][x] == num]
-		#     assert len(env) == 1
-		#     formula = re.sub('\(=\s*' + utils.CONTEXT_VAR_NAME + '\s' + i + '\)', 'env(' + env[0] + ')',formula)
 		# translate packages
 		where_declared = "user-required: "
 		spl_ids = set(re.findall('p([0-9]+)', formula))
@@ -229,8 +224,8 @@ def generate_to_install_spls(id_repository, config, mspl, exploration_use, featu
 	res = core_data.dictSet()
 	for spl_name, use_selection_core in res_core.iteritems():
 		spl = mspl[spl_name]
-		spl.use_selection(config)
-		res[spl_name] = use_selection_core | (spl.use_selection_full - spl.iuses_useful - config.mspl_config.use_declaration_hidden_from_user)
+		spl.use_selection_core(config)
+		res[spl_name] = use_selection_core | (spl.use_selection_full - spl.iuses_core - config.mspl_config.use_declaration_hidden_from_user)
 	return res
 
 
@@ -270,7 +265,7 @@ def solve_spls(
 				if spl.name in installed_spls:
 					logging.debug(spl.name + " => " + unicode(installed_spls[spl.name]))
 					constraint.extend(smt_encoding.convert_use_flag_selection(
-						id_repository, spl.name, spl.iuses_useful, set(installed_spls[spl.name]) & spl.iuses_useful))
+						id_repository, spl.name, spl.iuses_core, set(installed_spls[spl.name]) & spl.iuses_core))
 				else:
 					constraint.extend(spl.smt_use_selection(id_repository, config))
 		else:
@@ -394,7 +389,7 @@ def next_spls(pattern_repository, mspl, spl_groups, spl):
 	res = set()
 	for pattern in hyportage_data.spl_get_dependencies(spl):
 		res.update(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern).get_spls(mspl, spl_groups))
+			hyportage_pattern.pattern_repository_get(pattern_repository, pattern).matched_spls(mspl, spl_groups))
 	return res
 
 

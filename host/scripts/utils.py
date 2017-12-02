@@ -1,9 +1,6 @@
-"""
-utils.py: file containing some variables used by other modules 
-"""
+
 
 import re
-import uuid
 import time
 
 import multiprocessing
@@ -19,10 +16,15 @@ import gzip
 import cPickle
 
 
+"""
+utils.py: file containing some variables and functions used by other modules 
+"""
+
+
 __author__ = "Michael Lienhardt & Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
-__license__ = "ISC"
-__version__ = "0.1"
+__license__ = "GPL3"
+__version__ = "0.5"
 __maintainer__ = "Jacopo Mauro"
 __email__ = "mauro.jacopo@gmail.com"
 __status__ = "Prototype"
@@ -34,7 +36,6 @@ __status__ = "Prototype"
 
 
 # List of the temp files.
-__tmp_files_directory = "/tmp"
 __tmp_files = []
 __tmp_files_lock = multiprocessing.Lock()
 
@@ -54,8 +55,7 @@ def get_new_temp_file(extension):
 def clean_temp_files():
 	__tmp_files_lock.acquire()
 	for f in __tmp_files:
-		if os.path.exists(f):
-			os.remove(f)
+		if os.path.exists(f): os.remove(f)
 		__tmp_files_lock.release()
 
 
@@ -142,9 +142,6 @@ def new_ids(obj, nb=1):
 	return res
 
 
-CONTEXT_VAR_NAME = "ccc"
-
-
 ######################################################################
 # PHASE LOGGING
 ######################################################################
@@ -157,41 +154,16 @@ def phase_start(message):
 	logging.info(message)
 	t = time.time()
 
+
 def phase_end(message):
 	global t
 	logging.info(message + " in " + unicode(time.time() - t) + " seconds.")
 
 
 ######################################################################
-### TRANSLATION SIMPLIFICATION FUNCTIONS
+# ANNEX FUNCTIONS
 ######################################################################
 
-def is_base_package(mspl,name):
-	"""
-	given the data returns true if the name is a base package
-	"""
-	assert name in mspl
-	return "implementations" in mspl[name]
 
-
-def get_base_package(data,name):
-	"""
-	given a string returns the base package name if available, "" otherwise
-	"""
-	if name in data:
-		if "implementations" in data[name]:
-			return name
-		else:
-			return data[name]["group_name"]
-	m = re.search(VERSION_RE, name)
-	if m:
-		version = m.group()[1:]
-		return name.replace("-" + version, "")
-	return ""
-
-
-
-
-
-
-
+def filter_function_simple(x):
+	return True

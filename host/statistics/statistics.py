@@ -3,17 +3,17 @@
 # This file computes several characteristics of the portage graph
 #######################################
 
-import sys
 import math
-
-import db
-import graphs
+import sys
 
 import core_data
 import hyportage_constraint_ast
 import hyportage_data
 import utils
 
+import graphs
+import host.scripts.utils
+from host.scripts import hyportage_db
 
 data = {}
 
@@ -34,7 +34,7 @@ def map_base_statistics(value_number, total_size, map_size):
 	return average, variance
 
 
-def generics(input_iterator, extract_data, extract_key, filter_function=db.filter_function_simple, store_data_map=False):
+def generics(input_iterator, extract_data, extract_key, filter_function=host.scripts.utils.filter_function_simple, store_data_map=False):
 	value_number = 0
 
 	map_data = {}
@@ -75,11 +75,11 @@ def generics(input_iterator, extract_data, extract_key, filter_function=db.filte
 	}
 
 
-def generic_map(input_map, extraction_function, filter_function=db.filter_function_simple, store_data_map=False):
+def generic_map(input_map, extraction_function, filter_function=host.scripts.utils.filter_function_simple, store_data_map=False):
 	return generics(input_map.iteritems(), lambda el: extraction_function(el[1]), lambda el: el[0], filter_function, store_data_map)
 
 
-def generic_list(input_list, extraction_function, filter_function=db.filter_function_simple, store_data_map=False):
+def generic_list(input_list, extraction_function, filter_function=host.scripts.utils.filter_function_simple, store_data_map=False):
 	return generics(input_list, extraction_function, lambda el: tuple(el), filter_function, store_data_map)
 
 
@@ -88,23 +88,23 @@ def generic_list(input_list, extraction_function, filter_function=db.filter_func
 ######################################################################
 
 
-def features(filter_function=db.filter_function_simple):
+def features(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the USE Flags Core Statistics.")
 
-	required = sum([len(spl.required_iuses) for spl in db.mspl.itervalues() if filter_function(spl)])
-	local = sum([len(spl.iuses_default) for spl in db.mspl.itervalues() if filter_function(spl)])
+	required = sum([len(spl.required_iuses) for spl in hyportage_db.mspl.itervalues() if filter_function(spl)])
+	local = sum([len(spl.iuses_default) for spl in hyportage_db.mspl.itervalues() if filter_function(spl)])
 
 	global data
-	data['features'] = generic_map(db.mspl, hyportage_data.spl_get_iuses_full, filter_function)
+	data['features'] = generic_map(hyportage_db.mspl, hyportage_data.spl_get_iuses_full, filter_function)
 	data['features']['average_required'] = required / float(data['features']['number'])
 	data['features']['average_local'] = local / float(data['features']['number'])
 	utils.phase_end("Computation Completed")
 
 
-def features_usage(filter_function=db.filter_function_simple):
+def features_usage(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the USE Flags Core Statistics.")
 	map_features = {}
-	for key, value in db.mspl.iteritems():
+	for key, value in hyportage_db.mspl.iteritems():
 		if filter_function(value):
 			for feature in hyportage_data.spl_get_required_iuses(value):
 				if feature in map_features: map_features[feature].add(key)
@@ -185,10 +185,10 @@ class GETGuardedDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
 		return res
 
 
-def dependencies(filter_function=db.filter_function_simple):
+def dependencies(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the Dependencies Statistics.")
 	visitor = GETGuardedDependenciesVisitor()
-	local_map = {spl.name: visitor.visitSPL(spl) for spl in db.mspl.itervalues()}
+	local_map = {spl.name: visitor.visitSPL(spl) for spl in hyportage_db.mspl.itervalues()}
 	def extraction_function_all(data): return data.keys()
 	def extraction_function_guarded(data): return {pattern for pattern in data.iterkeys() if data[pattern]['guarded']}
 	def extraction_function_selects(data): return {pattern for pattern in data.iterkeys() if data[pattern]['selects']}
@@ -200,14 +200,14 @@ def dependencies(filter_function=db.filter_function_simple):
 	utils.phase_end("Computation Completed")
 
 
-def lone_packages(filter_function=db.filter_function_simple):
+def lone_packages(filter_function=host.scripts.utils.filter_function_simple):
 	referenced_spls = {
 		spl
-		for el in db.flat_pattern_repository.itervalues()
-		for spl in el.get_local_spls(db.mspl, db.spl_groups)
+		for el in hyportage_db.flat_pattern_repository.itervalues()
+		for spl in el.__generate_matched_spls(hyportage_db.mspl, hyportage_db.spl_groups)
 	}
 
-	spls = filter(filter_function, db.mspl.itervalues())
+	spls = filter(filter_function, hyportage_db.mspl.itervalues())
 	spls = filter(lambda spl: len(spl.dependencies) == 0, spls)
 	spls = filter(lambda spl: spl not in referenced_spls, spls)
 
@@ -293,22 +293,22 @@ def statistics_dependencies(filter_function=db.filter_function_simple):
 ######################################################################
 
 
-def pattern_refinement(filter_function=db.filter_function_simple):
+def pattern_refinement(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the Pattern (refinement) Statistics.")
-	def extraction_function(element): return element.get_spls(db.mspl, db.spl_groups)
+	def extraction_function(element): return element.matched_spls(hyportage_db.mspl, hyportage_db.spl_groups)
 	global data
-	data['pattern_refinement'] = generic_map(db.flat_pattern_repository, extraction_function, filter_function)
+	data['pattern_refinement'] = generic_map(hyportage_db.flat_pattern_repository, extraction_function, filter_function)
 	utils.phase_end("Computation Completed")
 
 
 
 
-def statistics_pattern(filter_function=db.filter_function_simple):
+def statistics_pattern(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the Pattern Core Statistics.")
 	pattern_number = 0
 	pattern_usage = {}
 	pattern_usage_max = 0
-	for pattern_element in db.flat_pattern_repository.itervalues():
+	for pattern_element in hyportage_db.flat_pattern_repository.itervalues():
 		if filter_function(pattern_element):
 			pattern_number = pattern_number + 1
 			size = len(pattern_element.containing_spl)
@@ -320,9 +320,9 @@ def statistics_pattern(filter_function=db.filter_function_simple):
 	pattern_abstraction_number = 0
 	pattern_abstraction_max = [0, []]
 	pattern_abstraction_min = [100, []]
-	for pattern_element in db.flat_pattern_repository.itervalues():
+	for pattern_element in hyportage_db.flat_pattern_repository.itervalues():
 		if filter_function(pattern_element):
-			pattern_abstraction_size = len(pattern_element.get_spls(db.mspl, db.spl_groups))
+			pattern_abstraction_size = len(pattern_element.matched_spls(hyportage_db.mspl, hyportage_db.spl_groups))
 			if pattern_abstraction_size < pattern_abstraction_min[0]:
 				pattern_abstraction_min[0] = pattern_abstraction_size
 				pattern_abstraction_min[1] = [pattern_element]
@@ -355,7 +355,7 @@ def statistics_pattern(filter_function=db.filter_function_simple):
 # CYCLES
 ######################################################################
 
-def graph(filter_function=db.filter_function_simple):
+def graph(filter_function=host.scripts.utils.filter_function_simple):
 	utils.phase_start("Computing the Graph Core Statistics.")
 	graph_mspl, spl_nodes = graphs.mspl(filter_function, keep_self_loop=True)
 	nodes_spl = {node: spl for spl, node in spl_nodes.iteritems()}
@@ -391,7 +391,7 @@ def graph(filter_function=db.filter_function_simple):
 					branches.pop()
 					if len(path) < shairplay_len: shairplay_len = sys.maxint
 
-	res = generic_map({tuple(v): v for v in cycles}, core_data.identity, db.filter_function_simple)
+	res = generic_map({tuple(v): v for v in cycles}, core_data.identity, host.scripts.utils.filter_function_simple)
 	res['cycles'] = cycles
 	global data
 	data['graph'] = res

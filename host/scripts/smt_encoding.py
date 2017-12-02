@@ -391,7 +391,7 @@ def convert_patterns(pattern_repository, id_repository, mspl, spl_groups, patter
 	spls = set()
 	constraints = []
 	for pattern in patterns:
-		new_spls = hyportage_pattern.pattern_repository_get(pattern_repository, pattern).get_spls(mspl, spl_groups)
+		new_spls = hyportage_pattern.pattern_repository_get(pattern_repository, pattern).matched_spls(mspl, spl_groups)
 		spls.update(new_spls)
 		#print(core_data.pattern_to_atom(pattern) + " => " + str([spl.name for spl in new_spls]))
 		constraints.append(smt_or([get_smt_spl_name(id_repository, spl.name) for spl in new_spls]))

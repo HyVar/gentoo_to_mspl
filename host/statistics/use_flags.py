@@ -1,13 +1,13 @@
 
-import os
-import logging
 import json
+import logging
+import os
 
 import hyportage_data
 import hyportage_pattern
 import utils
 
-import db
+from host.scripts import hyportage_db
 
 __author__ = "Michael Lienhardt"
 __copyright__ = "Copyright 2017, Michael Lienhardt"
@@ -36,8 +36,8 @@ def core():
 	use_flags_min = 100
 	spl_min = []
 	spl_max = []
-	nb_spl = len(db.mspl)
-	for spl in db.mspl.values():
+	nb_spl = len(hyportage_db.mspl)
+	for spl in hyportage_db.mspl.values():
 		use_flag_size = len(hyportage_data.spl_get_iuses_default(spl))
 		if use_flag_size < use_flags_min:
 			use_flags_min = use_flag_size
@@ -56,7 +56,7 @@ def core():
 		'number': use_flags_sum,
 		'spl_number': nb_spl,
 		'average': use_flags_sum / nb_spl,
-		'keywords': len(db.keywords)
+		'keywords': len(hyportage_db.keywords)
 	}
 	global data
 	statistics['core'] = res
@@ -84,7 +84,7 @@ def write_core(path, data):
 def missing_locally():
 	utils.phase_start("Computing the USE Flags ``Missing Locally''  Statistics.")
 	data = {}
-	for spl in db.mspl.values():
+	for spl in hyportage_db.mspl.values():
 		diff = spl.required_iuses_local.difference(spl.iuses_default)
 		diff.difference_update(hyportage_data.keywords_get_core_set(spl.keywords_list))
 		if diff:
@@ -141,10 +141,10 @@ def write_missing_locally(path, data):
 def missing_externally():
 	utils.phase_start("Computing the USE Flags ``Missing Externally''  Statistics.")
 	data = {}
-	for pattern, el in db.flat_pattern_repository.iteritems():
+	for pattern, el in hyportage_db.flat_pattern_repository.iteritems():
 		installable = False
 		missing = {}
-		for spl in hyportage_pattern.pattern_repository_element_get_spls(el, db.mspl, db.spl_groups):
+		for spl in hyportage_pattern.pattern_repository_element_get_spls(el, hyportage_db.mspl, hyportage_db.spl_groups):
 			diff = set(hyportage_pattern.pattern_repository_element_get_required_use_required(el)).difference(spl.iuses_default)
 			diff.difference_update(hyportage_data.keywords_get_core_set(spl.keywords_list))
 			if diff:
@@ -215,7 +215,7 @@ statistics_path_json = os.path.abspath(
 
 def main():
 	logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
-	db.load_hyportage()
+	hyportage_db.load()
 	core()
 	missing_locally()
 	missing_externally()

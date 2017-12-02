@@ -7,7 +7,7 @@ import hyportage
 import hyportage_ids
 import hyportage_data
 import hyportage_pattern
-import hyportage_from_egencache
+import utils_egencache
 
 
 # base configuration
@@ -44,8 +44,8 @@ def test_parse_require(constraint_list):
 	identifier = 1
 	for constraint in constraint_list:
 		print("==========")
-		print(str(hyportage_from_egencache.require.parse(constraint)))
-		ast = hyportage_from_egencache.translate_require(constraint)
+		print(str(utils_egencache.require.parse(constraint)))
+		ast = utils_egencache.translate_require(constraint)
 		print("==========")
 		print(str(ast))
 
@@ -53,14 +53,14 @@ def test_parse_require(constraint_list):
 def test_parse_depend(constraint_list):
 	identifier = 1
 	for constraint in constraint_list:
-		ast = hyportage_from_egencache.translate_depend(constraint)
+		ast = utils_egencache.translate_depend(constraint)
 		print("==========")
 		print(str(ast))
 
 
 def test_load_packages(concurrent_map, paths):
 	print("Translated MSPL:")
-	raw_mspl = concurrent_map(hyportage_from_egencache.create_spl_from_egencache_file, paths)
+	raw_mspl = concurrent_map(utils_egencache.create_spl_from_egencache_file, paths)
 	print("===============")
 	print(str(raw_mspl))
 	print("===============")

@@ -5,7 +5,7 @@ import core_data
 
 import utils
 
-import hyportage_from_egencache
+import utils_egencache
 import hyportage_data
 import hyportage_pattern
 import hyportage_ids
@@ -42,10 +42,17 @@ def filter_egencache_file_full(path_file, last_update, patterns):
 	return False
 
 
-def compute_portage_diff(concurrent_map, last_update, force, path_egencache_packages):
+def compute_to_load(last_update, force, path_egencache_packages):
+	"""
+	This function collects the names of the packages in the portage repository, and lists the ones that need to be loaded
+	:param last_update: the date of the last update of the hyportage repository
+	:param force: the list of patterns to force to load
+	:param path_egencache_packages: the path to the portage repository
+	:return: a pair consisting of the list of files to load, plus the set of packages in the portage repository
+		(so we know which spl must be removed from hyportage)
+	"""
 	utils.phase_start("Computing what to do.")
-
-	egencache_files = hyportage_from_egencache.get_egencache_files(path_egencache_packages)
+	egencache_files = utils_egencache.get_egencache_files(path_egencache_packages)
 	if force:
 		patterns = [ hyportage_pattern.pattern_create_from_atom(atom) for atom in force.split() ]
 		def filter_function(path_file): return filter_egencache_file_full(path_file, last_update, patterns)
@@ -56,28 +63,47 @@ def compute_portage_diff(concurrent_map, last_update, force, path_egencache_pack
 	logging.info("number of egencache files to load: " + str(len(egencache_files_to_load)))
 
 	utils.phase_end("Computation completed")
+	return egencache_files_to_load, {utils_egencache.get_package_name_from_path(f)[0] for f in egencache_files}
 
+
+def load_spl_to_load(concurrent_map, egencache_files_to_load):
+	"""
+	This function loads the spl in the list in parameter
+	:param concurrent_map: the map used to parallel the load
+	:param egencache_files_to_load: the list of files to load
+	:return: the list of loaded spls
+	"""
 	nb_egencache_files_to_load = len(egencache_files_to_load)
 	if nb_egencache_files_to_load > 0:  # load new hyportage spls  from egencache files
 		utils.phase_start("Loading the " + str(nb_egencache_files_to_load) + " egencache files.")
-		loaded_spls = concurrent_map(hyportage_from_egencache.create_spl_from_egencache_file, egencache_files_to_load)
+		loaded_spls = concurrent_map(utils_egencache.create_spl_from_egencache_file, egencache_files_to_load)
 		utils.phase_end("Loading completed")
 	else: loaded_spls = []
-
-	spl_name_list = [hyportage_from_egencache.get_package_name_from_path(f)[0] for f in egencache_files]
-
-	return spl_name_list, loaded_spls
-
-##
+	return loaded_spls
 
 
-def update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls):
+##########################################################################
+# 2. UPDATE CORE DATA: MSPL AND SPL_GROUPS
+##########################################################################
+
+
+def update_mspl_and_groups(mspl, spl_groups, spl_name_set, loaded_spls):
+	"""
+	This function updates the mspl and the spl_groups structures with the newly loaded spls,
+	while removing the spl that are not in the portage repository anymore
+	:param mspl: the hyportage mspl
+	:param spl_groups: the hyportage spl_groups
+	:param spl_name_set: the full set of spl names in the portage repository
+	:param loaded_spls: the newly loaded spls
+	:return: a tuple describing what changed (added spls, removed spls, added spl_groups, updated spl_groups and removed spl_groups)
+	Additionally, the mspl and spl_groups in parameter have been updated
+	"""
 	utils.phase_start("Updating the core hyportage data (mspl, spl_groups).")
 	spl_to_add, spl_to_update = [], []
 	for spl in loaded_spls:
-		if hyportage_data.spl_get_name(spl) in mspl: spl_to_update.append((mspl[hyportage_data.spl_get_name(spl)], spl))
+		if spl.name in mspl: spl_to_update.append((mspl[spl.name], spl))
 		else: spl_to_add.append(spl)
-	spl_to_remove = [mspl[spl_name] for spl_name in mspl.keys() if spl_name not in set(spl_name_list)]
+	spl_to_remove = [mspl[spl_name] for spl_name in mspl.keys() if spl_name not in spl_name_set]
 
 	spl_groups_added = set()
 	spl_groups_updated = set()
@@ -92,7 +118,7 @@ def update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls):
 	# update the updated spls
 	for old_spl, new_spl in spl_to_update:
 		hyportage_data.mspl_update_spl(mspl, old_spl, new_spl)
-		spl_groups_updated.add(hyportage_data.spl_get_group_name(new_spl))
+		spl_groups_updated.add(new_spl.group_name)
 
 	# remove the removed spls
 	for old_spl in spl_to_remove:
@@ -105,125 +131,103 @@ def update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls):
 	spl_removed_full.extend([el[0] for el in spl_to_update])
 	return spl_added_full, spl_removed_full, spl_groups_added, spl_groups_updated, spl_groups_removed
 
-##
+
+##########################################################################
+# 3. UPDATE THE PATTERN REPOSITORY
+##########################################################################
 
 
-def update_pattern_repository_with_spl_diff(pattern_repository, spl_added_full, spl_removed_full):
+def __update_pattern_repository_spl_dependencies(pattern_repository, spl_added, spl_removed):
 	pattern_added = set()
 	pattern_updated = set()
 	pattern_removed = set()
+
+	for new_spl in spl_added:
+		pattern_added_list, pattern_updated_list = pattern_repository.add_spl_dependencies(new_spl)
+		pattern_added.update(pattern_added_list)
+		pattern_updated.update(pattern_updated_list)
+	for old_spl in spl_removed:
+		pattern_removed_list, pattern_updated_list = pattern_repository.remove_spl_dependencies(old_spl)
+		pattern_removed.update(pattern_removed_list)
+		pattern_updated.update(pattern_updated_list)
+
+	return pattern_added, pattern_updated, pattern_removed
+
+
+def __update_pattern_repository_reset_pel(pattern_repository, spl_added, spl_removed):
+	pattern_updated = set()
+	for spl_group_name in {spl.group_name for spl in spl_added}:
+		pattern_updated.update(pattern_repository.reset_cache(spl_group_name))
+	for spl_group_name in {spl.group_name for spl in spl_removed}:  # no data changed in the spls
+		pattern_repository.reset_cache(spl_group_name)
+	return pattern_updated
+
+
+def update_pattern_repository(pattern_repository, spl_added, spl_removed):
 	utils.phase_start("Updating the pattern hyportage data (pattern_repository).")
-
-	for new_spl in spl_added_full:
-		pattern_added.update(hyportage_pattern.pattern_repository_add_pattern_from_spl(pattern_repository, new_spl))
-	for old_spl in spl_removed_full:
-		pattern_removed.update(hyportage_pattern.pattern_repository_remove_pattern_from_spl(pattern_repository, old_spl))
-
+	pattern_added, pattern_updated, pattern_removed = \
+		__update_pattern_repository_spl_dependencies(pattern_repository, spl_added, spl_removed)
+	pattern_updated.update(__update_pattern_repository_reset_pel(pattern_repository, spl_added, spl_removed))
 	utils.phase_end("Updating completed")
 	return pattern_added, pattern_updated, pattern_removed
 
-##
-
-
-def add_implicit_features_local(data, is_eapi4_updated, is_eapi5_updated, eapi4, eapi5):
-	spl_updated = []
-	for spl in data:
-		if (spl.eapi < 5) and is_eapi4_updated:
-			spl.iuses_full = spl.iuses_default | eapi4
-			spl_updated.append(spl)
-		elif (spl.eapi > 4) and is_eapi5_updated:
-			spl.iuses_full = spl.iuses_default | eapi5
-			spl_updated.append(spl)
-	return spl_updated
-
-
-def add_implicit_features(mspl, spl_added, is_eapi4_updated, is_eapi5_updated, eapi4, eapi5):
-	utils.phase_start("Adding the implicit Features to the spls.")
-	spl_updated = add_implicit_features_local(spl_added, True, True, eapi4, eapi5)
-	if is_eapi4_updated or is_eapi5_updated:
-		spl_updated.extend(add_implicit_features_local(mspl, is_eapi4_updated, is_eapi5_updated, eapi4, eapi5))
-	utils.phase_end("Addition completed")
-	return set(spl_updated)
 
 ##
 
 
-def spls_to_groups(spls):
-	res = {}
-	for spl in spls:
-		spl_group_name = hyportage_data.spl_get_group_name(spl)
-		if spl_group_name in res: res[spl_group_name].add(spl)
-		else: res[spl_group_name] = {spl}
-	return res
-
-
-def update_required_feature_external_update(pattern_repository, spls, pattern_added, pattern_updated, pattern_removed):
-	updated_spl = set()
-	for spl in spls:
-		for pattern_set in spl.required_iuses_external.values():
-			pattern_set.difference_update(pattern_updated)
-			pattern_set.difference_update(pattern_removed)
-
-	spl_groups = spls_to_groups(spls)
-
-	for pattern in pattern_added | pattern_updated:
-		element = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)
-		feature_required = hyportage_pattern.pattern_repository_element_get_required_use(element)
-		for spl in element.get_local_spls(spls, spl_groups):
-			if spl.update_required_iuses_external(feature_required, pattern):
-				updated_spl.add(spl)
-
-	for spl in spls:
-		for k, v in spl.required_iuses_external.iteritems():
-			if not v:
-				spl.required_iuses_external.pop(k)
-				updated_spl.add(spl)
-	return updated_spl
-
-
-def update_required_feature_external_new(pattern_repository, spls):
-	spl_groups = spls_to_groups(spls)
-
-	for pattern in hyportage_pattern.pattern_repository_get_patterns(pattern_repository):
-		element = hyportage_pattern.pattern_repository_get(pattern_repository, pattern)
-		feature_required = hyportage_pattern.pattern_repository_element_get_required_use(element)
-		for spl in element.get_local_spls(spls, spl_groups):
-			spl.update_required_iuses_external(feature_required, pattern)
-
-
-def update_required_feature_external(
-		pattern_repository, pattern_added, pattern_updated, pattern_removed, unchanged_spls, spl_added_full):
+def update_revert_dependencies(pattern_repository, pattern_added, pattern_updated, pattern_removed):
 	utils.phase_start("Updating the set of externally required features.")
-	updated_spl = update_required_feature_external_update(
-		pattern_repository, unchanged_spls, pattern_added, pattern_updated, pattern_removed)
-	update_required_feature_external_new(pattern_repository, spl_added_full)
 
-	updated_spl.update(spl_added_full)
-	for spl in updated_spl:
-		spl.required_iuses = spl.required_iuses_local | set(spl.required_iuses_external.keys())
+	updated_spl_list = []
+	for pattern in pattern_added | pattern_updated:
+		pel = pattern_repository[pattern]
+		required_uses = pel.required_uses
+		for spl in pel.matched_spls:
+			if spl.update_revert_dependencies(pattern, required_uses):
+				updated_spl_list.append(spl)
+
+	for pattern in pattern_removed:
+		pel = pattern_repository[pattern]
+		for spl in pel.matched_spls:
+			spl.reset_revert_dependencies(pattern)
+			updated_spl_list.append(spl)
 
 	utils.phase_end("Updating completed")
-	return updated_spl
-
-##
+	return updated_spl_list
 
 
-def update_id_repository(
-		id_repository, spl_updated_required_features, spl_removed_full, spl_groups_removed, spl_groups_added):
+##########################################################################
+# 4. UPDATE THE IMPLICIT IUSES
+##########################################################################
+
+
+def reset_implicit_features(mspl, is_eapi4_updated, is_eapi5_updated):
+	utils.phase_start("Adding the implicit Features to the spls.")
+	if is_eapi4_updated or is_eapi5_updated:
+		for spl in mspl.itervalues():
+			if (spl.eapi < 5) and is_eapi4_updated: spl.reset_iuses_full()
+			elif (spl.eapi > 4) and is_eapi5_updated: spl.reset_iuses_full()
+	utils.phase_end("Addition completed")
+
+
+##########################################################################
+# 5. UPDATE THE ID REPOSITORY
+##########################################################################
+
+
+def update_id_repository(id_repository, updated_spl_list, spl_removed, spl_groups_removed, spl_groups_added):
 	utils.phase_start("Updating the Id Repository")
-	for spl in spl_removed_full:
-		hyportage_ids.id_repository_remove_spl(id_repository, spl)
+	for spl in spl_removed: id_repository.remove_spl(spl)
+	for spl in updated_spl_list: id_repository.add_spl(spl)
 
-	for spl in spl_updated_required_features:
-		hyportage_ids.id_repository_add_spl(id_repository, spl)
-
-	for spl_group in spl_groups_removed:
-		hyportage_ids.id_repository_remove_spl_group(id_repository, spl_group)
-	for spl_group in spl_groups_added:
-		hyportage_ids.id_repository_add_spl_group(id_repository, spl_group)
+	for spl_group in spl_groups_removed: id_repository.remove_spl_group(spl_group)
+	for spl_group in spl_groups_added: id_repository.add_spl_group(spl_group)
 	utils.phase_end("Generation completed")
 
-##
+
+##########################################################################
+# 6. UPDATE THE SPL VISIBILITY
+##########################################################################
 
 
 def update_masks(mspl, spl_added_full, config):
@@ -284,7 +288,7 @@ def update_smt_constraints(
 	spls_to_update = set(spl_iuse_reset)
 	pattern_visibility = set([
 		pattern
-		for spl_group_name in set([hyportage_data.spl_get_group_name(spl) for spl in spl_modified_visibility])
+		for spl_group_name in {spl.group_name for spl in spl_modified_visibility}
 		for pattern in hyportage_pattern.pattern_repository_get_pattern_from_spl_group_name(pattern_repository, spl_group_name)])
 	spls_to_update.update([
 		spl
@@ -293,7 +297,7 @@ def update_smt_constraints(
 			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)])
 	spl_groups_to_update = [
 		spl_groups[spl_group_name]
-		for spl_group_name in set([hyportage_data.spl_get_group_name(spl) for spl in spls_to_update])]
+		for spl_group_name in {spl.group_name for spl in spls_to_update}]
 
 	spl_smts = map(
 		lambda spl: smt_encoding.convert_spl(

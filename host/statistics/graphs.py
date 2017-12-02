@@ -6,11 +6,10 @@
 import core_data
 import hyportage_data
 import hyportage_pattern
-
-import db
-
 from tulip import tlp
 
+import host.scripts.utils
+from host.scripts import hyportage_db
 
 
 def label_generator_simple(el):
@@ -22,10 +21,10 @@ def label_generator_simple(el):
 ######################################################################
 
 
-def mspl(filter_function=db.filter_function_simple, label_generator=label_generator_simple, keep_self_loop=False):
+def mspl(filter_function=host.scripts.utils.filter_function_simple, label_generator=label_generator_simple, keep_self_loop=False):
 	graph = tlp.newGraph()
 	spl_nodes = {}
-	for spl in db.mspl.itervalues():
+	for spl in hyportage_db.mspl.itervalues():
 		if filter_function(spl):
 			node = graph.addNode()
 			spl_nodes[spl] = node
@@ -37,7 +36,7 @@ def mspl(filter_function=db.filter_function_simple, label_generator=label_genera
 		dependency_list = {
 			dep
 			for pattern in spl.dependencies.iterkeys()
-			for dep in hyportage_pattern.pattern_repository_get(db.pattern_repository, pattern).get_spls(db.mspl, db.spl_groups)
+			for dep in hyportage_pattern.pattern_repository_get(hyportage_db.pattern_repository, pattern).matched_spls(hyportage_db.mspl, hyportage_db.spl_groups)
 		}
 		for dep in dependency_list & spls:
 			if keep_self_loop or (spl != dep):
@@ -48,19 +47,19 @@ def mspl(filter_function=db.filter_function_simple, label_generator=label_genera
 
 
 def mspl_full(
-		filter_spl=db.filter_function_simple, filter_pattern=db.filter_function_simple,
+		filter_spl=host.scripts.utils.filter_function_simple, filter_pattern=host.scripts.utils.filter_function_simple,
 		label_spl=label_generator_simple, label_pattern=core_data.pattern_to_atom):
 	graph = tlp.newGraph()
 	spl_nodes = {}
 	pattern_nodes = {}
 
-	for spl in db.mspl.itervalues():
+	for spl in hyportage_db.mspl.itervalues():
 		if filter_spl(spl):
 			node = graph.addNode()
 			spl_nodes[spl] = node
 			graph['viewLabel'][node] = label_spl(spl)
 
-	for pattern in db.flat_pattern_repository.iterkeys():
+	for pattern in hyportage_db.flat_pattern_repository.iterkeys():
 		if filter_pattern(pattern):
 			node = graph.addNode()
 			pattern_nodes[pattern] = node
@@ -75,7 +74,7 @@ def mspl_full(
 				graph.addEdge(node, pattern_nodes[pattern])
 
 	for pattern, node in pattern_nodes.iteritems():
-		for spl in db.flat_pattern_repository[pattern].get_spls(db.mspl, db.spl_groups):
+		for spl in hyportage_db.flat_pattern_repository[pattern].matched_spls(hyportage_db.mspl, hyportage_db.spl_groups):
 			if spl in spls:
 				graph.addEdge(node, spl_nodes[spl])
 
@@ -84,10 +83,10 @@ def mspl_full(
 
 
 
-def spl_groups(filter_function=db.filter_function_simple, label_generator=label_generator_simple, keep_self_loop=False):
+def spl_groups(filter_function=host.scripts.utils.filter_function_simple, label_generator=label_generator_simple, keep_self_loop=False):
 	graph = tlp.newGraph()
 	group_nodes = {}
-	for group in db.spl_groups.itervalues():
+	for group in hyportage_db.spl_groups.itervalues():
 		if filter_function(group):
 			node = graph.addNode()
 			group_nodes[group] = node
@@ -100,9 +99,9 @@ def spl_groups(filter_function=db.filter_function_simple, label_generator=label_
 			dep
 			for spl in group.references
 			for pattern in spl.dependencies.iterkeys()
-			for dep in hyportage_pattern.pattern_repository_get(db.pattern_repository, pattern).get_spls(db.mspl, db.spl_groups)
+			for dep in hyportage_pattern.pattern_repository_get(hyportage_db.pattern_repository, pattern).matched_spls(hyportage_db.mspl, hyportage_db.spl_groups)
 		}
-		group_dependency_list = {db.spl_groups[hyportage_data.spl_get_group_name(spl)] for spl in dependency_list}
+		group_dependency_list = {hyportage_db.spl_groups[hyportage_data.spl_get_group_name(spl)] for spl in dependency_list}
 		for dep in group_dependency_list & groups:
 			if keep_self_loop or (group != dep):
 				graph.addEdge(group_nodes[group], group_nodes[dep])

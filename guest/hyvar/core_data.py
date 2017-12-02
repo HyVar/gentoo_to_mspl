@@ -291,6 +291,9 @@ class dictSet(dict):
 		else:
 			self[key] = {val}
 
+	def add_key(self, key):
+		if key not in self: self[key] = set()
+
 	def set(self, key, values):
 		self[key] = values
 
@@ -604,8 +607,8 @@ class MSPLConfig(object):
 			return self.pattern_unmask.contains(spl_core)
 		else: return True
 
-	def get_stability_status(self, spl_core, unmasked, keywords_default):
-		keywords = keywords_default.copy()
+	def get_stability_status(self, spl_core, unmasked, keyword_set, licence):  # TODO: add license management
+		keywords = keyword_set.copy()
 		self.pattern_keywords.apply(spl_core, keywords)
 		accept_keywords = self.accept_keywords_full.copy()
 		self.pattern_accept_keywords.apply(spl_core, accept_keywords)
@@ -617,7 +620,7 @@ class MSPLConfig(object):
 		else:
 			installable = False
 			is_stable = False
-		return keyword_mask, installable, is_stable
+		return (not keyword_mask), installable, is_stable
 
 	def get_use_force_mask(self, spl_core, is_stable):
 		return self.use_selection_config.get_use_force_mask(spl_core, is_stable)

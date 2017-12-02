@@ -1,3 +1,5 @@
+
+
 import sys
 import os
 import utils
@@ -5,7 +7,7 @@ import logging
 import multiprocessing
 import click
 
-
+import hyportage_db
 import hyportage_translation
 import reconfigure
 
@@ -16,7 +18,7 @@ import hyportage_ids
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
-__license__ = "ISC"
+__license__ = "GPL3"
 __version__ = "0.5"
 __maintainer__ = "Michael Lienhardt & Jacopo Mauro"
 __email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
@@ -29,47 +31,6 @@ def usage():
 	print(__doc__)
 
 
-######################################################################
-# UTILITY FUNCTIONS
-######################################################################
-
-
-def load_hyportage(path_hyportage, save_modality):
-	if os.path.exists(path_hyportage):
-		if save_modality.endswith("json"):
-			return hyportage_data.hyportage_data_from_save_format(utils.load_data_file(path_hyportage, save_modality))
-		else:
-			return utils.load_data_file(path_hyportage, save_modality)
-	else:
-		pattern_repository = hyportage_pattern.pattern_repository_create()
-		id_repository = hyportage_ids.id_repository_create()
-		mspl = hyportage_data.mspl_create()
-		spl_groups = hyportage_data.spl_groups_create()
-		#core_configuration = hyportage_configuration.core_configuration_create()
-		#installed_spls = core_data.package_installed_create()
-		#return pattern_repository, id_repository, mspl, spl_groups, core_configuration, installed_spls
-		return pattern_repository, id_repository, mspl, spl_groups
-
-
-def load_configuration(path_configuration):
-	return utils.load_data_file(path_configuration, "pickle")
-
-
-def save_hyportage(path_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality):
-	if save_modality.endswith("json"):
-		logging.error("Cannot save data with json")
-	else:
-		data = pattern_repository, id_repository, mspl, spl_groups
-		utils.store_data_file(path_hyportage, data, save_modality)
-
-
-def save_configuration(path_configuration, config):
-	config.mspl_config.new_masks = False
-	config.mspl_config.new_use_declaration_eapi4 = False
-	config.mspl_config.new_use_declaration_eapi5 = False
-	config.mspl_config.new_keywords_config = False
-	config.mspl_config.new_use_flag_config = False
-	utils.store_data_file(path_configuration, config, "pickle")
 
 
 ######################################################################
@@ -198,8 +159,7 @@ def main(
 	logging.info("number of available cores: " + str(available_cores))
 
 	if (available_cores > 1) and (os.name != 'nt'):
-		pool = multiprocessing.Pool(available_cores)
-		concurrent_map = pool.map
+		concurrent_map = multiprocessing.Pool(available_cores).map
 	else: concurrent_map = map
 
 	todo_update_hyportage = mode == "update"
@@ -209,9 +169,11 @@ def main(
 	exploration_use = "use" in exploration
 	exploration_mask = "mask" in exploration
 	exploration_keywords = "keywords" in exploration
+	exploration_license = "license" in exploration
 	if exploration_use: logging.info("  USE exploration enabled")
 	if exploration_mask: logging.info("  MASK exploration enabled")
 	if exploration_keywords: logging.info("  KEYWORDS exploration enabled")
+	if exploration_license: logging.info("  LICENSE exploration enabled")
 
 	# 1.4. Solver selection
 	if local_solver:
@@ -244,21 +206,23 @@ def main(
 	# 3. COMPUTE WHAT TO DO
 	##########################################################################
 
+	# 3.1. load config
+	hyportage_db.load_config(path_configuration, save_modality)
+
+	# 3.2. compute what to update
+	spl_name_set = set()
+	loaded_spls = []
 	if todo_update_hyportage:
 		last_db_hyportage_update = os.path.getmtime(path_db_hyportage) if os.path.exists(path_db_hyportage) else 0.0
-
-		spl_name_list, loaded_spls = hyportage_translation.compute_portage_diff(
-			concurrent_map,	last_db_hyportage_update, force, path_egencache_packages)
-
+		egencache_files_to_load, spl_name_set = hyportage_translation.compute_to_load(
+			last_db_hyportage_update, force, path_egencache_packages)
+		loaded_spls = hyportage_translation.load_spl_to_load(concurrent_map, egencache_files_to_load)
 
 	##########################################################################
 	# 4. LOAD THE HYPORTAGE DATABASE
 	##########################################################################
 
-	utils.phase_start("Loading the stored hyportage data.")
-	pattern_repository, id_repository, mspl, spl_groups = load_hyportage(path_db_hyportage, save_modality)
-	config = load_configuration(path_configuration)
-	utils.phase_end("Loading completed")
+	hyportage_db.load_hyportage(path_db_hyportage, save_modality)
 
 	##########################################################################
 	# 5. UPDATE THE HYPORTAGE DATABASE IF NECESSARY
@@ -266,35 +230,46 @@ def main(
 
 	if todo_update_hyportage:
 		logging.info("updating hyportage...")
-		unchanged_spls = set(mspl.values())
+		#unchanged_spls = set(hyportage_db.mspl.values())
 
 		# update the hyportage spl database
-		spl_db_diff = hyportage_translation.update_mspl_and_groups(mspl, spl_groups, spl_name_list, loaded_spls)
-		spl_added_full, spl_removed_full, spl_groups_added, spl_groups_updated, spl_groups_removed = spl_db_diff
+		spl_added, spl_removed, spl_groups_added, spl_groups_updated, spl_groups_removed = hyportage_translation.update_mspl_and_groups(
+			hyportage_db.mspl, hyportage_db.spl_groups, spl_name_set, loaded_spls)
 
-		unchanged_spls.difference_update(spl_removed_full)
-
-		# update the feature list with the implicit declarations
-		spl_updated_features = hyportage_translation.add_implicit_features(
-			unchanged_spls, spl_added_full,
-			config.mspl_config.new_use_declaration_eapi4, config.mspl_config.new_use_declaration_eapi5,
-			config.mspl_config.use_declaration_eapi4, config.mspl_config.use_declaration_eapi5)
+		#unchanged_spls.difference_update(spl_removed)
 
 		# update the hyportage pattern repository
-		pattern_added, pattern_updated, pattern_removed = hyportage_translation.update_pattern_repository_with_spl_diff(
-			pattern_repository, spl_added_full, spl_removed_full)
+		pattern_added, pattern_updated, pattern_removed = hyportage_translation.update_pattern_repository(
+			hyportage_db.pattern_repository, spl_added, spl_removed)
 
-		# update the required feature list
-		spl_updated_required_features = hyportage_translation.update_required_feature_external(
-			pattern_repository, pattern_added, pattern_updated, pattern_removed, unchanged_spls, spl_added_full)
+		# update the revert dependencies
+		updated_spl_list = hyportage_translation.update_revert_dependencies(
+			hyportage_db.pattern_repository, pattern_added, pattern_updated, pattern_removed)
+
+		# reset the implicitly added use flags
+		hyportage_translation.reset_implicit_features(
+			hyportage_db.mspl,
+			hyportage_db.mspl_config.new_use_declaration_eapi4, hyportage_db.mspl_config.new_use_declaration_eapi5)
+
+		# update the feature list with the implicit declarations
+		#spl_updated_features = hyportage_translation.add_implicit_features(
+		#	unchanged_spls, spl_added,
+		#	config.mspl_config.new_use_declaration_eapi4, config.mspl_config.new_use_declaration_eapi5,
+		#	config.mspl_config.use_declaration_eapi4, config.mspl_config.use_declaration_eapi5)
+
+
 
 		# update the id repository
-		spl_updated_features.update(spl_updated_required_features)
+		#spl_updated_features.update(updated_spl_list)
+		#hyportage_translation.update_id_repository(
+		#	id_repository, spl_updated_features, spl_removed, spl_groups_removed, spl_groups_added)
 		hyportage_translation.update_id_repository(
-			id_repository, spl_updated_features, spl_removed_full, spl_groups_removed, spl_groups_added)
+			hyportage_db.id_repository, updated_spl_list, spl_removed, spl_groups_removed, spl_groups_added)
+
+
 
 		# update the mask and keywords information
-		spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added_full, config.mspl_config)
+		spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added, config.mspl_config)
 		spl_updated_visibility = hyportage_translation.update_keywords(mspl, spl_updated_mask, config.mspl_config)
 
 		# check if the main config of the spl must be regenerated
@@ -304,7 +279,7 @@ def main(
 		hyportage_translation.update_smt_constraints(
 			pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
 			pattern_added, pattern_updated, pattern_removed,
-			spl_updated_required_features, spl_updated_visibility)
+			updated_spl_list, spl_updated_visibility)
 
 		# save the hypotage database
 		save_hyportage(path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality)
@@ -347,6 +322,8 @@ def main(
 			mspl, path_install_script, path_use_flag_configuration, config.installed_packages, solution)
 
 	logging.info("Execution succesfully terminated")
+	# cleanup, because of Python GC bugs...
+	concurrent_map = None
 
 ##
 

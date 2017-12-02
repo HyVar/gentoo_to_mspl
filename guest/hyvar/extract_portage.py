@@ -552,12 +552,13 @@ def load_world_file():
 def load_installed_package(package_path, outfile):
 	eapi = None
 	iuses = None
-	keywords = None
-	slots = None
 	required_use = None
 	depend = None
 	rdepend = None
 	pdepend = None
+	slots = None
+	keywords = None
+	license = None
 	# parse "environment.bz2" in which all variables are declared
 	variable = None
 	value = None
@@ -585,10 +586,6 @@ def load_installed_package(package_path, outfile):
 						iuses = value
 					elif (variable.endswith("IUSE")) and (iuses is None):
 						iuses = value
-					elif variable.endswith("KEYWORDS"):
-						keywords = value
-					elif variable.endswith("SLOT"):
-						slots = value
 					elif variable.endswith("REQUIRED_USE"):
 						required_use = value
 					elif variable.endswith("DEPEND"):
@@ -597,6 +594,12 @@ def load_installed_package(package_path, outfile):
 						rdepend = value
 					elif variable.endswith("PDEPEND"):
 						pdepend = value
+					elif variable.endswith("SLOT"):
+						slots = value
+					elif variable.endswith("KEYWORDS"):
+						keywords = value
+					elif variable.endswith("LICENSE"):
+						license = value
 					# reset the data
 					variable = None
 					value = None
@@ -606,10 +609,6 @@ def load_installed_package(package_path, outfile):
 			f.write("EAPI=" + eapi + "\n")
 		if iuses:
 			f.write("IUSE=" + iuses + "\n")
-		if keywords:
-			f.write("KEYWORDS=" + keywords + "\n")
-		if slots:
-			f.write("SLOT=" + slots + "\n")
 		if required_use:
 			f.write("REQUIRED_USE=" + required_use + "\n")
 		if depend:
@@ -618,6 +617,12 @@ def load_installed_package(package_path, outfile):
 			f.write("RDEPEND=" + rdepend + "\n")
 		if pdepend:
 			f.write("PDEPEND=" + pdepend + "\n")
+		if slots:
+			f.write("SLOT=" + slots + "\n")
+		if keywords:
+			f.write("KEYWORDS=" + keywords + "\n")
+		if license:
+			f.write("LICENSE=" + license + "\n")
 
 
 def load_deprecated_packages(output_file_portage_deprecated):
