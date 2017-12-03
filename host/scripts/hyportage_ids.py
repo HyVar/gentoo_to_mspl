@@ -1,8 +1,22 @@
-# rename into id_repository.py
+#!/usr/bin/python
 
 
 import utils
-import hyportage_data
+
+
+"""
+This file contains the class for the ID repository of hyportage.
+This id repository maps all relevant data to unique IDs that can be put seamlessly as name of a z3 variable
+"""
+
+
+__author__ = "Michael Lienhardt"
+__copyright__ = "Copyright 2017, Michael Lienhardt"
+__license__ = "GPL3"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt"
+__email__ = "michael.lienhardt@laposte.net"
+__status__ = "Prototype"
 
 
 ######################################################################
@@ -59,114 +73,23 @@ class IDRepository(object):
 		self.spls.pop(spl_group_name)
 		self.ids.pop(spl_group_id)
 
+	#####################################
+	# GETTERS
+
+	def get_id_from_spl_name(self, spl_name):
+		return self.spls[spl_name][0]
+
+	def id_from_use_flag(self, spl_name, use_flag):
+		return self.spls[spl_name][3][use_flag]
+
+	def data_from_id(self, id):
+		return self.ids[id]
+
+	def exists_use_flag(self, spl_name, use_flag):
+		return use_flag in self.spls[spl_name][3]
 
 
-"""
-
-def id_repository_create():
-	return IDRepository()
-
-# id_repository getters
-
-def id_repository_get_ids(id_repository): return id_repository.ids
-def id_repository_get_spls(id_repository): return id_repository.spls
-def id_repository_get_keywords(id_repository): return id_repository.keywords
+def id_repository_create(): return IDRepository()
 
 
-def id_repository_get_id_from_spl_name(id_repository, spl_name):
-	return id_repository_get_spls(id_repository)[spl_name][0]
-
-
-def id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag):
-	return id_repository_get_spls(id_repository)[spl_name][3][use_flag]
-
-
-def id_repository_get_use_flag_from_spl_name(id_repository, spl_name):
-	return id_repository_get_spls(id_repository)[spl_name][3].keys()
-
-
-##
-
-def id_repository_exists_spl(id_repository, spl_name):
-	return spl_name in id_repository_get_spls(id_repository)
-
-
-def id_repository_exists_use_flag(id_repository, spl_name, use_flag):
-	return use_flag in id_repository_get_spls(id_repository)[spl_name][3]
-
-
-######################################################################
-# ID_REPOSITORY MANIPULATION
-######################################################################
-
-def id_repository_add_spl(id_repository, spl):
-	spl_name = spl.name
-	slot = spl.slot
-	subslot = spl.subslot
-	iuses = spl.iuses_core
-	id_list = utils.new_ids(id_repository, 3 + len(iuses))
-
-
-	ids = id_repository_get_ids(id_repository)
-	names = id_repository_get_spls(id_repository)
-
-	ids[id_list[0]] = ("package", spl_name)
-	ids[id_list[1]] = ("slot", slot, spl_name)
-	ids[id_list[2]] = ("subslot", subslot, spl_name)
-
-	iuses_id = {}
-	for idx, use in enumerate(iuses):
-		ids[id_list[3 + idx]] = ("use", use, spl_name)
-		iuses_id[use] = id_list[3 + idx]
-	names[spl_name] = (id_list[0], id_list[1], id_list[2], iuses_id)
-
-
-def id_repository_extends_spl_iuse_list(id_repository, spl_name, iuse_list):
-	ids = id_repository_get_ids(id_repository)
-	spl_data = id_repository_get_spls(id_repository)[spl_name]
-	core_iuse_list = spl_data[3].keys()
-
-	for iuse in iuse_list:
-		if iuse not in core_iuse_list:
-			id = utils.new_id(id_repository)
-			ids[id] = ("use", iuse, spl_name)
-			spl_data[3][iuse] = id
-
-
-def id_repository_remove_spl(id_repository, spl):
-	ids = id_repository_get_ids(id_repository)
-	spl_id, slot_id, subslot_id, iuses_ids = id_repository_get_spls(id_repository).pop(spl.name)
-
-	ids.pop(spl_id)
-	ids.pop(slot_id)
-	ids.pop(subslot_id)
-	for id_use in iuses_ids.values(): ids.pop(id_use)
-
-
-def id_repository_add_spl_group(id_repository, spl_group):
-	spl_group_name = spl_group.name
-	spl_group_id = utils.new_id(id_repository)
-
-	ids = id_repository_get_ids(id_repository)
-	names = id_repository_get_spls(id_repository)
-
-	ids[spl_group_id] = ("package", spl_group_name)
-	names[spl_group_name] = (spl_group_id, None, None, None)
-
-
-def id_repository_remove_spl_group(id_repository, spl_group):
-	spl_group_id, s1, s2, u = id_repository_get_spls(id_repository).pop(
-		hyportage_data.spl_get_name(hyportage_data.spl_group_get_name(spl_group)))
-	id_repository_get_ids(id_repository).pop(spl_group_id)
-
-
-def id_repository_set_keywords(id_repository, keywords):
-	ids, names = id_repository_get_keywords(id_repository)
-	ids[:] = []
-	ids.extend(keywords)
-	names.clear()
-	for idx, keyword in enumerate(keywords):
-		names[keyword] = idx
-
-"""
 

@@ -1,6 +1,6 @@
+#!/usr/bin/python
 
 
-import sys
 import os
 import utils
 import logging
@@ -9,11 +9,8 @@ import click
 
 import hyportage_db
 import hyportage_translation
+import smt_encoding
 import reconfigure
-
-import hyportage_data
-import hyportage_pattern
-import hyportage_ids
 
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
@@ -25,17 +22,10 @@ __email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
 
 
-
 def usage():
 	"""Print usage"""
 	print(__doc__)
 
-
-
-
-######################################################################
-# USE CONFIGURATION MANIPULATION
-######################################################################
 
 @click.command()
 @click.argument(
@@ -165,7 +155,10 @@ def main(
 	todo_update_hyportage = mode == "update"
 	todo_emerge = mode == "emerge"
 
-	# 1.3. Exploration mode:
+	# 1.3. simplify_mode
+	hyportage_db.simplify_mode = simplify_mode
+
+	# 1.4. Exploration mode:
 	exploration_use = "use" in exploration
 	exploration_mask = "mask" in exploration
 	exploration_keywords = "keywords" in exploration
@@ -175,7 +168,7 @@ def main(
 	if exploration_keywords: logging.info("  KEYWORDS exploration enabled")
 	if exploration_license: logging.info("  LICENSE exploration enabled")
 
-	# 1.4. Solver selection
+	# 1.5. Solver selection
 	if local_solver:
 		reconfigure.run_hyvar = lambda json_data: reconfigure.run_local_hyvar(
 			json_data, explain_modality, local_solver.split(), par)
@@ -239,17 +232,18 @@ def main(
 		#unchanged_spls.difference_update(spl_removed)
 
 		# update the hyportage pattern repository
-		pattern_added, pattern_updated, pattern_removed = hyportage_translation.update_pattern_repository(
+		pattern_added, pattern_updated_containing, pattern_updated_content, pattern_removed = hyportage_translation.update_pattern_repository(
 			hyportage_db.pattern_repository, spl_added, spl_removed)
 
 		# update the revert dependencies
-		updated_spl_list = hyportage_translation.update_revert_dependencies(
-			hyportage_db.pattern_repository, pattern_added, pattern_updated, pattern_removed)
+		pattern_added_updated = pattern_added | pattern_updated_containing | pattern_updated_content
+		updated_spl_set = set(hyportage_translation.update_revert_dependencies(
+			hyportage_db.pattern_repository, pattern_added_updated, pattern_removed))
 
 		# reset the implicitly added use flags
-		hyportage_translation.reset_implicit_features(
+		updated_spl_set.update(hyportage_translation.reset_implicit_features(
 			hyportage_db.mspl,
-			hyportage_db.mspl_config.new_use_declaration_eapi4, hyportage_db.mspl_config.new_use_declaration_eapi5)
+			hyportage_db.mspl_config.new_use_declaration_eapi4, hyportage_db.mspl_config.new_use_declaration_eapi5))
 
 		# update the feature list with the implicit declarations
 		#spl_updated_features = hyportage_translation.add_implicit_features(
@@ -264,26 +258,42 @@ def main(
 		#hyportage_translation.update_id_repository(
 		#	id_repository, spl_updated_features, spl_removed, spl_groups_removed, spl_groups_added)
 		hyportage_translation.update_id_repository(
-			hyportage_db.id_repository, updated_spl_list, spl_removed, spl_groups_removed, spl_groups_added)
+			hyportage_db.id_repository, updated_spl_set, spl_removed, spl_groups_removed, spl_groups_added)
 
 
 
-		# update the mask and keywords information
-		spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added, config.mspl_config)
-		spl_updated_visibility = hyportage_translation.update_keywords(mspl, spl_updated_mask, config.mspl_config)
+		# update the visibility information
+		hyportage_translation.update_visibility(
+			hyportage_db.mspl, spl_added,
+			hyportage_db.mspl_config.new_masks, hyportage_db.mspl_config.new_keywords, hyportage_db.mspl_config.new_licenses)
+
+		#spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added, config.mspl_config)
+		#spl_updated_visibility = hyportage_translation.update_keywords(mspl, spl_updated_mask, config.mspl_config)
 
 		# check if the main config of the spl must be regenerated
-		hyportage_translation.reset_use_flag_config(mspl, config.mspl_config)
+		hyportage_translation.update_use_flag_selection(
+			hyportage_db.mspl, spl_added,
+			hyportage_db.mspl_config.new_keywords, hyportage_db.mspl_config.new_use_flag_config)
 
 		# update the smt
+		implicit_use_flag_changed = hyportage_db.mspl_config.new_use_declaration_eapi4 or hyportage_db.mspl_config.new_use_declaration_eapi5
+		#hyportage_translation.update_smt_constraints(
+		#	pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
+		#	pattern_added, pattern_updated, pattern_removed,
+		#	updated_spl_list, spl_updated_visibility)
+		pattern_added_updated_content = pattern_added | pattern_updated_content
 		hyportage_translation.update_smt_constraints(
-			pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
-			pattern_added, pattern_updated, pattern_removed,
-			updated_spl_list, spl_updated_visibility)
+			hyportage_db.pattern_repository, hyportage_db.mspl, hyportage_db.spl_groups,
+			pattern_added_updated_content, updated_spl_set, implicit_use_flag_changed)
 
 		# save the hypotage database
-		save_hyportage(path_db_hyportage, pattern_repository, id_repository, mspl, spl_groups, save_modality)
-		save_configuration(path_configuration, config)
+		has_changed_config = implicit_use_flag_changed or hyportage_db.mspl_config.new_masks or\
+			hyportage_db.mspl_config.new_keywords or hyportage_db.mspl_config.new_licenses or\
+			hyportage_db.mspl_config.new_use_flag_config
+		has_changed_hyportage = bool(updated_spl_set) or has_changed_config
+
+		if has_changed_config: hyportage_db.save_configuration(path_db_hyportage, save_modality)
+		if has_changed_hyportage: hyportage_db.save_hyportage(path_configuration, save_modality)
 
 		return None
 
@@ -294,16 +304,16 @@ def main(
 	if todo_emerge:
 		logging.info("computing a new system configuration... " + str(atoms))
 		# compute what to install
-		#requested_patterns, default_patterns, use_selection = reconfigure.compute_request(atoms, config)
 		root_spls, request_constraint = reconfigure.process_request(
-			pattern_repository, id_repository, mspl, spl_groups, config, atoms)
+			hyportage_db.pattern_repository, hyportage_db.id_repository, hyportage_db.config, atoms)
 
 		# get the transitive closure of the spls
-		all_spls = reconfigure.get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, root_spls)
+		all_spls = reconfigure.get_dependency_transitive_closure(
+			hyportage_db.pattern_repository, hyportage_db.mspl, root_spls)
 
 		# solve these spl, with the request constraint
 		solution = reconfigure.solve_spls(
-			id_repository, config, mspl, spl_groups, config.installed_packages,
+			hyportage_db.id_repository, hyportage_db.config, hyportage_db.mspl, hyportage_db.spl_groups,
 			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords,
 			explain_modality=explain_modality)
 
@@ -319,11 +329,15 @@ def main(
 
 		# write the installation files
 		reconfigure.generate_installation_files(
-			mspl, path_install_script, path_use_flag_configuration, config.installed_packages, solution)
+			hyportage_db.mspl, path_install_script, path_use_flag_configuration,
+			hyportage_db.config.installed_packages, solution)
 
 	logging.info("Execution succesfully terminated")
+
 	# cleanup, because of Python GC bugs...
 	concurrent_map = None
+	smt_encoding.cleanup()
+
 
 ##
 

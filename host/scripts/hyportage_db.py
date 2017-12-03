@@ -1,3 +1,4 @@
+#!/usr/bin/python
 
 
 import os
@@ -44,16 +45,19 @@ config_db_save_modality_default = "pickle"
 hyportage_db_loaded = False
 id_repository = hyportage_ids.id_repository_create()
 pattern_repository = hyportage_pattern.pattern_repository_create()
-flat_pattern_repository = {}
 mspl = hyportage_data.mspl_create()
 spl_groups = hyportage_data.spl_groups_create()
-# configuraton data
+
+# configuration data
 config_db_loaded = False
 config = core_data.Config()
 mspl_config = core_data.MSPLConfig()
 keyword_list = []
 installed_packages = core_data.dictSet()
 world = set()
+
+# annex info
+simplify_mode = "individual"
 
 
 ###############################

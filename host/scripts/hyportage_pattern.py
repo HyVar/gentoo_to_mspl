@@ -3,7 +3,23 @@
 import core_data
 
 import hyportage_db
-import hyportage_data
+
+
+"""
+This file contains the class for the hyportage pattern repository.
+This structure is essential to compute which are the relevant USE flags of a package (without considering all the noise
+added by the profile) and to provide utility functions that resolve a pattern into the corresponding set of spls 
+"""
+
+
+__author__ = "Michael Lienhardt"
+__copyright__ = "Copyright 2017, Michael Lienhardt"
+__license__ = "GPL3"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt"
+__email__ = "michael.lienhardt@laposte.net"
+__status__ = "Prototype"
+
 
 ######################################################################
 # TRANSLATE ATOMS INTO HASHABLE PATTERNS (direct link to core_data)
@@ -39,9 +55,6 @@ def pattern_is_package_group_specific(pattern):
 # PATTERN REPOSITORY MANIPULATION
 ######################################################################
 
-# structure of a repository:
-# ( {spl_group_name -> { pattern -> PatternElement} }
-#   { pattern -> PatternElement } )
 
 ######################################################################
 # PATTERN ELEMENTS
@@ -102,83 +115,6 @@ class PatternElement(object):
 	def contains(self, spl):
 		if self.__matched_spls is not None: return spl in self.__matched_spls
 		else: return match_spl_full(self.pattern, spl)
-
-"""
-
-
-# pattern repository element management
-
-def pattern_repository_element_add_required_use(pattern_repository_element, spl, required_use):
-	return pattern_repository_element.add_containing_spl(spl, required_use)
-
-
-def pattern_repository_element_remove_required_use(pattern_repository_element, spl, required_use):
-	return pattern_repository_element.remove_containing_spl(spl, required_use)
-
-
-def pattern_repository_element_add_spl(pattern_repository_element, spl): pattern_repository_element.add_spl(spl)
-
-
-def pattern_repository_element_remove_spl(pattern_repository_element, spl): pattern_repository_element.remove_spl(spl)
-
-
-def pattern_repository_element_get_required_use(pattern_repository_element):
-	return pattern_repository_element.required_uses()
-
-
-def pattern_repository_element_get_required_use_required(pattern_repository_element):
-	return pattern_repository_element.get_required_uses_required()
-
-
-def pattern_repository_element_get_spls(pattern_repository_element, mspl, spl_groups):
-	return pattern_repository_element.matched_spls(mspl, spl_groups)
-
-
-def pattern_repository_element_get_spls_visible(pattern_repository_element, mspl, spl_groups):
-	return pattern_repository_element.get_spls_visible(mspl, spl_groups)
-
-##
-
-
-def pattern_repository_element_set_in_profile_configuration(pattern_repository_element, boolean):
-	pattern_repository_element.in_profile_configuration = boolean
-
-
-def pattern_repository_element_set_in_user_configuration(pattern_repository_element, boolean):
-	pattern_repository_element.in_user_configuration = boolean
-
-
-def pattern_repository_element_is_useful(pattern_repository_element):
-	return pattern_repository_element.is_useful()
-
-
-def pattern_repository_element_contains(pattern_repository_element, spl):
-	return pattern_repository_element.contains(spl)
-
-##
-
-
-def pattern_repository_element_to_save_format(pattern_repository_element):
-	return {
-		'in_profile_configuration': pattern_repository_element.in_profile_configuration,
-		'in_user_configuration': pattern_repository_element.in_user_configuration,
-		'containing_spl_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element.containing_spl ],
-		'required_use': pattern_repository_element.use_mapping,
-		'matched_spls_names': [ hyportage_data.spl_get_name(spl) for spl in pattern_repository_element.matched_spls ]
-	}
-
-
-def pattern_repository_element_from_save_format(save_format, mspl):
-	res = PatternElement()
-	res.in_profile_configuration = save_format['in_profile_configuration']
-	res.in_user_configuration = save_format['in_user_configuration']
-	res.containing_spl = set([ mspl(spl_name) for spl_name in save_format['containing_spl_names']])
-	res.use_mapping = save_format['required_use']
-	res.__matched_spls = set([mspl(spl_name) for spl_name in save_format['matched_spls_names']])
-	return res
-
-"""
-
 
 
 ######################################################################
@@ -242,153 +178,13 @@ class PatternRepository(dict):
 				reset_list.append(pattern)
 		return reset_list
 
+	def get_with_default(self, pattern):
+		res = dict.get(self, pattern)
+		if res is None: res = PatternElement(pattern)
+		return res
 
 
 def pattern_repository_create():
-	return {}, {}, {}  # full pattern mapping, spl group local pattern mapping, non spl group local pattern mapping
-
-
-def pattern_repository_add_pattern_from_spl(pattern_repository, spl):
-	pattern_added = set()
-	for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems():
-		if pattern_is_package_group_specific(pattern):
-			spl_group_name = pattern_get_package_group(pattern)
-			if spl_group_name in pattern_repository[0]:
-				added = pattern_repository_local_map_add_pattern_from_spl(
-					pattern_repository[0][spl_group_name], spl, pattern, required_use)
-			else:
-				res = {}
-				added = pattern_repository_local_map_add_pattern_from_spl(res, spl, pattern, required_use)
-				pattern_repository[0][spl_group_name] = res
-			if added:
-				pattern_added.add(pattern)
-		else:
-			added = pattern_repository_local_map_add_pattern_from_spl(pattern_repository[1], spl, pattern, required_use)
-			if added:
-				pattern_added.add(pattern)
-	return pattern_added
-
-
-def pattern_repository_remove_pattern_from_spl(pattern_repository, spl):
-	pattern_removed = set()
-	for pattern, required_use in hyportage_data.spl_get_dependencies(spl).iteritems():
-		if pattern_is_package_group_specific(pattern):
-			removed = pattern_repository_local_map_remove_pattern_from_spl(
-				pattern_repository[0][pattern_get_package_group(pattern)], spl, pattern, required_use)
-			if removed: pattern_removed.add(pattern)
-		else:
-			removed = pattern_repository_local_map_remove_pattern_from_spl(pattern_repository[1], spl, pattern, required_use)
-		if removed: pattern_removed.add(pattern)
-	return pattern_removed
-
-
-def pattern_repository_add_pattern_from_scratch(pattern_repository, pattern):
-	if pattern_is_package_group_specific(pattern):
-		spl_group_name = pattern_get_package_group(pattern)
-		if spl_group_name in pattern_repository[0]:
-			pattern_repository_local_map_add_pattern_from_scratch(pattern_repository[0][spl_group_name], pattern)
-		else:
-			res = {}
-			pattern_repository_local_map_add_pattern_from_scratch(res, pattern)
-			pattern_repository[0][spl_group_name] = res
-	else:
-		pattern_repository_local_map_add_pattern_from_scratch(pattern_repository[1], pattern)
-
-
-##
-
-def pattern_repository_add_spl(pattern_repository, spl):
-	pattern_updated = set()
-	package_group = hyportage_data.spl_get_group_name(spl)
-	if package_group in pattern_repository[0]:
-		pattern_updated.update(pattern_repository_local_map_add_spl(
-			pattern_repository[0][package_group], spl, match_spl_simple))
-	pattern_updated.update(pattern_repository_local_map_add_spl(pattern_repository[1], spl, match_spl_full))
-	return pattern_updated
-
-
-def pattern_repository_remove_spl(pattern_repository, spl):
-	pattern_updated = set()
-	package_group = hyportage_data.spl_get_group_name(spl)
-	if package_group in pattern_repository[0]:
-		pattern_updated.update(pattern_repository_local_map_remove_spl(
-			pattern_repository[0][package_group], spl, match_spl_simple))
-	pattern_updated.update(pattern_repository_local_map_remove_spl(pattern_repository[1], spl, match_spl_full))
-	return pattern_updated
-
-
-##
-
-def is_pattern_in_pattern_repository(pattern_repository, pattern):  # not used
-	if pattern_is_package_group_specific(pattern):
-		return pattern in pattern_repository[0][pattern_get_package_group(pattern)]
-	else: return pattern in pattern_repository[1]
-
-
-def pattern_repository_get(pattern_repository, pattern):
-	if pattern_is_package_group_specific(pattern):
-		return pattern_repository_local_map_get(pattern_repository[0][pattern_get_package_group(pattern)], pattern)
-	else: return pattern_repository_local_map_get(pattern_repository[1], pattern)
-
-
-def pattern_repository_get_spl_required_use(pattern_repository, spl):
-	package_group = hyportage_data.spl_get_group_name(spl)
-	if package_group in pattern_repository[0]:
-		res = pattern_repository_local_map_get_spl_required_use(pattern_repository[0][package_group], spl)
-	else: res = set()
-	res.update(pattern_repository_local_map_get_spl_required_use(pattern_repository[1], spl))
-	return res
-
-
-def pattern_repository_get_pattern_from_spl_group_name(pattern_repository, spl_group_name):
-	res = pattern_repository[0].get(spl_group_name, set())
-	for pattern in pattern_repository[1].keys():
-		if match_only_package_group(pattern, spl_group_name): res.add(pattern)
-	return res
-
-
-class PatternIterator(object):
-	def __init__(self, pattern_repository):
-		self.repo = pattern_repository
-		self.stage = 0
-		self.iter_spl_groups = pattern_repository[0].iteritems()
-		self.iter_pattern = self.iter_spl_groups.next()[1].iteritems()
-
-	def __iter__(self): return self
-
-	def next(self):
-		while True:
-			try:
-				return self.iter_pattern.next()[0]
-			except StopIteration:
-				if self.stage == 1:
-					raise StopIteration()
-				else:
-					try:
-						self.iter_pattern = self.iter_spl_groups.next()[1].iteritems()
-					except StopIteration:
-						self.stage = 1
-						self.iter_pattern = self.repo[1].iteritems()
-
-
-def pattern_repository_get_patterns(pattern_repository):
-	return PatternIterator(pattern_repository)
-
-
-##
-
-def pattern_repository_to_save_format(pattern_repository):
-	return {
-		'package_specific': {
-			k: pattern_repository_local_map_to_save_format(local_map)
-			for k, local_map in pattern_repository[0].iteritems() },
-		'global_patterns': pattern_repository_local_map_to_save_format(pattern_repository[1]) }
-
-
-def pattern_repository_from_save_format(save_format, mspl):
-	return ( {
-			k: pattern_repository_local_map_from_save_format(sf_local_map, mspl)
-			for k, sf_local_map in save_format['package_specific'].iteritems() },
-		pattern_repository_local_map_from_save_format(save_format['global_patterns'], mspl) )
+	return PatternRepository()
 
 

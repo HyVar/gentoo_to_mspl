@@ -15,6 +15,7 @@ Module defining utility functions for manipulating egencache files.
 In particular, it contains the function to translate an egencache file into an hyportage spl
 """
 
+
 __author__ = "Michael Lienhardt & Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
 __license__ = "ISC"

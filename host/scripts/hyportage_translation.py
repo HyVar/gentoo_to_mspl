@@ -1,3 +1,6 @@
+#!/usr/bin/python
+
+
 import os
 import logging
 
@@ -8,8 +11,7 @@ import utils
 import utils_egencache
 import hyportage_data
 import hyportage_pattern
-import hyportage_ids
-import smt_encoding
+
 
 """
 This file contains all the function for translating the portage data to our hyportage representation.
@@ -54,7 +56,8 @@ def compute_to_load(last_update, force, path_egencache_packages):
 	utils.phase_start("Computing what to do.")
 	egencache_files = utils_egencache.get_egencache_files(path_egencache_packages)
 	if force:
-		patterns = [ hyportage_pattern.pattern_create_from_atom(atom) for atom in force.split() ]
+		atom_list = force.split()
+		patterns = [hyportage_pattern.pattern_create_from_atom(atom) for atom in atom_list]
 		def filter_function(path_file): return filter_egencache_file_full(path_file, last_update, patterns)
 	else:
 		def filter_function(path_file): return filter_egencache_file(path_file, last_update)
@@ -103,7 +106,7 @@ def update_mspl_and_groups(mspl, spl_groups, spl_name_set, loaded_spls):
 	for spl in loaded_spls:
 		if spl.name in mspl: spl_to_update.append((mspl[spl.name], spl))
 		else: spl_to_add.append(spl)
-	spl_to_remove = [mspl[spl_name] for spl_name in mspl.keys() if spl_name not in spl_name_set]
+	spl_to_remove = [spl for spl_name, spl in mspl.iteritems() if spl_name not in spl_name_set]
 
 	spl_groups_added = set()
 	spl_groups_updated = set()
@@ -156,30 +159,49 @@ def __update_pattern_repository_spl_dependencies(pattern_repository, spl_added, 
 
 def __update_pattern_repository_reset_pel(pattern_repository, spl_added, spl_removed):
 	pattern_updated = set()
-	for spl_group_name in {spl.group_name for spl in spl_added}:
+	added_spl_group_names = {spl.group_name for spl in spl_added}
+	for spl_group_name in added_spl_group_names:
 		pattern_updated.update(pattern_repository.reset_cache(spl_group_name))
-	for spl_group_name in {spl.group_name for spl in spl_removed}:  # no data changed in the spls
+	removed_spl_group_names = {spl.group_name for spl in spl_removed}
+	for spl_group_name in removed_spl_group_names:  # no data changed in the spls
 		pattern_repository.reset_cache(spl_group_name)
 	return pattern_updated
 
 
 def update_pattern_repository(pattern_repository, spl_added, spl_removed):
+	"""
+	This function updates the pattern repository in input with the newly added spls and the ones removed. In particular,
+	this function updates the set of patterns in the repository to only contains those referenced in the mspl,
+	and reset the cache of the patterns that are modified by the addition and removal of the spls in parameter
+	:param pattern_repository: the pattern repository to update
+	:param spl_added: the spls that are added to the mspl
+	:param spl_removed: the spls that are removed from the mspl
+	:return: the set of patterns that are added, updated and removed during the update
+	"""
 	utils.phase_start("Updating the pattern hyportage data (pattern_repository).")
-	pattern_added, pattern_updated, pattern_removed = \
+	pattern_added, pattern_updated_containing, pattern_removed = \
 		__update_pattern_repository_spl_dependencies(pattern_repository, spl_added, spl_removed)
-	pattern_updated.update(__update_pattern_repository_reset_pel(pattern_repository, spl_added, spl_removed))
+	pattern_updated_content = __update_pattern_repository_reset_pel(pattern_repository, spl_added, spl_removed)
 	utils.phase_end("Updating completed")
-	return pattern_added, pattern_updated, pattern_removed
+	return pattern_added, pattern_updated_containing, pattern_updated_content, pattern_removed
 
 
 ##
 
 
-def update_revert_dependencies(pattern_repository, pattern_added, pattern_updated, pattern_removed):
+def update_revert_dependencies(pattern_repository, pattern_added_updated, pattern_removed):
+	"""
+	This function resets the cached data in the spls related to the core use flags declared in the pattern.
+	Indeed, because the pattern repository changed, the set of core use flags of an spl may change as well.
+	:param pattern_repository: the hyportage pattern repository
+	:param pattern_added: the patterns that were added to the repository
+	:param pattern_updated: the patterns that were changed in the repository
+	:param pattern_removed: the patterns that were removed from the repository
+	:return: the set of spls whose cache has been reset
+	"""
 	utils.phase_start("Updating the set of externally required features.")
-
 	updated_spl_list = []
-	for pattern in pattern_added | pattern_updated:
+	for pattern in pattern_added_updated:
 		pel = pattern_repository[pattern]
 		required_uses = pel.required_uses
 		for spl in pel.matched_spls:
@@ -190,7 +212,6 @@ def update_revert_dependencies(pattern_repository, pattern_added, pattern_update
 		pel = pattern_repository[pattern]
 		for spl in pel.matched_spls:
 			spl.reset_revert_dependencies(pattern)
-			updated_spl_list.append(spl)
 
 	utils.phase_end("Updating completed")
 	return updated_spl_list
@@ -202,12 +223,25 @@ def update_revert_dependencies(pattern_repository, pattern_added, pattern_update
 
 
 def reset_implicit_features(mspl, is_eapi4_updated, is_eapi5_updated):
+	"""
+	This function resets the cached data of the spls if the implicit use flags changed
+	:param mspl: the hyportage mspl
+	:param is_eapi4_updated: if the implicit use fags for eapi4 or less changed
+	:param is_eapi5_updated: if the implicit use fags for eapi5 or more changed
+	:return: the list of updated spls
+	"""
 	utils.phase_start("Adding the implicit Features to the spls.")
+	updated_spl_list = []
 	if is_eapi4_updated or is_eapi5_updated:
 		for spl in mspl.itervalues():
-			if (spl.eapi < 5) and is_eapi4_updated: spl.reset_iuses_full()
-			elif (spl.eapi > 4) and is_eapi5_updated: spl.reset_iuses_full()
+			if (spl.eapi < 5) and is_eapi4_updated:
+				spl.reset_iuses_full()
+				updated_spl_list.append(spl)
+			elif (spl.eapi > 4) and is_eapi5_updated:
+				spl.reset_iuses_full()
+				updated_spl_list.append(spl)
 	utils.phase_end("Addition completed")
+	return updated_spl_list
 
 
 ##########################################################################
@@ -230,83 +264,78 @@ def update_id_repository(id_repository, updated_spl_list, spl_removed, spl_group
 ##########################################################################
 
 
-def update_masks(mspl, spl_added_full, config):
-	utils.phase_start("Updating the SPL Masks")
-	if config.new_masks:
-		res = []
-		for k, spl in mspl.iteritems():
-			unmasked = config.get_unmasked(spl.core)
-			if unmasked != spl.unmasked:
-				res.append(spl)
-				spl.unmasked = unmasked
+def update_visibility(mspl, spl_added, new_masks, new_keywords, new_licenses):
+	utils.phase_start("Updating the SPL Visibility")
+	if new_masks:
+		for spl in mspl.itervalues():
+			spl.reset_unmasked()
+			spl.generate_visibility_data()
+	elif new_keywords or new_licenses:
+		for spl in mspl.itervalues():
+			spl.reset_unmasked_other()
+			spl.generate_visibility_data()
 	else:
-		for spl in spl_added_full:
-			spl.unmasked = config.get_unmasked(spl.core)
-		res = spl_added_full
-	utils.phase_end("Generation completed")
-	return res
-
-##
-
-
-def update_keywords(mspl, spl_updated_mask, config):
-	utils.phase_start("Updating the SPL Keywords")
-	if config.new_keywords_config: iterator = mspl.itervalues()
-	else: iterator = iter(spl_updated_mask)
-
-	res = []
-	for spl in iterator:
-		keyword_mask, installable, is_stable = config.get_stability_status(spl.core, spl.unmasked, spl.keywords_list)
-		if (keyword_mask, is_stable) != (spl.keyword_mask, spl.is_stable):
-			res.append(spl)
-			spl.keyword_mask, spl.installable, spl.is_stable = keyword_mask, installable, is_stable
-	utils.phase_end("Generation completed")
-	return res
-
-##
-
-
-
-def reset_use_flag_config(mspl, config):
-	utils.phase_start("Updating the Id Repository")
-	if config.new_keywords_config and config.new_use_flag_config:
-		for spl_name, spl in mspl.iteritems():
-			spl.use_selection_full = None
+		for spl in spl_added:
+			spl.generate_visibility_data()
 	utils.phase_end("Generation completed")
 
-##
+
+##########################################################################
+# 7. UPDATE THE SPL USE FLAG SELECTION
+##########################################################################
 
 
+def update_use_flag_selection(mspl, spl_added, new_keywords, new_use_flag_config):
+	utils.phase_start("Updating the SPL use flag Selection")
+	if new_keywords or new_use_flag_config:
+		for spl in mspl.itervalues():
+			spl.reset_use_selection()
+			_ = spl.use_selection_core
+	else:
+		for spl in spl_added:
+			_ = spl.use_selection_core
+	utils.phase_end("Generation completed")
 
+
+##########################################################################
+# 7. UPDATE THE SPL USE FLAG SELECTION
+##########################################################################
 
 
 def update_smt_constraints(
-		pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
-		pattern_added, pattern_updated, pattern_removed,
-		spl_iuse_reset, spl_modified_visibility):
+		pattern_repository, mspl, spl_groups,
+		pattern_added_updated_content,
+		updated_spl_set, implicit_use_flag_changed):
 	utils.phase_start("Updating the core SMT Constraints")
-	spls_to_update = set(spl_iuse_reset)
-	pattern_visibility = set([
-		pattern
-		for spl_group_name in {spl.group_name for spl in spl_modified_visibility}
-		for pattern in hyportage_pattern.pattern_repository_get_pattern_from_spl_group_name(pattern_repository, spl_group_name)])
-	spls_to_update.update([
-		spl
-		for pattern in pattern_added | pattern_updated | pattern_removed | pattern_visibility
-		for spl in hyportage_pattern.pattern_repository_element_get_spls(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern), mspl, spl_groups)])
-	spl_groups_to_update = [
-		spl_groups[spl_group_name]
-		for spl_group_name in {spl.group_name for spl in spls_to_update}]
+	# the spls for which we need to recompute the constraint are:
+	#  - all spls if the use flag changed
+	#      (it is a good enough approximation, and computing the actual set would be far to costly)
+	#  - otherwise the added spls and the ones with a reference to the modified patterns
+	# additionally, we need to update the SMT of the spl_group of these spls
+	#
+	# Note about the computation of the set of spl in case of use flag modification:
+	#  - we need to update the constraint of all these spls
+	#  - plus the ones that depend on these spls (because e.g. some use flags might not exist anymore)
+	# too costly
+	if implicit_use_flag_changed:
+		iterator_spl = mspl.itervalues()
+		iterator_spl_group = iter(spl_groups)
+	else:
+		spl_set = updated_spl_set.copy()
+		for pattern in pattern_added_updated_content:
+			spl_set.update(pattern_repository[pattern].containing_spl.keys())
+		spl_group_set = {spl_groups[spl.group_name] for spl in spl_set}
+		iterator_spl = iter(spl_set)
+		iterator_spl_group = iter(spl_group_set)
 
-	spl_smts = map(
-		lambda spl: smt_encoding.convert_spl(
-			pattern_repository, id_repository, mspl, spl_groups, spl, simplify_mode), spls_to_update)
-	spl_group_smts = map(
-		lambda spl_group: smt_encoding.convert_spl_group(id_repository, spl_group, simplify_mode), spl_groups_to_update)
+	for spl in iterator_spl:
+		spl.reset_smt()
+		_ = spl.smt
 
-	for spl_name, smt in spl_smts: hyportage_data.spl_set_smt_constraint(mspl[spl_name], smt)
-	for spl_group_name, smt in spl_group_smts: hyportage_data.spl_group_set_smt_constraint(spl_groups[spl_group_name], smt)
+	for spl_group in iterator_spl_group:
+		spl_group.reset_smt()
+		_ = spl_group.smt
+
 	utils.phase_end("Updating completed")
 
 

@@ -1,11 +1,16 @@
 #!/usr/bin/python
 
+
 import core_data
 
 import hyportage_db
 import smt_encoding
 import hyportage_constraint_ast
-##
+
+
+"""
+This file contains the classes for the two main hyportage data: SPL and SPL_Groups
+"""
 
 
 __author__ = "Michael Lienhardt & Jacopo Mauro"
@@ -71,7 +76,7 @@ class SPL(object):
 		self.eapi                     = eapi
 		self.name                     = name
 		self.core                     = core
-		self.deprecated               = deprecated
+		self.is_deprecated               = deprecated
 		#######################
 		# feature model
 		self.iuses_default            = iuses_default             # list of features declared in this spl by default
@@ -102,8 +107,11 @@ class SPL(object):
 		self.__installable             = None                     # if this package is installable
 		self.__is_stable               = None                     # if this package is stable
 		#######################
+		# graph traversal
+		self.visited = False
+		#######################
 		# initial setup
-		self.__generate_dependencies_and_requirements()
+		self.generate_dependencies_and_requirements()
 
 	def __hash__(self): return hash(self.name)
 
@@ -125,25 +133,25 @@ class SPL(object):
 	@property
 	def subslot(self): return core_data.spl_core_get_subslot(self.core)
 
-	def __generate_dependencies_and_requirements(self):
+	def generate_dependencies_and_requirements(self):
 		visitor = GETDependenciesVisitor()
 		visitor.visitRequired(self.fm_local)
 		visitor.visitDepend(self.fm_combined)
 		self.__dependencies = visitor.dependencies
 		self.__required_iuses_local = visitor.local
 
-	def __generate_visibility_data(self):
+	def generate_visibility_data(self):
 		self.__unmasked_keyword, self.__unmasked_license, self.__installable, self.__is_stable =\
 			hyportage_db.mspl_config.get_stability_status(self.core, self.unmasked, self.keyword_set, self.license)
 
 	@property
 	def dependencies(self):
-		if self.__dependencies is None: self.__generate_dependencies_and_requirements()
+		if self.__dependencies is None: self.generate_dependencies_and_requirements()
 		return self.__dependencies
 
 	@property
 	def required_iuses_local(self):
-		if self.__required_iuses_local is None: self.__generate_dependencies_and_requirements()
+		if self.__required_iuses_local is None: self.generate_dependencies_and_requirements()
 		return self.__required_iuses_local
 
 	@property
@@ -228,29 +236,33 @@ class SPL(object):
 	@property
 	def unmasked_keyword(self):
 		if self.__unmasked_keyword is None:
-			self.__generate_visibility_data()
+			self.generate_visibility_data()
 		return self.__unmasked_keyword
 
 	@property
 	def unmasked_license(self):
 		if self.__unmasked_license is None:
-			self.__generate_visibility_data()
+			self.generate_visibility_data()
 		return self.__unmasked_license
 
 	@property
 	def installable(self):
 		if self.__installable is None:
-			self.__generate_visibility_data()
+			self.generate_visibility_data()
 		return self.__installable
 
 	@property
 	def is_stable(self):
 		if self.__is_stable is None:
-			self.__generate_visibility_data()
+			self.generate_visibility_data()
 		return self.__is_stable
 
 	#####################################
 	# DATA UPDATE METHODS
+
+	def reset_required_iuses(self):
+		self.__required_iuses = None
+		self.reset_iuses_full()
 
 	def reset_iuses_full(self):
 		self.__iuses_full         = None
@@ -259,9 +271,22 @@ class SPL(object):
 		self.__use_selection_full = None
 		self.__use_selection_core = None
 
-	def reset_required_iuses(self):
-		self.__required_iuses = None
-		self.reset_iuses_full()
+	def reset_use_selection(self):
+		self.__use_selection_full = None
+		self.__use_selection_core = None
+
+	def reset_smt(self):
+		self.__smt_constraint = None
+
+	def reset_unmasked_other(self):
+		self.__unmasked_keyword = None
+		self.__unmasked_license = None
+		self.__installable = None
+		self.__is_stable = None
+
+	def reset_unmasked(self):
+		self.__unmasked = None
+		self.reset_unmasked_other()
 
 	def update_revert_dependencies(self, pattern, uses):
 		self.__revert_dependencies[pattern] = uses
@@ -272,7 +297,28 @@ class SPL(object):
 
 	def reset_revert_dependencies(self, pattern):
 		self.__revert_dependencies.pop(pattern)
-		self.reset_required_iuses()
+		# I don't reset the __required_iuses field, because it would cause too much computation (recomputing the list,
+		#  the constraints and the constraints of the revert dependencies) for just having a possibly smaller list
+
+
+##
+
+MSPL = dict
+
+
+def mspl_create(): return {}
+
+
+def mspl_add_spl(mspl, spl):
+	mspl[spl.name] = spl
+
+
+def mspl_remove_spl(mspl, spl):
+	mspl.pop(spl.name)
+
+
+def mspl_update_spl(mspl, old_spl, new_spl):
+	mspl[old_spl.name] = new_spl
 
 
 ######################################################################
@@ -291,134 +337,26 @@ def keywords_get_core_set(keywords):
 	return res
 
 
-##
-
-######################################################################
-# DEPENDENCIES MANIPULATION
-######################################################################
-
-"""
-The SPL dependency is the list of pattern used in the SPL's DEPEND, RDEPEND and PDEPEND.
-For efficiency, in the "dependencies" structure, we store also information about the use flags used with these patterns
-Hence, our dependencies structure is a mapping from patterns to use flag data,
-	which is itself a mapping from use flags used with the pattern to
-	a boolean stating if the use flag is required to also be declared locally.
-"""
-
-"""
-def dependencies_create(): return {}
-
-
-def dependencies_add_pattern(raw_dependencies, pattern):
-	if pattern not in raw_dependencies: raw_dependencies[pattern] = {}
-
-
-def dependencies_add_pattern_use(raw_dependencies, pattern, use, is_required):
-	mapping = raw_dependencies[pattern]
-	if is_required:
-		mapping[use] = is_required
-	elif use not in mapping:
-		mapping[use] = is_required
-
-
-def dependencies_get_patterns(raw_dependencies): return raw_dependencies.keys()
-
-
-
-def spl_get_name(spl): return spl.name
-def spl_get_group_name(spl): return core_data.spl_core_get_spl_group_name(spl.core)
-def spl_get_slot(spl): return core_data.spl_core_get_slot(spl.core)
-def spl_get_subslot(spl): return core_data.spl_core_get_subslot(spl.core)
-def spl_get_slots(spl): return spl.slots
-def spl_get_version(spl): return core_data.spl_core_get_version(spl.core)
-def spl_get_version_full(spl): return core_data.spl_core_get_version_full(spl.core)
-def spl_get_dependencies(spl): return spl.dependencies
-def spl_is_deprecated(spl): return spl.deprecated
-
-
-def spl_get_fm_local(spl): return spl.fm_local
-def spl_get_fm_combined(spl): return spl.fm_combined
-def spl_get_smt_constraint(spl): return spl.smt_constraint
-
-
-def spl_get_required_iuses_local(spl): return spl.required_iuses_local
-def spl_get_required_iuses(spl): return spl.required_iuses
-
-
-def spl_get_keywords_list(spl): return spl.keywords_list
-def spl_get_keywords_default(spl): return spl.keywords_default
-
-
-def spl_get_iuses_default(spl): return spl.iuses_default
-def spl_get_iuses_full(spl): return spl.iuses_full
-
-
-def spl_get_use_selection_default(spl): return spl.use_selection_default
-
-
-def spl_is_installable(spl): return spl.installable
-
-
-def spl_is_visited(spl): return spl.visited
-
-##
-
-
-def spl_set_keywords_default(spl, keywords): spl.keywords_default = keywords
-def spl_set_keywords_profile(spl, keywords): spl.keywords_profile = keywords
-def spl_set_iuses_profile(spl, new_iuses): spl.iuses_profile = new_iuses
-def spl_set_use_selection_profile(spl, new_use_selection): spl.use_selection_profile = new_use_selection
-def spl_set_mask_profile(spl, new_mask): spl.mask_profile = new_mask
-
-
-def spl_set_keywords_user(spl, keywords): spl.keywords_user = keywords
-def spl_set_iuses_user(spl, new_iuses): spl.iuses_user = new_iuses
-def spl_set_use_selection_user(spl, new_use_selection): spl.use_selection_user = new_use_selection
-def spl_set_mask_user(spl, new_mask): spl.mask_user = new_mask
-
-
-def spl_set_smt_constraint(spl, smt_constraint): spl.smt_constraint = smt_constraint
-
-"""
-##
-
-MSPL = dict
-
-def mspl_create(): return {}
-
-
-def mspl_add_spl(mspl, spl):
-	mspl[spl.name] = spl
-
-
-def mspl_remove_spl(mspl, spl):
-	mspl.pop(spl.name)
-
-
-def mspl_update_spl(mspl, old_spl, new_spl):
-	mspl[old_spl.name] = new_spl
-
-
 ######################################################################
 # SPL GROUP MANIPULATION
 ######################################################################
 
 
-class SPLGroup(object):
+class SPLGroup(list):
 	"""
 	This class stores all the information related to an spl group,
 	i.e., the "software" folder containing the .ebuild files for all the software's version.
 	"""
-	def __init__(self, spl):
+	def __init__(self, name):
 		"""
 		The constructor of the class
 		:param group_name: the name of the group
 		:param spl: the first spl known to be part of this group
 		"""
-		self.name = spl.group_name                            # name of the group
-		self.references = [spl]                           # list of spls contained in this group
-		self.slots_mapping = {spl.slot: {spl}}  # mapping listings all spls stored in one slot
-		self.smt_constraint = None                        # z3 constraint encoding this group
+		super(list, self).__init__()
+		self.name = name                            # name of the group
+		self.slots_mapping = core_data.dictSet()    # mapping listings all spls stored in one slot
+		self.__smt_constraint = None                # z3 constraint encoding this group
 
 	def add_spl(self, spl):
 		"""
@@ -426,22 +364,31 @@ class SPLGroup(object):
 		:param spl: the added spl
 		:return: None
 		"""
-		self.references.append(spl)
-		slot = spl.slot
-		if slot in self.slots_mapping: self.slots_mapping[slot].add(spl)
-		else: self.slots_mapping[slot] = {spl}
+		self.append(spl)
+		self.slots_mapping.add(spl.slot, spl)
+
+	def remove_spl(self, spl):
+		self.remove(spl)
+		self.slots_mapping.remove_with_key(spl.slot, spl)
 
 	def replace_spl(self, old_spl, new_spl):
 		self.add_spl(new_spl)
 		self.remove_spl(old_spl)
 
-	def remove_spl(self, spl):
-		self.references.remove(spl)
-		slot = spl.slot
-		if len(self.slots_mapping[slot]) == 1: self.slots_mapping.pop(slot)
-		else: self.slots_mapping[slot].remove(spl)
+	#####################################
+	# GENERATORS AND PROPERTIES
 
-	def __iter__(self): return iter(self.references)
+	@property
+	def smt(self):
+		if self.__smt_constraint is None:
+			self.__smt_constraint = smt_encoding.convert_spl_group(hyportage_db.id_repository, self, hyportage_db.simplify_mode)
+		return self.__smt_constraint
+
+	#####################################
+	# DATA UPDATE METHODS
+
+	def reset_smt(self):
+		self.__smt_constraint = None
 
 
 """
@@ -461,7 +408,8 @@ def spl_groups_add_spl(spl_groups, spl):
 		group.add_spl(spl)
 		return None
 	else:
-		group = SPLGroup(spl)
+		group = SPLGroup(spl.group_name)
+		group.add_spl(spl)
 		spl_groups[spl.group_name] = group
 		return group
 
@@ -483,20 +431,4 @@ def spl_groups_remove_spl(spl_groups, spl):
 
 
 
-"""
-def spl_group_get_references(spl_group): return spl_group.references
-
-
-def spl_group_get_name(spl_group): return spl_group.name
-
-
-def spl_group_get_slot_mapping(spl_group): return spl_group.slots_mapping
-
-
-def spl_group_set_smt_constraint(spl_group, smt_constraint): spl_group.smt_constraint = smt_constraint
-
-
-def spl_group_get_smt_constraint(spl_group): return spl_group.smt_constraint
-
-"""
 

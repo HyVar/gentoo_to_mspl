@@ -1,6 +1,6 @@
+#!/usr/bin/python
 
 
-import re
 import time
 
 import multiprocessing

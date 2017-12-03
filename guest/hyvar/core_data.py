@@ -303,6 +303,11 @@ class dictSet(dict):
 				self[k].update(v)
 			else: self[k] = v
 
+	def remove_with_key(self, key, val):
+		if len(self[key]) == 1: self.pop(key)
+		else: self[key].remove(val)
+
+
 
 ######################################################################
 # SET MANIPULATION STRUCTURE
@@ -560,6 +565,7 @@ class MSPLConfig(object):
 		self.new_use_declaration_eapi4 = True
 		self.new_use_declaration_eapi5 = True
 		self.new_keywords_config = True
+		self.new_licenses_config = True
 		self.new_use_flag_config = True
 
 	def update(self, config):
@@ -607,7 +613,7 @@ class MSPLConfig(object):
 			return self.pattern_unmask.contains(spl_core)
 		else: return True
 
-	def get_stability_status(self, spl_core, unmasked, keyword_set, licence):  # TODO: add license management
+	def get_stability_status(self, spl_core, unmasked, keyword_set, license):  # TODO: add license management
 		keywords = keyword_set.copy()
 		self.pattern_keywords.apply(spl_core, keywords)
 		accept_keywords = self.accept_keywords_full.copy()

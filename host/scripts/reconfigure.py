@@ -13,12 +13,17 @@ import requests
 
 import core_data
 
-import hyportage_data
-import hyportage_ids
 import hyportage_pattern
 
 from pysmt.smtlib.parser import SmtLib20Parser
 import cStringIO
+
+
+"""
+This file contains all the functions related to solving the constraints generated from a set of spls,
+in order to compute a new configuration of the system
+"""
+
 
 __author__ = "Michael Lienhardt and Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt and Jacopo Mauro"
@@ -27,6 +32,7 @@ __version__ = "0.5"
 __maintainer__ = "Michael Lienhardt and Jacopo Mauro"
 __email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
 __status__ = "Prototype"
+
 
 ##########################################################################
 # UTILITIES TO CALL THE HYVAR-REC SOLVER
@@ -85,7 +91,7 @@ run_hyvar = None
 ##########################################################################
 
 
-def process_request(pattern_repository, id_repository, mspl, spl_groups, config, atoms):
+def process_request(pattern_repository, id_repository, config, atoms):
 	"""
 	This function simply takes the user request and his USE configuration from the environment,
 	and translate them in relevant data
@@ -102,13 +108,10 @@ def process_request(pattern_repository, id_repository, mspl, spl_groups, config,
 	"""
 	requested_patterns = set([hyportage_pattern.pattern_create_from_atom(atom) for atom in atoms])
 	requested_patterns.update(config.pattern_required_flat)
-	for pattern in requested_patterns:
-		hyportage_pattern.pattern_repository_add_pattern_from_scratch(pattern_repository, pattern)
 
 	config.set_use_manipulation_env(os.environ.get("USE", "").split())
 
-	root_spls, constraint = smt_encoding.convert_patterns(
-		pattern_repository, id_repository, mspl, spl_groups, requested_patterns)
+	root_spls, constraint = smt_encoding.convert_patterns(pattern_repository, id_repository, requested_patterns)
 	return root_spls, constraint
 
 
@@ -133,7 +136,7 @@ def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 	pref_less_remove = " + ".join([
 		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
 		for spl_name in installed_spls
-		if not hyportage_data.spl_is_deprecated(mspl[spl_name])])
+		if not mspl[spl_name].is_deprecated])
 	# preference to minimize number of new packages to install
 	pref_less_add = " + ".join([
 		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
@@ -187,7 +190,7 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 		for spl_id in spl_ids:
 			name = id_repository.ids[spl_id][1]
 			formula = re.sub('p' + spl_id, name, formula)
-			if i in hyportage_data.spl_get_smt_constraint(mspl[name]):
+			if i in mspl[name].smt:
 				where_declared = name + ": "
 
 		# translate uses
@@ -211,7 +214,7 @@ def generate_to_install_spls(id_repository, config, mspl, exploration_use, featu
 	res_core = core_data.dictSet()
 	use_flags = []
 	for feature in feature_list:
-		el = hyportage_ids.id_repository_get_ids(id_repository)[smt_encoding.get_id_from_smt_variable(feature)]
+		el = id_repository.data_from_id(smt_encoding.get_id_from_smt_variable(feature))
 		if el[0] == "package":  # el = ("package", spl_name)
 			res_core.set(el[1], set())
 		else:  # el = ("use", use, spl_name)
@@ -230,7 +233,7 @@ def generate_to_install_spls(id_repository, config, mspl, exploration_use, featu
 
 
 def solve_spls(
-		id_repository, config, mspl, spl_groups, installed_spls,
+		id_repository, config, mspl, spl_groups,
 		spls, annex_constraint, exploration_use, exploration_mask, exploration_keywords, explain_modality=False):
 	"""
 	Solves the spls in input locally assuming that there is a command hyvar-rec
@@ -238,7 +241,6 @@ def solve_spls(
 	:param config: the config of hyportage
 	:param mspl: the mspl of hyportage
 	:param spl_groups: the spl groups of hyportage
-	:param installed_spls: the mapping stating the use flag selection for all installed spls
 	:param spls: the spls to solve
 	:param annex_constraint: the additional constraint to add in the solver input
 	:param exploration_use: boolean saying if the solver can change the use flag default selection
@@ -248,6 +250,7 @@ def solve_spls(
 	:return: the solution found by the solver, if it exists
 	"""
 	spl_names = {spl.name for spl in spls}
+	installed_spls = config.installed_packages
 	# 1. construct the input data for the solver
 	# 1.1. construct the constraint
 	constraint = annex_constraint[:]
@@ -308,7 +311,7 @@ def solve_spls(
 			logging.error("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
 		return None
 
-	return generate_to_install_spls(id_repository, config, mspl, res['features'])
+	return generate_to_install_spls(id_repository, config, mspl, exploration_use, res['features'])
 
 
 def generate_installation_files(mspl, path_emerge_script, path_use_flag_configuration, old_installation, new_installation):
@@ -385,15 +388,15 @@ def generate_installation_files(mspl, path_emerge_script, path_use_flag_configur
 ##########################################################################
 
 
-def next_spls(pattern_repository, mspl, spl_groups, spl):
+def next_spls(pattern_repository, spl):
 	res = set()
-	for pattern in hyportage_data.spl_get_dependencies(spl):
-		res.update(
-			hyportage_pattern.pattern_repository_get(pattern_repository, pattern).matched_spls(mspl, spl_groups))
+	pattern_iterator = spl.dependencies.iterkeys()
+	for pattern in pattern_iterator:
+		res.update(pattern_repository.get_with_default(pattern).matched_spls)
 	return res
 
 
-def get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, spls):
+def get_dependency_transitive_closure(pattern_repository, mspl, spls):
 	for spl in mspl.itervalues():
 		spl.visited = False
 	nexts = spls
@@ -403,7 +406,7 @@ def get_dependency_transitive_closure(pattern_repository, mspl, spl_groups, spls
 		for spl in nexts:
 			spl.visited = True
 			res.add(spl)
-			accu.update(next_spls(pattern_repository, mspl, spl_groups, spl))
+			accu.update(next_spls(pattern_repository, spl))
 		nexts = filter(lambda spl: not spl.visited, accu)
 
 	return res

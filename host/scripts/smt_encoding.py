@@ -1,19 +1,35 @@
+#!/usr/bin/python
+
 
 import logging
 import itertools
 import z3
 
-import core_data
 import hyportage_constraint_ast
-import hyportage_data
-import hyportage_ids
-import hyportage_pattern
 
 
 """
 This file contains the functions that computes the constraints for spls, spl_groups and use flag selection
-
 """
+
+
+__author__ = "Michael Lienhardt & Jacopo Mauro"
+__copyright__ = "Copyright 2017, Michael Lienhardt & Jacopo Mauro"
+__license__ = "GPL3"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt & Jacopo Mauro"
+__email__ = "michael.lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__status__ = "Prototype"
+
+
+def cleanup():
+	global smt_false, smt_true, smt_or, smt_and, smt_not, smt_implies
+	smt_false = None
+	smt_true  = None
+	smt_or    = None
+	smt_and   = None
+	smt_not   = None
+	smt_implies = None
 
 
 ######################################################################
@@ -84,7 +100,7 @@ def smt_list_to_strings(constraints, status="unknown", name="benchmark", logic="
 
 def get_smt_variable_spl_name(id_repository, spl_name):
 	"""returns the variable name corresponding to the spl name in input"""
-	return "p" + (hyportage_ids.id_repository_get_id_from_spl_name(id_repository, spl_name))
+	return "p" + (id_repository.get_id_from_spl_name(spl_name))
 
 
 def get_smt_spl_name(id_repository, spl_name):
@@ -99,7 +115,7 @@ def get_smt_not_spl_name(id_repository, spl_name):
 
 def get_smt_variable_use_flag(id_repository, spl_name, use_flag):
 	"""returns the variable name corresponding to the use flag name in input"""
-	return "u" + (hyportage_ids.id_repository_get_id_from_use_flag(id_repository, spl_name, use_flag))
+	return "u" + (id_repository.get_id_from_use_flag(spl_name, use_flag))
 
 
 def get_smt_use_flag(id_repository, spl_name, use_flag):
@@ -147,7 +163,7 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 	res = [get_smt_spl_name(id_repository, spl_name)]
 	for selection in selection_list:
 		use_flag = selection['use']
-		if hyportage_ids.id_repository_exists_use_flag(id_repository, spl_name, use_flag):
+		if id_repository.exists_use_flag(spl_name, use_flag):
 			use_id = get_smt_use_flag(id_repository, spl_name, use_flag)
 			if "prefix" in selection:  # two cases: "-" (not selected), or "!" (compact form)
 				if selection['prefix'] == "-":
@@ -251,18 +267,17 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return map(self.visitDependEL, ctx)
 
 	def visitDependSIMPLE(self, ctx):
-		spls = hyportage_pattern.pattern_repository_element_get_spls(
-			hyportage_pattern.pattern_repository_get(self.pattern_repository, ctx['atom']), self.mspl, self.spl_groups)
-		spl_names = [hyportage_data.spl_get_name(spl) for spl in spls]
-		if spl_names:
+		spls = self.pattern_repository[ctx['atom']].matched_spls
+		spl_name_list = [spl.name for spl in spls]
+		if spl_name_list:
 			# decompact compact forms
 			if "selection" in ctx:
 				formulas = [
 					decompact_selection_list(self.id_repository, self.spl_name, spl_name, ctx['selection'])
-					for spl_name in spl_names ]
+					for spl_name in spl_name_list]
 				formula = z3.Or([z3.And(formula) for formula in formulas])
 			else:
-				formula = z3.Or(get_smt_spl_names(self.id_repository, spl_names))
+				formula = z3.Or(get_smt_spl_names(self.id_repository, spl_name_list))
 		else:
 			formula = smt_false
 
@@ -329,15 +344,15 @@ def simplify_constraints(spl_name, constraints, simplify_mode):
 
 
 def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simplify_mode):
-	spl_name = hyportage_data.spl_get_name(spl)
+	spl_name = spl.name
 	spl_id = get_smt_spl_name(id_repository, spl_name)
 	#logging.debug("Processing spl " + spl_name)
 	constraints = []
 	# print("processing (" + str(spl_name) + ", " + str(spl_id) + ")")
 	# 1. convert feature model
 	visitor = ASTtoSMTVisitor(pattern_repository, id_repository, mspl, spl_groups, spl_name)
-	constraints.extend(visitor.visitRequired(hyportage_data.spl_get_fm_local(spl)))
-	for constraint in visitor.visitDepend(hyportage_data.spl_get_fm_combined(spl)):
+	constraints.extend(visitor.visitRequired(spl.fm_local))
+	for constraint in visitor.visitDepend(spl.fm_combined):
 		constraints.append(z3.Implies(spl_id, constraint))
 
 	# 2. constraint stating that selecting an spl also selects its group
@@ -359,22 +374,14 @@ def convert_spl(pattern_repository, id_repository, mspl, spl_groups, spl, simpli
 
 
 def convert_spl_group(id_repository, spl_group, simplify_mode):
-	spl_group_name = hyportage_data.spl_group_get_name(spl_group)
-	spl_group_var = get_smt_spl_name(id_repository, spl_group_name)
-	spls = hyportage_data.spl_group_get_references(spl_group)
-	spl_vars = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
-
+	spl_group_name = spl_group.name
 	#logging.debug("Processing spl group " + spl_group_name)
 	constraints = []
 
-	# 1. if installed then one of its version should be installed as well, and reciprocally
-	#constraints.append(z3.Implies(spl_group_var, z3.Or(spl_vars)))
-	#constraints.append(z3.Implies(z3.Or(spl_vars), spl_group_var))
-
-	# 2. two installed spl should have different slots or subslots
-	for spls in hyportage_data.spl_group_get_slot_mapping(spl_group).values():
+	# two installed spl should have different slots or subslots
+	for spls in spl_group.slots_mapping.itervalues():
 		if len(spls) > 1:
-			spl_vars = get_smt_spl_names(id_repository, [hyportage_data.spl_get_name(spl) for spl in spls])
+			spl_vars = get_smt_spl_names(id_repository, [spl.name for spl in spls])
 			constraints.append(get_no_two_true_expressions(spl_vars))
 
 	return spl_group_name, smt_list_to_strings(simplify_constraints(spl_group_name, constraints, simplify_mode))
@@ -387,11 +394,11 @@ def convert_use_flag_selection(id_repository, spl_name, use_flags, use_selection
 	return smt_list_to_strings(constraint)
 
 
-def convert_patterns(pattern_repository, id_repository, mspl, spl_groups, patterns):
+def convert_patterns(pattern_repository, id_repository, patterns):
 	spls = set()
 	constraints = []
 	for pattern in patterns:
-		new_spls = hyportage_pattern.pattern_repository_get(pattern_repository, pattern).matched_spls(mspl, spl_groups)
+		new_spls = pattern_repository.get_with_default(pattern).matched_spls
 		spls.update(new_spls)
 		#print(core_data.pattern_to_atom(pattern) + " => " + str([spl.name for spl in new_spls]))
 		constraints.append(smt_or([get_smt_spl_name(id_repository, spl.name) for spl in new_spls]))
