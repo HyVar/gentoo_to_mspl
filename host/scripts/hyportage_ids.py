@@ -33,45 +33,34 @@ class IDRepository(object):
 		self.keywords = ([], {})  # list of keywords and mapping between keyword name and index in the list. not used
 
 	def remove_spl(self, spl):
-		spl_id, slot_id, subslot_id, iuses_ids = self.spls.pop(spl.name)
+		spl_id, iuses_ids = self.spls.pop(spl.name)
 
 		self.ids.pop(spl_id)
-		self.ids.pop(slot_id)
-		self.ids.pop(subslot_id)
 		for id_use in iuses_ids.values(): self.ids.pop(id_use)
 
 	def add_spl(self, spl):
 		spl_name = spl.name
-		if spl_name in self.spls: self.remove_spl(spl)
-
-		slot = spl.slot
-		subslot = spl.subslot
 		iuses = spl.iuses_core
-		id_list = utils.new_ids(self, 3 + len(iuses))
+		if spl_name in self.spls:  # update previous data
+			data = self.spls[spl_name]
+			new_iuses = {iuse for iuse in iuses if iuse not in data[3]}
+			id_list = utils.new_ids(self, len(new_iuses))
+			for idx, iuse in enumerate(new_iuses):
+				iuse_id = "u" + id_list[idx]
+				data[1][iuse] = iuse_id
+				self.ids[iuse_id] = ("use", iuse, spl_name)
+		else:  # create new data
+			id_list = utils.new_ids(self, 1 + len(iuses))
+			spl_id = "p" + id_list[0]
+			self.ids[spl_id] = ("package", spl_name)
 
-		self.ids[id_list[0]] = ("package", spl_name)
-		self.ids[id_list[1]] = ("slot", slot, spl_name)
-		self.ids[id_list[2]] = ("subslot", subslot, spl_name)
+			iuses_id = {}
+			for idx, iuse in enumerate(iuses):
+				iuse_id = "u" + id_list[1 + idx]
+				self.ids[iuse_id] = ("use", iuse, spl_name)
+				iuses_id[iuse] = iuse_id
+			self.spls[spl_name] = (spl_id, iuses_id)
 
-		iuses_id = {}
-		for idx, use in enumerate(iuses):
-			self.ids[id_list[3 + idx]] = ("use", use, spl_name)
-			iuses_id[use] = id_list[3 + idx]
-			self.spls[spl_name] = (id_list[0], id_list[1], id_list[2], iuses_id)
-
-	def add_spl_group(self, spl_group):
-		spl_group_name = spl_group.name
-		spl_group_id = utils.new_id(self)
-
-		self.ids[spl_group_id] = ("package", spl_group_name)
-		self.spls[spl_group_name] = (spl_group_id, None, None, None)
-
-	def remove_spl_group(self, spl_group):
-		spl_group_name = spl_group.name
-
-		spl_group_id = self.spls[spl_group_name][0]
-		self.spls.pop(spl_group_name)
-		self.ids.pop(spl_group_id)
 
 	#####################################
 	# GETTERS
@@ -79,14 +68,14 @@ class IDRepository(object):
 	def get_id_from_spl_name(self, spl_name):
 		return self.spls[spl_name][0]
 
-	def id_from_use_flag(self, spl_name, use_flag):
-		return self.spls[spl_name][3][use_flag]
+	def get_id_from_use_flag(self, spl_name, use_flag):
+		return self.spls[spl_name][1][use_flag]
 
 	def data_from_id(self, id):
 		return self.ids[id]
 
 	def exists_use_flag(self, spl_name, use_flag):
-		return use_flag in self.spls[spl_name][3]
+		return use_flag in self.spls[spl_name][1]
 
 
 def id_repository_create(): return IDRepository()

@@ -39,12 +39,14 @@ class GETDependenciesVisitor(hyportage_constraint_ast.ASTVisitor):
 	def visitCondition(self, ctx): self.local.add(ctx['use'])
 
 	def visitDependSIMPLE(self, ctx):
+		#print("found dependency: " + ctx['atom'])
 		self.pattern = ctx['atom']
 		self.dependencies.add_key(self.pattern)
 		if "selection" in ctx: map(self.visitSelection, ctx['selection'])
 
 	def visitSelection(self, ctx):
 		use = ctx['use']
+		#print("  found use flag: " + use)
 		self.dependencies.add(self.pattern, use)
 		if 'suffix' in ctx: self.local.add(use)
 
@@ -168,9 +170,9 @@ class SPL(object):
 	def iuses_full(self):
 		if self.__iuses_full is None:
 			if self.eapi < 5:
-				self.__iuses_full = self.iuses_default | hyportage_db.mspl_config.new_use_declaration_eapi4
+				self.__iuses_full = self.iuses_default | hyportage_db.mspl_config.use_declaration_eapi4
 			else:
-				self.__iuses_full = self.iuses_default |  hyportage_db.mspl_config.new_use_declaration_eapi5
+				self.__iuses_full = self.iuses_default |  hyportage_db.mspl_config.use_declaration_eapi5
 		return self.__iuses_full
 
 	@property
@@ -187,8 +189,11 @@ class SPL(object):
 	@property
 	def use_selection_full(self):
 		if self.__use_selection_full is None:
-			self.__use_selection_full = hyportage_db.mspl_config.get_use_flags(
-				self.core, self.unmasked, self.__is_stable, self.use_manipulation_default) & self.iuses_full
+			if self.name in hyportage_db.installed_packages:  # TODO: this if is not true with the --newuse option
+				self.__use_selection_full = hyportage_db.installed_packages[self.name]
+			else:
+				self.__use_selection_full = hyportage_db.mspl_config.get_use_flags(
+					self.core, self.unmasked, self.__is_stable, self.use_manipulation_default) & self.iuses_full
 		return self.__use_selection_full
 
 	@property
@@ -209,7 +214,7 @@ class SPL(object):
 
 	@property
 	def smt_false(self):
-		return [smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(hyportage_db.id_repository, self.name))]
+		return [smt_encoding.smt_to_string(smt_encoding.get_spl_smt_not(hyportage_db.id_repository, self.name))]
 
 	@property
 	def smt_use_selection(self):
@@ -342,7 +347,7 @@ def keywords_get_core_set(keywords):
 ######################################################################
 
 
-class SPLGroup(list):
+class SPLGroup(object):
 	"""
 	This class stores all the information related to an spl group,
 	i.e., the "software" folder containing the .ebuild files for all the software's version.
@@ -353,10 +358,19 @@ class SPLGroup(list):
 		:param group_name: the name of the group
 		:param spl: the first spl known to be part of this group
 		"""
-		super(list, self).__init__()
 		self.name = name                            # name of the group
+		self.spls = []                              # the spls of this group
 		self.slots_mapping = core_data.dictSet()    # mapping listings all spls stored in one slot
 		self.__smt_constraint = None                # z3 constraint encoding this group
+
+	def __hash__(self): return hash(self.name)
+
+	def __eq__(self, other):
+		if isinstance(other, SPLGroup):
+			return self.name == other.name
+		else: return False
+
+	def __iter__(self): return iter(self.spls)
 
 	def add_spl(self, spl):
 		"""
@@ -364,11 +378,11 @@ class SPLGroup(list):
 		:param spl: the added spl
 		:return: None
 		"""
-		self.append(spl)
+		self.spls.append(spl)
 		self.slots_mapping.add(spl.slot, spl)
 
 	def remove_spl(self, spl):
-		self.remove(spl)
+		self.spls.remove(spl)
 		self.slots_mapping.remove_with_key(spl.slot, spl)
 
 	def replace_spl(self, old_spl, new_spl):

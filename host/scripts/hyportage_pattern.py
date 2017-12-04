@@ -132,9 +132,9 @@ class PatternRepository(dict):
 		for pattern, required_uses in spl.dependencies.iteritems():
 			if pattern in self:
 				pel = self[pattern]
-				required_uses = pel.required_uses
+				old_required_uses = pel.containing_spl.get(spl)
 				pel.add_containing_spl(spl, required_uses)
-				if required_uses != pel.required_uses:
+				if old_required_uses != pel.required_uses:
 					pattern_updated_list.append(pattern)
 			else:
 				pel = PatternElement(pattern)

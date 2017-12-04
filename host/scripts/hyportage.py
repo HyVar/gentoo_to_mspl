@@ -115,20 +115,6 @@ def main(
 		hyvarrec_url,
 		local_solver,
 		atoms):
-	"""
-	Tool that converts the gentoo files
-
-	dir_portage directory containing the engencache portage files (see https://wiki.gentoo.org/wiki/Egencache).
-	Usually it is ../../../host/portage/gen/md5-cache
-
-	dir_hyportage directory where all the files resulting of the translation will be put
-	Usually it is ../../../host/portage/json
-
-	Example: python hyportage.py -v --translate-only "sys-fs/udev-232-r2" ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-	Example: python hyportage.py -v ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-	Example: python hyportage.py -v -p 1 --use-existing-data ../../../host/portage/json/hyvarrec/hyvar_mspl.gentoorec --translate-only ../../../host/portage/usr/portage/metadata/md5-cache ../../../host/portage/json/hyvarrec
-
-	"""
 
 	##########################################################################
 	# 1. OPTIONS
@@ -148,7 +134,7 @@ def main(
 	else: available_cores = 1
 	logging.info("number of available cores: " + str(available_cores))
 
-	if (available_cores > 1) and (os.name != 'nt'):
+	if available_cores > 1:
 		concurrent_map = multiprocessing.Pool(available_cores).map
 	else: concurrent_map = map
 
@@ -223,77 +209,56 @@ def main(
 
 	if todo_update_hyportage:
 		logging.info("updating hyportage...")
-		#unchanged_spls = set(hyportage_db.mspl.values())
 
 		# update the hyportage spl database
-		spl_added, spl_removed, spl_groups_added, spl_groups_updated, spl_groups_removed = hyportage_translation.update_mspl_and_groups(
-			hyportage_db.mspl, hyportage_db.spl_groups, spl_name_set, loaded_spls)
-
-		#unchanged_spls.difference_update(spl_removed)
+		spl_added_list, spl_removed_list, spl_groups_added, spl_groups_updated, spl_groups_removed =\
+			hyportage_translation.update_mspl_and_groups(hyportage_db.mspl, hyportage_db.spl_groups, spl_name_set, loaded_spls)
 
 		# update the hyportage pattern repository
-		pattern_added, pattern_updated_containing, pattern_updated_content, pattern_removed = hyportage_translation.update_pattern_repository(
-			hyportage_db.pattern_repository, spl_added, spl_removed)
+		pattern_added, pattern_updated_containing, pattern_updated_content, pattern_removed =\
+			hyportage_translation.update_pattern_repository(hyportage_db.pattern_repository, spl_added_list, spl_removed_list)
 
 		# update the revert dependencies
+		changed_ids_spl_set = set(spl_added_list)
 		pattern_added_updated = pattern_added | pattern_updated_containing | pattern_updated_content
-		updated_spl_set = set(hyportage_translation.update_revert_dependencies(
+		changed_ids_spl_set.update(hyportage_translation.update_revert_dependencies(
 			hyportage_db.pattern_repository, pattern_added_updated, pattern_removed))
 
 		# reset the implicitly added use flags
-		updated_spl_set.update(hyportage_translation.reset_implicit_features(
+		changed_ids_spl_set.update(hyportage_translation.reset_implicit_features(
 			hyportage_db.mspl,
 			hyportage_db.mspl_config.new_use_declaration_eapi4, hyportage_db.mspl_config.new_use_declaration_eapi5))
 
-		# update the feature list with the implicit declarations
-		#spl_updated_features = hyportage_translation.add_implicit_features(
-		#	unchanged_spls, spl_added,
-		#	config.mspl_config.new_use_declaration_eapi4, config.mspl_config.new_use_declaration_eapi5,
-		#	config.mspl_config.use_declaration_eapi4, config.mspl_config.use_declaration_eapi5)
-
-
-
 		# update the id repository
-		#spl_updated_features.update(updated_spl_list)
-		#hyportage_translation.update_id_repository(
-		#	id_repository, spl_updated_features, spl_removed, spl_groups_removed, spl_groups_added)
-		hyportage_translation.update_id_repository(
-			hyportage_db.id_repository, updated_spl_set, spl_removed, spl_groups_removed, spl_groups_added)
-
-
+		hyportage_translation.update_id_repository(hyportage_db.id_repository, changed_ids_spl_set, spl_removed_list)
 
 		# update the visibility information
 		hyportage_translation.update_visibility(
-			hyportage_db.mspl, spl_added,
-			hyportage_db.mspl_config.new_masks, hyportage_db.mspl_config.new_keywords, hyportage_db.mspl_config.new_licenses)
-
-		#spl_updated_mask = hyportage_translation.update_masks(mspl, spl_added, config.mspl_config)
-		#spl_updated_visibility = hyportage_translation.update_keywords(mspl, spl_updated_mask, config.mspl_config)
+			hyportage_db.mspl, spl_added_list,
+			hyportage_db.mspl_config.new_masks, hyportage_db.mspl_config.new_keywords_config, hyportage_db.mspl_config.new_licenses_config)
 
 		# check if the main config of the spl must be regenerated
-		hyportage_translation.update_use_flag_selection(
-			hyportage_db.mspl, spl_added,
-			hyportage_db.mspl_config.new_keywords, hyportage_db.mspl_config.new_use_flag_config)
+		# COMMENTED OUT: the USE variable is changed every time the tool is called,
+		#  so it is efficiency-damaging to store the use selection of every spl
+		#hyportage_translation.update_use_flag_selection(
+		#	hyportage_db.mspl, spl_added_list,
+		#	hyportage_db.mspl_config.new_keywords_config, hyportage_db.mspl_config.new_use_flag_config)
 
 		# update the smt
 		implicit_use_flag_changed = hyportage_db.mspl_config.new_use_declaration_eapi4 or hyportage_db.mspl_config.new_use_declaration_eapi5
-		#hyportage_translation.update_smt_constraints(
-		#	pattern_repository, id_repository, mspl, spl_groups, simplify_mode,
-		#	pattern_added, pattern_updated, pattern_removed,
-		#	updated_spl_list, spl_updated_visibility)
 		pattern_added_updated_content = pattern_added | pattern_updated_content
 		hyportage_translation.update_smt_constraints(
 			hyportage_db.pattern_repository, hyportage_db.mspl, hyportage_db.spl_groups,
-			pattern_added_updated_content, updated_spl_set, implicit_use_flag_changed)
+			pattern_added_updated_content, spl_added_list, implicit_use_flag_changed)
 
 		# save the hypotage database
 		has_changed_config = implicit_use_flag_changed or hyportage_db.mspl_config.new_masks or\
-			hyportage_db.mspl_config.new_keywords or hyportage_db.mspl_config.new_licenses or\
+			hyportage_db.mspl_config.new_keywords_config or hyportage_db.mspl_config.new_licenses_config or\
 			hyportage_db.mspl_config.new_use_flag_config
-		has_changed_hyportage = bool(updated_spl_set) or has_changed_config
+		has_changed_hyportage = bool(spl_added_list) or bool(spl_removed_list) or has_changed_config
 
-		if has_changed_config: hyportage_db.save_configuration(path_db_hyportage, save_modality)
-		if has_changed_hyportage: hyportage_db.save_hyportage(path_configuration, save_modality)
+		if has_changed_config: hyportage_db.save_configuration(path_configuration, save_modality)
+		if has_changed_hyportage: hyportage_db.save_hyportage(path_db_hyportage, save_modality)
 
 		return None
 
@@ -315,7 +280,7 @@ def main(
 		solution = reconfigure.solve_spls(
 			hyportage_db.id_repository, hyportage_db.config, hyportage_db.mspl, hyportage_db.spl_groups,
 			all_spls, request_constraint, exploration_use, exploration_mask, exploration_keywords,
-			explain_modality=explain_modality)
+			explain_modality)
 
 		if solution is None:
 			logging.error("Non valid configuration found")

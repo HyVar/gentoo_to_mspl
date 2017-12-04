@@ -70,6 +70,7 @@ def spl_core_get_subslot(spl_core):
 # TRANSLATE ATOMS INTO HASHABLE PATTERNS
 ######################################################################
 
+
 def pattern_create_from_atom(atom):
 	"""
 	creates a pattern from a portage atom.
@@ -112,7 +113,8 @@ def pattern_create_from_atom(atom):
 		atom = atom[begin:]
 
 	# 3. version
-	package_group, version_full, version = parse_package_name(atom)
+	if vop is None:	package_group, version_full, version = atom, None, None
+	else: package_group, version_full, version = parse_package_name(atom)
 	has_star = False
 	if (version_full is not None) and (version_full[-1] == "*"):
 		has_star = True
@@ -185,20 +187,62 @@ def pattern_from_save_format(save_format):
 # MATCHING FUNCTIONS
 ######################################################################
 
+
+def compare_extra_len(s):
+	c = s[0]
+	if c == '_': return (s[1] == 'p') and ((len(s) < 3) or (s[2] != 'r'))
+	elif c == "r": return False
+	else: return True
+
+
+def get_int(s):
+	i = 0
+	lens = len(s)
+	while (i < lens) and s[i].isdigit(): i = i + 1
+	return int(s[:i])
+
 def compare_version(s1, s2):
-	i, len1, len2 = 0, len(s1), len(s2)
+	"""
+	Returns a positive number if s1 > 2, 0 if the two versions are equal and a negative number if s2 > s1
+	:param s1: the first version
+	:param s2: the second version
+	:return: a positive number if s1 > 2, 0 if the two versions are equal and a negative number if s2 > s1
+	"""
+	i = 0
+	len1 = len(s1)
+	len2 = len(s2)
 	maximum = min(len1, len2)
-	while (i < maximum) and (s1[i] == s2[i]):
-		i = i + 1
+	while (i < maximum) and (s1[i] == s2[i]): i = i + 1
 	if i == maximum:
-		return len1 - len2
+		if len1 == len2: return 0
+		if len1 < len2: return -1 if compare_extra_len(s2[i:]) else 1
+		return 1 if compare_extra_len(s1[i:]) else -1
 	else:
 		if s1[i].isdigit() and s2[i].isdigit():
-			n1 = int(re.search("\d+", s1[i:]).group(0))
-			n2 = int(re.search("\d+", s2[i:]).group(0))
-			return n1 - n2
+			# 1. check the factional part, that starts with a 0
+			if s1[i] == '0': return -1
+			elif s2[i] == '0': return 1
+			elif (i > 0) and (s1[i-1] == '0'): return ord(s1[i]) - ord(s2[i])  # note that s1[i-1] == s2[i-1]
+			else:  # 2. check the integer part
+				n1 = get_int(s1[i:])
+				n2 = get_int(s2[i:])
+				return n1 - n2
 		else:
+			# captures "1*" > ".*", "1*" > "_*" and "1*" > "-*", in any context
+			if s1[i].isdigit(): return 1
+			elif s2[i].isdigit(): return -1
+			# captures ".*" > "_*" and ".*" > "-*", in any context
+			elif s1[i] == '.': return 1
+			elif s2[i] == '.': return -1
+			# captures "-*" > "_alpha* -- _rc*" and "_p-*" > "_pre*", in any context
+			elif s1[i] == '-':
+				cond = (s2[i] == "r") or (not ((s2[i] == "_") and s2[i+1] == 'p') and ((len2 < i+3) or (s2[i+2] != 'r')))
+				return 1 if cond else -1
+			elif s2[i] == '-':
+				cond = (s1[i] == "r") or (not ((s1[i] == "_") and s1[i+1] == 'p') and ((len1 < i+3) or (s1[i+2] != 'r')))
+				return -1 if cond else 1
 			return ord(s1[i]) - ord(s2[i])
+
 
 
 def match_only_package_group(pattern, package_group):
@@ -619,14 +663,14 @@ class MSPLConfig(object):
 		accept_keywords = self.accept_keywords_full.copy()
 		self.pattern_accept_keywords.apply(spl_core, accept_keywords)
 		matched = keywords & accept_keywords
-		keyword_mask = bool(matched)
+		keyword_unmask = bool(matched)
 		if unmasked:
-			installable = keyword_mask
+			installable = keyword_unmask
 			is_stable = not bool(filter(lambda x: x[0] == '~', matched))
 		else:
 			installable = False
 			is_stable = False
-		return (not keyword_mask), installable, is_stable
+		return keyword_unmask, True, installable, is_stable  # TODO: filled license_unmasked with True for now
 
 	def get_use_force_mask(self, spl_core, is_stable):
 		return self.use_selection_config.get_use_force_mask(spl_core, is_stable)
@@ -640,15 +684,15 @@ class MSPLConfig(object):
 			use_flags = set()
 		return use_flags
 
-	def apply(self, spl_core, use_manipulation, keywords_default):
-		# 1. check if the package is masked
-		unmasked = self.get_unmasked(spl_core)
-		# 2. check if installable and stable
-		keyword_mask, installable, is_stable = self.get_stability_status(spl_core, unmasked, keywords_default)
-		# 3. compute the USE flag configuration (i.e., product)
-		use_flags = self.get_use_flags(spl_core, unmasked, is_stable, use_manipulation)
-		# 4. return the result
-		return unmasked, installable, is_stable, use_flags
+	#def apply(self, spl_core, use_manipulation, keywords_default):
+	#	# 1. check if the package is masked
+	#	unmasked = self.get_unmasked(spl_core)
+	#	# 2. check if installable and stable
+	#	keyword_mask, installable, is_stable = self.get_stability_status(spl_core, unmasked, keywords_default)
+	#	# 3. compute the USE flag configuration (i.e., product)
+	#	use_flags = self.get_use_flags(spl_core, unmasked, is_stable, use_manipulation)
+	#	# 4. return the result
+	#	return unmasked, installable, is_stable, use_flags
 
 	def close(self):
 		self.pattern_required_flat = {el for k, v in self.pattern_required.iteritems() for el in v}
@@ -702,12 +746,6 @@ class Config(object):
 	def set_use_manipulation_env(self, use_flag_manipulation):
 		self.use_manipulation_env = SetManipulation()
 		self.use_manipulation_env.add_all(use_flag_manipulation)
-
-	def apply(self, spl_core, use_manipulation, keywords_default):
-		unmasked, installable, is_stable, use_flags = self.mspl_config.apply(spl_core, use_manipulation, keywords_default)
-		if installable:
-			use_flags = self.use_manipulation_env.apply(use_flags)
-		return unmasked, installable, is_stable, use_flags
 
 	def close_init_phase(self): self.mspl_config.close_init_phase()
 

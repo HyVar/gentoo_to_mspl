@@ -134,12 +134,12 @@ def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 	installed_spls = set(installed_spls.keys()) & spl_names
 	# preference for removing less packages installed and not deprecated as possible
 	pref_less_remove = " + ".join([
-		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
+		smt_encoding.get_spl_hyvarrec(id_repository, spl_name)
 		for spl_name in installed_spls
 		if not mspl[spl_name].is_deprecated])
 	# preference to minimize number of new packages to install
 	pref_less_add = " + ".join([
-		smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name)
+		smt_encoding.get_spl_hyvarrec(id_repository, spl_name)
 		for spl_name in spl_names if spl_name not in installed_spls])
 	if not pref_less_remove: pref_less_remove = "0"
 	return pref_less_remove + (" - (" + pref_less_add + ")" if pref_less_add else "")
@@ -163,7 +163,7 @@ def installed_spls_to_solver(id_repository, installed_spls, spl_names):
 	res = []
 	for spl_name, use_selection in installed_spls.iteritems():
 		if spl_name in spl_names:
-			res.append(smt_encoding.get_smt_variable_full_spl_name(id_repository, spl_name))
+			res.append(smt_encoding.get_spl_hyvarrec(id_repository, spl_name))
 	return res
 
 
@@ -201,34 +201,36 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 	return ls
 
 
-def generate_to_install_spls(id_repository, config, mspl, exploration_use, feature_list):
+def generate_to_install_spls(id_repository, mspl, feature_list):
 	"""
 	translate the output of the solver into a system to install (mapping from spl names to use flag selection)
 	:param id_repository: the id repository of hyportage
-	:param config: the config of hyportage
 	:param mspl: the mspl of hyportage
-	:param exploration_use: boolean saying if the solver can change the use flag default selection
 	:param feature_list: the solution found by the solver
 	:return: a dictionary spl_name -> use flag selection
 	"""
+	# 1. translate the computed solution into a configuration
 	res_core = core_data.dictSet()
 	use_flags = []
 	for feature in feature_list:
-		el = id_repository.data_from_id(smt_encoding.get_id_from_smt_variable(feature))
+		el = id_repository.data_from_id(feature)
 		if el[0] == "package":  # el = ("package", spl_name)
-			res_core.set(el[1], set())
+			res_core.add_key(el[1])
 		else:  # el = ("use", use, spl_name)
 			use_flags.append((el[1], el[2]))
-
 	for use_flag, spl_name in use_flags:
 		if spl_name in res_core:
 			res_core.add(spl_name, use_flag)
 
+	# 2. compares the computed solution to the actual spl use flag configuration, and generate the final configuration
 	res = core_data.dictSet()
 	for spl_name, use_selection_core in res_core.iteritems():
 		spl = mspl[spl_name]
-		spl.use_selection_core(config)
-		res[spl_name] = use_selection_core | (spl.use_selection_full - spl.iuses_core - config.mspl_config.use_declaration_hidden_from_user)
+		if spl.use_selection_core == use_selection_core:
+			res[spl_name] = spl.use_selection_full
+		else:
+			annex_use_flags = spl.use_selection_full - spl.iuses_core
+			res[spl_name] = use_selection_core | annex_use_flags
 	return res
 
 
@@ -249,8 +251,6 @@ def solve_spls(
 	:param explain_modality: boolean saying if a problem should be explained (by default: False)
 	:return: the solution found by the solver, if it exists
 	"""
-	spl_names = {spl.name for spl in spls}
-	installed_spls = config.installed_packages
 	# 1. construct the input data for the solver
 	# 1.1. construct the constraint
 	constraint = annex_constraint[:]
@@ -258,31 +258,27 @@ def solve_spls(
 	#tmp = 0
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
-		included = (spl.unmasked or exploration_mask) and ((spl.is_stable and spl.keyword_mask) or exploration_keywords)
+		included = (spl.unmasked or exploration_mask) and ((spl.is_stable and spl.unmasked_keyword) or exploration_keywords)
 		if included:
 			#tmp = tmp + 1
-			constraint.extend(spl.smt())
+			constraint.extend(spl.smt)
 			if exploration_use:
 				constraint.extend(spl.smt_use_exploration(id_repository, config))
 			else:
-				if spl.name in installed_spls:
-					logging.debug(spl.name + " => " + unicode(installed_spls[spl.name]))
-					constraint.extend(smt_encoding.convert_use_flag_selection(
-						id_repository, spl.name, spl.iuses_core, set(installed_spls[spl.name]) & spl.iuses_core))
-				else:
-					constraint.extend(spl.smt_use_selection(id_repository, config))
+				constraint.extend(spl.smt_use_selection)
 		else:
 			#logging.info("spl \"" + spl.name + "\" is not scheduled for possible installation")
-			constraint.extend(spl.smt_false(id_repository))
+			constraint.extend(spl.smt_false)
 	for spl_group_name, spls_tmp in spl_group_names.iteritems():
 		spl_group = spl_groups[spl_group_name]
-		constraint.extend(spl_group.smt_constraint)
-		for spl in spl_group.references:
-			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_smt_not_spl_name(id_repository, spl.name)))
+		constraint.extend(spl_group.smt)
+		for spl in spl_group:
+			if spl not in spls_tmp: constraint.append(smt_encoding.smt_to_string(smt_encoding.get_spl_smt_not(id_repository, spl.name)))
 	#logging.info("included spl: " + str(tmp))
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
-	preferences = [get_preferences_core(id_repository, mspl, installed_spls, spl_names)]
+	spl_names = {spl.name for spl in spls}
+	preferences = [get_preferences_core(id_repository, mspl, config.installed_packages, spl_names)]
 	# 1.3. construct the current system
 	current_system = [] #installed_spls_to_solver(id_repository, installed_spls, spl_names)
 	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration
@@ -311,7 +307,7 @@ def solve_spls(
 			logging.error("Conflict detected. Explanation:\n" + "\n".join(constraints) + '\n')
 		return None
 
-	return generate_to_install_spls(id_repository, config, mspl, exploration_use, res['features'])
+	return generate_to_install_spls(id_repository, mspl, res['features'])
 
 
 def generate_installation_files(mspl, path_emerge_script, path_use_flag_configuration, old_installation, new_installation):

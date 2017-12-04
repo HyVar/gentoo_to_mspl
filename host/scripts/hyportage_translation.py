@@ -249,13 +249,10 @@ def reset_implicit_features(mspl, is_eapi4_updated, is_eapi5_updated):
 ##########################################################################
 
 
-def update_id_repository(id_repository, updated_spl_list, spl_removed, spl_groups_removed, spl_groups_added):
+def update_id_repository(id_repository, changed_ids_spl_set, spl_removed):
 	utils.phase_start("Updating the Id Repository")
 	for spl in spl_removed: id_repository.remove_spl(spl)
-	for spl in updated_spl_list: id_repository.add_spl(spl)
-
-	for spl_group in spl_groups_removed: id_repository.remove_spl_group(spl_group)
-	for spl_group in spl_groups_added: id_repository.add_spl_group(spl_group)
+	for spl in changed_ids_spl_set: id_repository.add_spl(spl)
 	utils.phase_end("Generation completed")
 
 
@@ -305,7 +302,7 @@ def update_use_flag_selection(mspl, spl_added, new_keywords, new_use_flag_config
 def update_smt_constraints(
 		pattern_repository, mspl, spl_groups,
 		pattern_added_updated_content,
-		updated_spl_set, implicit_use_flag_changed):
+		spl_added_list, implicit_use_flag_changed):
 	utils.phase_start("Updating the core SMT Constraints")
 	# the spls for which we need to recompute the constraint are:
 	#  - all spls if the use flag changed
@@ -317,11 +314,11 @@ def update_smt_constraints(
 	#  - we need to update the constraint of all these spls
 	#  - plus the ones that depend on these spls (because e.g. some use flags might not exist anymore)
 	# too costly
-	if implicit_use_flag_changed:
+	if implicit_use_flag_changed or (len(pattern_repository)/2 < len(pattern_added_updated_content)):
 		iterator_spl = mspl.itervalues()
-		iterator_spl_group = iter(spl_groups)
+		iterator_spl_group = spl_groups.itervalues()
 	else:
-		spl_set = updated_spl_set.copy()
+		spl_set = set(spl_added_list)
 		for pattern in pattern_added_updated_content:
 			spl_set.update(pattern_repository[pattern].containing_spl.keys())
 		spl_group_set = {spl_groups[spl.group_name] for spl in spl_set}

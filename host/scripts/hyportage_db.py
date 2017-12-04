@@ -84,17 +84,16 @@ def load_config(path=config_db_path_default, save_modality=config_db_save_modali
 def load_hyportage(path=hyportage_db_path_default, save_modality=hyportage_db_save_modality_default):
 	utils.phase_start("Loading the hyportage database.")
 	global hyportage_db_loaded
-	global pattern_repository, flat_pattern_repository, id_repository, mspl, spl_groups
+	global pattern_repository, id_repository, mspl, spl_groups
 	if not hyportage_db_loaded:
 		if os.path.exists(path):
 			pattern_repository, id_repository, mspl, spl_groups = utils.load_data_file(path, save_modality)
 		else:
-			logging.info("No hyportage databse found: creating an empty one")
+			logging.info("No hyportage database found: creating an empty one")
 			pattern_repository = hyportage_pattern.PatternRepository()
 			id_repository = hyportage_ids.IDRepository()
 			mspl = hyportage_data.mspl_create()
 			spl_groups = hyportage_data.spl_groups_create()
-		flat_pattern_repository = pattern_repository.mapping_full
 		hyportage_db_loaded = True
 	utils.phase_end("Loading Completed")
 
@@ -117,6 +116,7 @@ def save_configuration(path=config_db_path_default, save_modality=config_db_save
 	mspl_config.new_use_declaration_eapi4 = False
 	mspl_config.new_use_declaration_eapi5 = False
 	mspl_config.new_keywords_config = False
+	mspl_config.new_licenses_config = False
 	mspl_config.new_use_flag_config = False
 	utils.store_data_file(path, config, save_modality)
 	utils.phase_end("Saving Completed")
@@ -124,7 +124,7 @@ def save_configuration(path=config_db_path_default, save_modality=config_db_save
 
 def save_hyportage(path=config_db_path_default, save_modality=config_db_save_modality_default):
 	utils.phase_start("Saving the hyportage database.")
-	global pattern_repository, flat_pattern_repository, id_repository, mspl, spl_groups
+	global pattern_repository, id_repository, mspl, spl_groups
 	data = pattern_repository, id_repository, mspl, spl_groups
 	utils.store_data_file(path, data, save_modality)
 	utils.phase_end("Saving Completed")
