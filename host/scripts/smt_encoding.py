@@ -325,12 +325,11 @@ def simplify_constraints(spl_name, constraints, simplify_mode):
 		return [formula]
 	elif simplify_mode == "individual":
 		formulas = []
-		for i in constraints:
-			formula = z3.simplify(i)
+		for c in constraints:
+			formula = z3.simplify(c)
 			if z3.is_false(formula):
-				logging.warning(
-					"Dependency " + unicode(i) + " in package " + spl_name + " is false."
-					+ "Package can not be installed")
+				logging.warning("Dependencies in package " + spl_name + " make it uninstallable.")
+				return [smt_false]
 			formulas.append(formula)
 		return formulas
 
@@ -383,3 +382,9 @@ def convert_patterns(pattern_repository, id_repository, patterns):
 		constraints.append(smt_or([get_spl_smt(id_repository, spl.name) for spl in new_spls]))
 	return spls, smt_list_to_strings(constraints)
 
+
+def convert_installed_spls(id_repository, domain_spls, installed_spls):
+	uninstalled_spls = [spl.name for spl in domain_spls if spl.name not in installed_spls]
+	constraint = [get_spl_smt(id_repository, spl_name) for spl_name in installed_spls]
+	constraint.extend([get_spl_smt_not(id_repository, spl_name) for spl_name in uninstalled_spls])
+	return smt_list_to_strings(constraint)

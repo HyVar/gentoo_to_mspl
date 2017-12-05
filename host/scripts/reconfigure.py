@@ -120,7 +120,7 @@ def process_request(pattern_repository, id_repository, config, atoms):
 ##########################################################################
 
 
-def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
+def get_preferences_core(id_repository, mspl, installed_spls, spl_name_set):
 	"""
 	the priority of preferences is decided as follows:
 		- remove less packages installed as possible,
@@ -128,21 +128,24 @@ def get_preferences_core(id_repository, mspl, installed_spls, spl_names):
 	:param id_repository: the repository of hyportage
 	:param mspl: the mspl of hyportage
 	:param installed_spls: the currently installed spls with their configuration
-	:param spl_names: the names of the spls considered in the reconfiguration process
+	:param spl_name_set: the names of the spls considered in the reconfiguration process
 	:return: an equation encoding the preference as described previously
 	"""
-	installed_spls = set(installed_spls.keys()) & spl_names
+	installed_spls = {
+		spl_name
+		for spl_name in installed_spls.iterkeys()
+		if (spl_name in spl_name_set) and (not mspl[spl_name].is_deprecated)}
+	uninstalled_spls = spl_name_set - installed_spls
 	# preference for removing less packages installed and not deprecated as possible
-	pref_less_remove = " + ".join([
-		smt_encoding.get_spl_hyvarrec(id_repository, spl_name)
-		for spl_name in installed_spls
-		if not mspl[spl_name].is_deprecated])
+	res = '0'
+	if installed_spls:
+		res = " + ".join([
+			smt_encoding.get_spl_hyvarrec(id_repository, spl_name) for spl_name in installed_spls])
 	# preference to minimize number of new packages to install
-	pref_less_add = " + ".join([
-		smt_encoding.get_spl_hyvarrec(id_repository, spl_name)
-		for spl_name in spl_names if spl_name not in installed_spls])
-	if not pref_less_remove: pref_less_remove = "0"
-	return pref_less_remove + (" - (" + pref_less_add + ")" if pref_less_add else "")
+	if uninstalled_spls:
+		res = res + " - (" + (" + ".join([
+			smt_encoding.get_spl_hyvarrec(id_repository, spl_name) for spl_name in uninstalled_spls])) + ")"
+	return [res]
 
 
 def get_preferences_use_flags(id_repository, mspl, spl_names):
@@ -186,17 +189,17 @@ def get_better_constraint_visualization(id_repository, mspl, constraints):
 		formula = pysmt.shortcuts.to_smtlib(formula, daggify=False)
 		# translate packages
 		where_declared = "user-required: "
-		spl_ids = set(re.findall('p([0-9]+)', formula))
+		spl_ids = set(re.findall('(p[0-9]+)', formula))
 		for spl_id in spl_ids:
 			name = id_repository.ids[spl_id][1]
-			formula = re.sub('p' + spl_id, name, formula)
+			formula = re.sub(spl_id, name, formula)
 			if i in mspl[name].smt:
 				where_declared = name + ": "
 
 		# translate uses
-		use_ids = set(re.findall('u([0-9]+)', formula))
+		use_ids = set(re.findall('(u[0-9]+)', formula))
 		for use_id in use_ids:
-			formula = re.sub('u' + use_id, id_repository.ids[use_id][2] + "#" + id_repository.ids[use_id][1], formula)
+			formula = re.sub(use_id, id_repository.ids[use_id][2] + "#" + id_repository.ids[use_id][1], formula)
 		ls.append(where_declared + formula)
 	return ls
 
@@ -263,7 +266,7 @@ def solve_spls(
 			#tmp = tmp + 1
 			constraint.extend(spl.smt)
 			if exploration_use:
-				constraint.extend(spl.smt_use_exploration(id_repository, config))
+				constraint.extend(spl.smt_use_exploration)
 			else:
 				constraint.extend(spl.smt_use_selection)
 		else:
@@ -278,7 +281,7 @@ def solve_spls(
 	logging.debug("number of constraints to solve: " + str(len(constraint)))
 	# 1.2. construct the preferences
 	spl_names = {spl.name for spl in spls}
-	preferences = [get_preferences_core(id_repository, mspl, config.installed_packages, spl_names)]
+	preferences = get_preferences_core(id_repository, mspl, config.installed_packages, spl_names)
 	# 1.3. construct the current system
 	current_system = [] #installed_spls_to_solver(id_repository, installed_spls, spl_names)
 	data_configuration = {"selectedFeatures": current_system, "attribute_values": [], "context_values": []} # current configuration
@@ -359,7 +362,7 @@ def generate_installation_files(mspl, path_emerge_script, path_use_flag_configur
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		if added_spl_names:
-			f.write("emerge -a --newuse -u " + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
+			f.write("emerge -a --newuse " + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
 		if removed_spl_names:
 			f.write("emerge --unmerge " + " ".join(["=" + spl_name for spl_name in removed_spl_names]) + "\n")
 		f.write("\n")
