@@ -31,7 +31,7 @@ The functions are:
  - `hyportage.sh setup_host`: creates the correct folder structure in the host to store the data. This must be executed before `sync_guest`
  - `hyportage.sh translate`: translate the portage tree and the user data into our internal representation
  - `hyportage.sh emerge`: acts like gentoo's `emerge -p`, except that it generates a installation script and a package.use file
- - `hyportage.sh install`: copy the generated installation script and package.use file to the guest VM, and executes the scripts, thus performing the installation.
+<!-- - `hyportage.sh install`: copy the generated installation script and package.use file to the guest VM, and executes the scripts, thus performing the installation. -->
 
 
 
@@ -46,7 +46,6 @@ Note that this structure is configurable in the main script hyportage.sh
     2. setup.sh: bash script to setup the right environment for the scripts
     3. load_make_defaults.sh: bash script to load a make.defaults or make.conf portage file
     4. core_data.py: core data structures used in our tool
-    5. portage_data.py: portage-specific data structures used in our tool
     5. extract_portage.py: main script that extract variability information from the portage packages, and store them in a local folder
 
 * host: contains the code needed for the translation and computation of the new configuration
@@ -54,11 +53,13 @@ Note that this structure is configurable in the main script hyportage.sh
       * portage: contains all the data extracted from the guest gentoo VM
          1. packages/portage-tree: a copy of the egencache folder of the portage repository
          2. packages/deprecated: generated egencache files from the installed packages that are not available in portage anymore
-         3. installed_packages.json: lists the packages that are installed on the guest VM, with the selected use flags
-         4. profile_configuration.json: stores the packages variability information stored in the guest VM profile
-         5. user_configuration.json: stores the packages variability information defined by the user in the guest VM
+         3. config.pickle: pickle file containing all information concerning the VM portage configuration:
+           1. the configuration done by the portage's profile and the user, including the use flag selection, the package masks and keywords.
+              Licenses are not considered at the moment.
+           2. the list of packages that are installed on the guest VM, with the selected use flags
+           3. the world list and the package sets (declared in the profile and by the user)
       * hyportage: contains our translation of the gentoo packages with information related to their variability, and some annex useful data
-        1. hyportage.enc: contains the main information
+        1. hyportage.pickle: pickle file that contains the translated packages and their visibility status
    - scripts: contains all the scripts for translating portage into hyportage, and for installing new packages.
       In particular:
       * hyportage.py: is the main python script, responsible for both translating the data extracted from portage into our hyportage encoding, and for computing a nnew connfiguration from a user request
@@ -106,7 +107,7 @@ If the VM is reachable then run the following command that will install the nece
 
 To get the required information from the VM please run the following scripts:
 ```
-./hyportage.sh sync_guest
+bash hyportage.sh sync_guest
 ```
 
 This script copies to the host VM the package data (in the [egencache](https://wiki.gentoo.org/wiki/Egencache) format),
@@ -123,116 +124,99 @@ Note that if an installed package is deprecated (i.e., it is not in the portage 
 The next step is to translate the egencache files and the extracted data into our hyportage encoding.
 This is done by executing
 ```
-./hyportage.sh translate
+bash hyportage.sh translate
 ```
 
 This script can take several minutes to complete.
 
 
 This script have several options:
- * `-v`: verbose mode. The verbosity of the tool can be increased by having several instances of this option
+ * `-v`: verbose mode. The verbosity of the tool can be increased by having several instances of this option (`-vvv` is for debugging)
  * `-p`: parallel mode. This option takes in parameter how many process to use, and parallelizes the loading of the egencache files
 
 Typically, for a verbose execution of the script on a 4 core processor, one runs:
 ```
-./hyportage.sh translate -vvv -p 3
+bash hyportage.sh translate -vvv -p 3
 ```
 
 
 
 ### Computing a new Configuration
 
-
-
-
-To run the reconfiguration run the following script.
+As discussed before, the function to compute a new configuration is `emerge` and can be called similarly to the portage `emerge` tool, without its options:
 ```
-sh reconfigure <request file> <keyword>
+bash hyportage.sh emerge <list of atoms to install>
 ```
 
-For example, to install git execute the following script.
+or
 ```
-sh reconfigure world amd64
+bash USE="use flag selection" hyportage.sh emerge <list of atoms to install>
 ```
-where the world file is the following JSON file.
+Note that the atoms in parameter must be qualified with the package category.
+For instance, `www-servers/apache` is accepted while `apache` is not.
+
+However, our tool have additional very important options that we discuss below.
+
+#### External Solver Configuration
+
+The computation of a new configuration uses an external solver called [hyvar-rec](https://github.com/HyVar/hyvar-rec).
+By default, our tool suppose that the executable `hyvar-rec` can be called, but two options can change this behavior:
+ 1. `--local-solver 'command'` specifies the command to call the solver on the local computer.
+    It can be useful when it is not possible to create an `hyvar-rec` executable (on windows for instance).
+    For instance, one can specify a command that directly execute the hyvar-rec.py file with python:
+    ```
+    bash hyportage.sh emerge -vvv  --local-solver 'python C:\Users\user\git\hyvar-rec\hyvar-rec.py' www-servers/apache
+    ```
+    Note that the paths in the command cannot contain spaces
+ 2. `--hyvarrec-url` specifies the url of an hyvar-rec server.
+
+#### Exploration
+
+By default, our tool installs only installable packages (that are stable and not masked) with the use flag configuration as specified by the user.
+However, the `--exploration` option allow our tool to be more flexible.
+This option takes in parameter a list of exploration mode to consider:
+  - **use**: this mode allows the tool to change the use flag configuration of the packages
+  - **keywords**: this mode allows the tool to consider also packages that are unstable or that cannot be installed in the specified architecture
+  - **mask**: this mode allows the tool to consider also masked packages
+For instance, to install gnome considering unstable packages and allowing the tool to change the use flag configuration:
 ```
-{
-	"app-admin/sudo":{},
-	"app-admin/syslog-ng":{},
-	"sys-apps/dbus":{},
-	"sys-boot/grub":{},
-	"sys-kernel/genkernel":{},
-	"sys-kernel/gentoo-sources":{},
-	"dev-vcs/git":{}
-}
-```
-
-Updating the VM
-----------------------
-To update the VM run the following script.
-```
-sh update-guest.sh osboxes@localhost 9022
-```
-This script move to the VM in the user home folder the installation script update.sh and set the configuration file
-for the packages. The update script needs to be run on the VM by the user as follows.
-```
-sudo update.sh
+bash hyportage.sh emerge --exploration=keywords,use gnome-base/gnome
 ```
 
 
+#### Error Management
 
-### Removing the installed scripts and data
+By default, if the atoms in parameter cannot be installed, the tool simply states that there are no solution and terminates without giving any explanation.
+This is due to a limitation of the backend solver.
+However, if an explanation of the problem is needed, it is possible to re-run the tool with the `--explain-modality` option
+ to get a message listing the constraints that are in conflict.
 
-
-Note that this script for safety does not override existing data.
-Please run the following script to delete local data TODO
-
-
-
-Assumptions
-----------------------
-
-Package that are always visible (**) are treated as packages visible if they are stable on any architecture (*)
-
-When the keyword is not specified for a package we do not consider its installation
-
-Slot Operators
- - := is treated as :*
- - :SLOT= is treated as :SLOT
-
-TODO:
------------------------- 
- sys-apps/kbd-2.0.3 can not be disinstalled
-
- Both: change world structure file to allow user to disinstall packages + extend capabilities (version,slots)
- 
- Michael: correct generation of world from gentoo also translating the profile in hyvarrec
-
- Michael: split the configuration files to have a more efficient update
-
- Both: find a way to deal with necessary packages (should be easy), and global use flags preference (more complex)
-
- Michael: handle the deprecated packages after an update
- 
- Jacopo: remove slot o subslot variables in encoding
- 
- Jacopo: install world of kde version into minimal gentoo version and check what happens
- 
- Jacopo: incrementality of translation into hyvarrec
- 
- Jacopo: try to unify both parsing of dependencies (talk with Michael)
- 
- Michael: contact gentoo community
- 
-
-Known Bugs
-----------
-
- - the list of use flags of a package is not well computed
- -
+Note that it is possible to directly call our tool with the `--explain-modality`, but it disturbs the solver that most probably will install many unnecessary packages.
+For instance, to have an idea of why gnome cannot be installed, one can call
+```
+bash hyportage.sh emerge --explain-modality gnome-base/gnome
+```
+and will obtain the following message
+```
+user-required: (or gnome-base/gnome-3.20.0 gnome-base/gnome-3.22.0)
+user-required: (not gnome-base/gvfs-1.28.3-r1#udisks)
+user-required: (not gnome-base/gvfs-1.30.3)
+gnome-base/gnome-3.20.0: (=> gnome-base/gnome-3.20.0 (and x11-themes/sound-theme-freedesktop-0.8 (or gnome-base/gdm-3.20.1 gnome-base/gdm-3.22.3) (or x11-themes/gnome-backgrounds-3.20 x11-themes/gnome-backgrounds-3.22.1 x11-themes/gnome-backgrounds-3.23.91) (or x11-wm/mutter-3.22.3 x11-wm/mutter-3.20.3) (or (and gnome-base/gnome-core-apps-3.22.2 (or (not gnome-base/gnome-3.20.0#cups) gnome-base/gnome-core-apps-3.22.2#cups) (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-core-apps-3.22.2#bluetooth) (or (not gnome-base/gnome-3.20.0#cdr) gnome-base/gnome-core-apps-3.22.2#cdr)) (and gnome-base/gnome-core-apps-3.20.0 (or (not gnome-base/gnome-3.20.0#cups) gnome-base/gnome-core-apps-3.20.0#cups) (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-core-apps-3.20.0#bluetooth) (or (not gnome-base/gnome-3.20.0#cdr) gnome-base/gnome-core-apps-3.20.0#cdr)) (and gnome-base/gnome-core-apps-3.22.0 (or (not gnome-base/gnome-3.20.0#cups) gnome-base/gnome-core-apps-3.22.0#cups) (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-core-apps-3.22.0#bluetooth) (or (not gnome-base/gnome-3.20.0#cdr) gnome-base/gnome-core-apps-3.22.0#cdr))) (or (and gnome-base/gnome-core-libs-3.22.2 (or (not gnome-base/gnome-3.20.0#cups) gnome-base/gnome-core-libs-3.22.2#cups)) (and gnome-base/gnome-core-libs-3.20.0-r1 (or (not gnome-base/gnome-3.20.0#cups) gnome-base/gnome-core-libs-3.20.0-r1#cups))) (or (and gnome-base/gnome-shell-3.22.3 (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-shell-3.22.3#bluetooth)) (and gnome-base/gnome-shell-3.22.2 (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-shell-3.22.2#bluetooth)) (and gnome-base/gnome-shell-3.20.4 (or (not gnome-base/gnome-3.20.0#bluetooth) gnome-base/gnome-shell-3.20.4#bluetooth))) (or (and gnome-base/gvfs-1.28.3-r1 gnome-base/gvfs-1.28.3-r1#udisks) (and gnome-base/gvfs-1.30.3 gnome-base/gvfs-1.30.3#udisks)) (or (not gnome-base/gnome-3.20.0#accessibility) (and (or app-accessibility/at-spi2-atk-2.22.0 app-accessibility/at-spi2-atk-2.20.1) (or app-accessibility/at-spi2-core-2.22.1 app-accessibility/at-spi2-core-2.20.2) app-accessibility/caribou-0.4.21 (or app-accessibility/orca-3.20.3-r1 app-accessibility/orca-3.22.2 app-accessibility/orca-3.22.1) gnome-extra/mousetweaks-3.12.0)) (or (not gnome-base/gnome-3.20.0#classic) gnome-extra/gnome-shell-extensions-3.20.1 gnome-extra/gnome-shell-extensions-3.22.2) (or (not gnome-base/gnome-3.20.0#extras) gnome-base/gnome-extra-apps-3.20.0 gnome-base/gnome-extra-apps-3.22.0)))
+user-required: (not gnome-base/gnome-3.22.0)
+```
+This message is not very satisfactory (it does not contain proper sentence using portage syntax), but still give us some information:
+ - to install gnome, we need to install either `gnome-base/gnome-3.20.0` or `gnome-base/gnome-3.22.0`
+ - `gnome-base/gnome-3.22.0` is not installable, either because it is masked or unstable
+ - `gnome-base/gnome-3.20.0` is not installable because of its dependencies requires the use flag `udisks` to be selected for the packages `gnome-base/gvfs`, which is not.
 
 
-Task:
------------------------- 
-Find configuration from which installing something can not be done in portage easily
 
+## Limitations
+
+This tool, being a prototype in a research project, has many limitations and most probably bugs
+ - As previously discussed, the installation and error messages could greatly be improved.
+   However, this would require a lot of engineering work.
+ - This tool does not consider the different stages of package installation, and merges together the dependencies, the runtime dependencies and the p-dependencies.
+ - This tool does not manage the order of package installation/removal. For instance, to install gnome, our tool states that `=sys-fs/eudev-3.1.5` must be removed but does not say when.
+   By default, the tool first states what must be installed and then what must be removed.
+ - This tool does not ask for the recompilation of packages with the slot `:=` dependency (this is however managed by portage itself when our installation script calls emerge)
