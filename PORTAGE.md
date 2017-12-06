@@ -215,26 +215,124 @@ This folder contains one sh script,
 
 ## Definition of a Package
 
+In portage, packages are characterised by several information that we structure in three categories.
+To illustrate our presentation, we will use the content of the package `app-admin/sudo-1.8.19_p2`,
+ called `sudo` in this section for simplicity.
+
+
 ### Feature Model
 
- - **IUSE**
- - **IUSE_REQUIRED**
- - **DEPEND**
- - **RDEPEND**
- - **PDEPEND**
+The feature model of a package contains all the information related to its variability
+ and its relationship with other packages.
+It is described in portage with 6 variables:
+
+ - [**IUSE**](https://dev.gentoo.org/~zmedico/portage/doc/portage.html#package-ebuild-eapi-1-iuse-defaults)
+    This variable declares the list of default features (or *use flags* in portage terminology) of the package.
+    Additionally, the use flags in this list can be prefixed with `+` or `-` to specify a *use flag manipulation*
+    that is used to define the default product (or *use flag selection*) of the package.
+    This will be discussed more in detail in the section about [use flag configuration](#use-flags-configuration).
+    The IUSE of the `sudo` package is
+    ```
+    ldap nls pam offensive selinux skey +sendmail
+    ```
+    As we just discussed, this is the list of the default features of this package.
+    Note that `sendmail` is prefixed with `+`, that states that the default product of this package (most probably) contains that feature.
+    Note also that this variable lists the *default* features of the package:
+    *implicit* features can be added to it by the portage or user profile, as discussed in the [use flag configuration](#use-flags-configuration).
+ - [**REQUIRED_USE**](https://dev.gentoo.org/~zmedico/portage/doc/portage.html#package-ebuild-eapi-4-metadata-required-use)
+   This variable contains a constraint that states what are the valid products of the package,
+   i.e. how the use flags can be selected for this package.
+   The REQUIRED_USE of the `sudo` package is
+   ```
+   pam? ( !skey ) skey? ( !pam )
+   ```
+   This constraint states that the features `pam` and `skey` are in conflict and cannot be selected together.
+   For instance, the product `sendmail skey` is valid, while `sendmail pam skey` is not.
+ - [**DEPEND**](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
+   This variable contains a constraint stating for every product of the package,
+   which other packages are required during (or in conflict with) the installation of the current package.
+   For instance, the DEPEND variable of the `sudo` package is
+   ```
+   pam? ( virtual/pam ) skey? ( >=sys-auth/skey-1.1.5-r1 ) ldap? ( >=net-nds/openldap-2.1.30-r1 dev-libs/cyrus-sasl ) sys-libs/zlib sys-devel/bison
+   ```
+   This constraint states for instance that if the feature `pam` is selected, then one of the packages implementing `virtual/pam` must be present during its installation.
+   Note also that this package depends on `sys-devel/bison` which is used to generate a grammar in the sudo source code.
+ - [**RDEPEND**](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
+   This variable contains a constraint following the same syntax as DEPEND, that describes the dependencies *at runtime* of the package.
+   For instance, the RDEPEND of `sudo` is
+   ```
+   pam? ( virtual/pam ) skey? ( >=sys-auth/skey-1.1.5-r1 ) ldap? ( >=net-nds/openldap-2.1.30-r1 dev-libs/cyrus-sasl ) sys-libs/zlib selinux? ( sec-policy/selinux-sudo ) ldap? ( dev-lang/perl ) pam? ( sys-auth/pambase ) >=app-misc/editor-wrapper-3 virtual/editor sendmail? ( virtual/mta )
+   ```
+   In this constraint, it is possible to see that the dependency to `sys-devel/bison` is not present anymore (the package is indeed installed so it is not necessary to download its source code), but additional dependencies like `virtual/editor` appeared.
+ - [**PDEPEND**](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
+   This variable is similar to the two previous ones as it contains the *post-merge* dependencies, i.e.
+   > dependencies that should be merged after the package, but which may be merged at any time, if the former is not possible.
+   > [...] Generally `PDEPEND` should be avoided in favour of `RDEPEND` except where this will create circular dependency chains.
+   The `sudo` package does not have a PDEPEND variable.
  - [**SLOT**](https://devmanual.gentoo.org/general-concepts/slotting/index.html)
+   Slots is portage's mechanism to specify which packages of the same group can be installed at the same time.
+   This is very useful for instance for `python` that has two parallel sets of versions: `2.7.*` and `3.*`.
+   The slot of a package is simply a string (by default `0`), and two package of the same group can be installed at the same time only if their slot is different.
+   The SLOT variable thus contains the slot of the package, plus an optional *subslot*.
+   This subslot is not used to specify conflicts between packages, but to specify recompilation events:
+    a package that has a [*`=` slot dependency*](https://devmanual.gentoo.org/general-concepts/dependencies/index.html#slot-dependencies) must be recompiled if that dependency changes sublot.
+   The `sudo` package has a simple `SLOT=0` slot variable.
+
 
 ### Visibility
 
- - **KEYWORDS**
- - **ACCEPT_KEYWORDS**
- - **STABLE**
- - **MASK**
- - **LICENSE**
- - **ACCEPT_LICENSE**
+The visibility of a package states if a package can be considered in an installation process or not.
+It is related to different factors: the computer hardware architecture (not all program can be installed on all architecture), if the package is stable or not, etc.
+In the following, we list the different data related to a package visibility:
 
-### Installation scripts
+ - [**KEYWORDS**](https://wiki.gentoo.org/wiki/KEYWORDS)
+   As previously discussed, KEYWORDS is a variable that lists the architecture on which this package can be installed.
+   By default, this variable contains just a list of architecture names,
+    possibly prefixed with `~` to state that this package might be installable on that architecture but is not fully tested: this package is *unstable* for that architecture.
+   Additionally, this list can also contain *set operators* like `-*` that removes all previously specified architectures (see the [documentation](https://wiki.gentoo.org/wiki/KEYWORDS) for more information).
+   The KEYWORDS variable of `sudo` is a simple list of architecture (like most packages) that however states that this package is not tested on any architecture:
+   ```
+   ~alpha ~amd64 ~arm ~arm64 ~hppa ~ia64 ~m68k ~mips ~ppc ~ppc64 ~s390 ~sh ~sparc ~x86 ~amd64-fbsd ~sparc-fbsd ~x86-fbsd ~sparc-solaris
+   ```
+ - [**ACCEPT_KEYWORDS**](https://wiki.gentoo.org/wiki/ACCEPT_KEYWORDS/en)
+   By default, a package can only be installed if the hardware architecture of the computer (specified in the `ARCH` variable in portage) is listed in the KEYWORDS variable of the package.
+   However, this behavior can be overwritten by the user, by specifying an ACCEPT_KEYWORDS for this packages.
+   This variable override the `ARCH` variable, and lists the architecture against which the package's KEYWORDS must be confronted.
+   For instance, specifying the ACCEPT_KEYWORDS `~alpha` for `sudo` would make this package installable.
+   We will see in the TODO how to specify a package's ACCEPT_KEYWORDS
+ - **INSTALLABLE** and **STABLE** These two information are a consequence to the matching between a package's KEYWORDS, its ACCEPT_KEYWORDS, and the ARCH variable.
+   A package is *installable* if the intersection between the set stated by its KEYWORDS variable and ARCH (or its ACCEPT_KEYWORDS if defined) is non empty.
+   A package is *stable* if that intersection contains no testing architecture (i.e., architecture prefixed with `~`).
+ - [**(UN)**](https://wiki.gentoo.org/wiki/Knowledge_Base:Unmasking_a_package) [**MASK**](https://wiki.gentoo.org/wiki/Knowledge_Base:Masking_a_package)
+   In portage, package can be masked so they will never be installed.
+   Masked package can also be unmasked by the user so he can install it nonetheless (assuming the risk that it could break something on the computer).
+ - [**LICENSE**](https://www.gentoo.org/glep/glep-0023.html)
+   This variable is a constraint (that uses a syntax identical to the one in REQUIRED_USE) that lists the licenses under which the package is distributed.
+   This is essential, as installing a package means accepting one of its distribution licenses, which is legally binding.
+   By default, portage allows to install package with a free license (see [here](https://wiki.gentoo.org/wiki/License_Groups) or [wikipedia](https://en.wikipedia.org/wiki/Free_license) for some discussion on that topic),
+   and package with a more restricting license, like `dev-java/oracle-jdk-bin` can be installed only if its license is explicitly accepted by the user.
+   The LICENSE of `sudo` contains two elements: `ISC` and `BSD` (which are [GPL-Compatible](https://wiki.gentoo.org/wiki/License_Groups/GPL-COMPATIBLE)).
+ - [**ACCEPT_LICENSE**](https://www.gentoo.org/glep/glep-0023.html)
+   As we just discussed, it is possible to define the ACCEPT_LICENSE of a package to list the license terms the user accepts for that package.
+   In portage, it is not necessary to accept any license to install `sudo`, but it is necessary to accept the `Oracle-BCLA-JavaSE` license to install `dev-java/oracle-jdk-bin`
 
+**Remark**: at one point in the evolution of portage, ACCEPT_KEYWORDS did not exist and the only way to install a package was to directly change its KEYWORDS list (using the [/etc/portage/package.keywords](https://wiki.gentoo.org/wiki//etc/portage/package.accept_keywords) file).
+Due to backward compatibility, this is still possible, which means that a user can both modify the KEYWORDS of a package, and its ACCEPT_KEYWORDS:
+ consequently, it is possible in portage to make any package installable and stable.
+
+
+### Installation
+
+The installation of a package is characterized in portage by two main elements:
+ - **SRC_URI**
+   This variable lists the links from which the package implementation can be downloaded.
+   For instance, the SRC_URI of `sudo` is
+   ```
+   SRC_URI=http://www.sudo.ws/sudo/dist/sudo-1.8.19p2.tar.gz ftp://ftp.sudo.ws/pub/sudo/sudo-1.8.19p2.tar.gz
+   ```
+ - [**installation functions**](https://devmanual.gentoo.org/ebuild-writing/functions/index.html)
+   The developer of the package also defines a set of functions that implement the build process.
+   In this documentation, we focus on the configuration of a package, not on its installation, and we invite the interested reader to look at the [documentation](https://devmanual.gentoo.org/ebuild-writing/functions/index.html).
 
 
 ## Package Configuration
