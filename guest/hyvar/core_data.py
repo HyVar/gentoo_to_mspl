@@ -187,7 +187,6 @@ def pattern_from_save_format(save_format):
 # MATCHING FUNCTIONS
 ######################################################################
 
-
 def compare_extra_len(s):
 	c = s[0]
 	if c == '_': return (s[1] == 'p') and ((len(s) < 3) or (s[2] != 'r'))
@@ -201,9 +200,11 @@ def get_int(s):
 	while (i < lens) and s[i].isdigit(): i = i + 1
 	return int(s[:i])
 
+
 def compare_version(s1, s2):
 	"""
 	Returns a positive number if s1 > 2, 0 if the two versions are equal and a negative number if s2 > s1
+	This function assumes that the parameters are valid portage versions
 	:param s1: the first version
 	:param s2: the second version
 	:return: a positive number if s1 > 2, 0 if the two versions are equal and a negative number if s2 > s1
@@ -212,7 +213,19 @@ def compare_version(s1, s2):
 	len1 = len(s1)
 	len2 = len(s2)
 	maximum = min(len1, len2)
-	while (i < maximum) and (s1[i] == s2[i]): i = i + 1
+	dot = False
+	number_alternative_mode = False
+	while (i < maximum) and (s1[i] == s2[i]):
+		# computes if the number should be managed as integers or fractional part
+		if s1[i] == '.':
+			dot = True
+			number_alternative_mode = False
+		elif dot:
+			if s1[i] == '0': number_alternative_mode = True
+			dot = False
+		elif number_alternative_mode and (not s1[i].isdigit()):
+			number_alternative_mode = False
+		i = i + 1
 	if i == maximum:
 		if len1 == len2: return 0
 		if len1 < len2: return -1 if compare_extra_len(s2[i:]) else 1
@@ -222,7 +235,7 @@ def compare_version(s1, s2):
 			# 1. check the factional part, that starts with a 0
 			if s1[i] == '0': return -1
 			elif s2[i] == '0': return 1
-			elif (i > 0) and (s1[i-1] == '0'): return ord(s1[i]) - ord(s2[i])  # note that s1[i-1] == s2[i-1]
+			elif number_alternative_mode: return ord(s1[i]) - ord(s2[i])
 			else:  # 2. check the integer part
 				n1 = get_int(s1[i:])
 				n2 = get_int(s2[i:])
@@ -241,8 +254,8 @@ def compare_version(s1, s2):
 			elif s2[i] == '-':
 				cond = (s1[i] == "r") or (not ((s1[i] == "_") and s1[i+1] == 'p') and ((len1 < i+3) or (s1[i+2] != 'r')))
 				return -1 if cond else 1
+			# captures comparison between alpha characters
 			return ord(s1[i]) - ord(s2[i])
-
 
 
 def match_only_package_group(pattern, package_group):
