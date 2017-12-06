@@ -215,7 +215,7 @@ This folder contains one sh script,
 
 ## Definition of a Package
 
-In portage, packages are characterised by several information that we structure in three categories.
+In portage, packages are characterised by several information that we structure in four categories.
 To illustrate our presentation, we will use the content of the package `app-admin/sudo-1.8.19_p2`,
  called `sudo` in this section for simplicity.
 
@@ -224,13 +224,13 @@ To illustrate our presentation, we will use the content of the package `app-admi
 
 The feature model of a package contains all the information related to its variability
  and its relationship with other packages.
-It is described in portage with 6 variables:
+It is described in portage with 6 information:
 
  - [**IUSE**](https://dev.gentoo.org/~zmedico/portage/doc/portage.html#package-ebuild-eapi-1-iuse-defaults)
-    This variable declares the list of default features (or *use flags* in portage terminology) of the package.
-    Additionally, the use flags in this list can be prefixed with `+` or `-` to specify a *use flag manipulation*
-    that is used to define the default product (or *use flag selection*) of the package.
-    This will be discussed more in detail in the section about [use flag configuration](#use-flags-configuration).
+    This variable declares the list of default features (or *USE flags* in portage terminology) of the package.
+    Additionally, the USE flags in this list can be prefixed with `+` or `-` to specify a *USE flag manipulation*
+    that is used to define the default product (or *USE flag selection*) of the package.
+    This will be discussed more in detail in the section about [USE flag configuration](#use-flags-configuration).
     The IUSE of the `sudo` package is
     ```
     ldap nls pam offensive selinux skey +sendmail
@@ -238,10 +238,15 @@ It is described in portage with 6 variables:
     As we just discussed, this is the list of the default features of this package.
     Note that `sendmail` is prefixed with `+`, that states that the default product of this package (most probably) contains that feature.
     Note also that this variable lists the *default* features of the package:
-    *implicit* features can be added to it by the portage or user profile, as discussed in the [use flag configuration](#use-flags-configuration).
+    *implicit* features can be added to it by the portage or user profile, as discussed in the [USE flag configuration](#use-flags-configuration).
+ - **SELECTED_USE**
+   To the best of our knowledge, this information is not explicitly named in the portage documentation,
+   and corresponds to the product (i.e. the set of USE flags) that is installed when installing the package.
+   This product is not directly stated by the user (it is not possible to write something like `SELECTED_USE=<list of USE flags`),
+   but is constructed in several steps, as discussed in the [package configuration section](#configuration-of-a-package).
  - [**REQUIRED_USE**](https://dev.gentoo.org/~zmedico/portage/doc/portage.html#package-ebuild-eapi-4-metadata-required-use)
    This variable contains a constraint that states what are the valid products of the package,
-   i.e. how the use flags can be selected for this package.
+   i.e. how the USE flags can be selected for this package.
    The REQUIRED_USE of the `sudo` package is
    ```
    pam? ( !skey ) skey? ( !pam )
@@ -273,7 +278,7 @@ It is described in portage with 6 variables:
    Slots is portage's mechanism to specify which packages of the same group can be installed at the same time.
    This is very useful for instance for `python` that has two parallel sets of versions: `2.7.*` and `3.*`.
    The slot of a package is simply a string (by default `0`), and two package of the same group can be installed at the same time only if their slot is different.
-   The SLOT variable thus contains the slot of the package, plus an optional *subslot*.
+   The SLOT variable thus contains the slot of the package, plus an optional *subslot* separated from the slot with a `/` character.
    This subslot is not used to specify conflicts between packages, but to specify recompilation events:
     a package that has a [*`=` slot dependency*](https://devmanual.gentoo.org/general-concepts/dependencies/index.html#slot-dependencies) must be recompiled if that dependency changes sublot.
    The `sudo` package has a simple `SLOT=0` slot variable.
@@ -305,7 +310,7 @@ In the following, we list the different data related to a package visibility:
    A package is *stable* if that intersection contains no testing architecture (i.e., architecture prefixed with `~`).
  - [**(UN)**](https://wiki.gentoo.org/wiki/Knowledge_Base:Unmasking_a_package) [**MASK**](https://wiki.gentoo.org/wiki/Knowledge_Base:Masking_a_package)
    In portage, package can be masked so they will never be installed.
-   Masked package can also be unmasked by the user so he can install it nonetheless (assuming the risk that it could break something on the computer).
+   Masked package can also be unmasked by the user so he can install it nonetheless (assuming the risk that it could break something in his system).
  - [**LICENSE**](https://www.gentoo.org/glep/glep-0023.html)
    This variable is a constraint (that uses a syntax identical to the one in REQUIRED_USE) that lists the licenses under which the package is distributed.
    This is essential, as installing a package means accepting one of its distribution licenses, which is legally binding.
@@ -334,8 +339,152 @@ The installation of a package is characterized in portage by two main elements:
    The developer of the package also defines a set of functions that implement the build process.
    In this documentation, we focus on the configuration of a package, not on its installation, and we invite the interested reader to look at the [documentation](https://devmanual.gentoo.org/ebuild-writing/functions/index.html).
 
+### EAPI
 
-## Package Configuration
+The last important information in a package is its [`EAPI`](https://devmanual.gentoo.org/ebuild-writing/eapi/index.html)
+ variable, that informs portage about syntax used in the package declaration and its content.
+In particular, this variable is used for deciding which USE flags must be implicitly added to the package's `IUSE` variable.
+
+
+## Configuration of a Package
+
+Portage has a complex, layered system for configuring its packages.
+Among all the information described in the previous section, only the
+ `REQUIRED_USE`, `*DEPEND`, `SLOT` and `LICENSE` variables are not configurable.
+
+For the sake of clarity, and because the way portage configures package is quite complex,
+we structure our presentation in two main parts:
+ we first give an overview of the mechanisms used by portage to configure each information individually,
+ and in a second step we discussed the layered structure of this configuration.
+
+### Overview per Variable
+
+#### IUSE
+
+According to the [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/ebuild.5.html),
+ the declaration of a package's USE flags is done in each package declaration individually.
+Here is an excerpt of the documentation:
+> **IUSE**
+>
+> This should be a list of any and all USE flags that are leveraged within your build script.
+> The only USE flags that should not be listed here are arch related flags (see KEYWORDS).
+> Beginning with EAPI 1, it is possible to prefix flags with + or - in order to create default settings that respectively enable or disable the corresponding USE flags.
+> For details about USE flag stacking order, refer to the USE_ORDER variable in make.conf(5).
+> Given the default USE_ORDER setting, negative IUSE default settings are effective only for negation of repo-level USE settings, since profile and user configuration settings override them.
+
+However, in reality, many USE flags, not only the ones that are arch related, are implicitly declared in two places:
+ * a package's [eclasses](https://devmanual.gentoo.org/eclass-writing/index.html)
+    implicitly declares USE flags for that package, like the different `python_target_*`, `ruby_target_*`, and other similar USE Flags.
+   These implicit definitions are expanded into the `IUSE` variable by the [egencache tool](https://wiki.gentoo.org/wiki/Egencache).
+   Hence, these implicitly added USE flags can be found in the files in [metadata/md5-cache](https://wiki.gentoo.org/wiki//usr/portage/metadata/md5-cache).
+ * The `make.defaults` files in the [portage's profile](https://wiki.gentoo.org/wiki/Profile_(Portage)),
+    are *bash<sup>1</sup>* script files (see [portage's manpage](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html))
+    that implicitly declares system-wide USE flags (i.e., for all packages),
+    like the different `kernel_*`, `elibc_*`, and other USE flags, including the arch-related ones.
+   The [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html)
+    vaguely describes how several variables are involved in the implicit declaration of USE flags,
+    but this description is not very precise and seems obsolete.
+   We looked up the [actual implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1852)
+    of the IUSE variable construction to know how USE flags are implicitly declared in a `make.defaults` file,
+    which depends on the package's EAPI variable.
+
+<sup>1</sup>: More precisely, the `make.defaults` file supports a small subset of bash-like terminal language,
+ as described in the `make.conf` [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html).
+The actual parser of the `make.defaults` and similar files uses [shlex](https://docs.python.org/3/library/shlex.html)
+ and is defined in [portage/util](https://github.com/gentoo/portage/blob/master/pym/portage/util/__init__.py)
+ and in [portage/package/ebuild/config.py](https://github.com/gentoo/portage/blob/master/pym/portage/package/ebuild/config.py).
+
+##### USE Flag Declaration for EAPI <= 4
+
+We did not find any information on this subject in the portage documentation,
+ so we describe how the [implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1882) generates the list.
+
+The USE flags are declared with the following variables:
+ * `ARCH`: this variable contains the name of the architecture of the host machine (e.g., amd64), which is included in the list of declared USE flags
+ * `PORTAGE_ARCHLIST`: this variables declares a list of architecture names, which are included in the list of declared USE flags
+ * `USE_EXPAND_HIDDEN`: this variable contains a list of other variables names, themselves containing a list of USE flags to declare.
+    This variable is thus expanded into a list of USE flags to declare, of the form`(lowercase(variable name))_(use flag)`
+     where `variable_name` is an element of the list contained in  `USE_EXPAND_HIDDEN` and `use flag` is an element of the variable name's contained list.
+ * `BOOTSTRAP_USE`: this variables contains a list of USE flag to declare for creating a bootstrap image of portage.
+    These USE flags are also declared for the packages with an EAPI <= 4.
+
+   **Example**
+   ```
+   ARCH="amd64"
+   PORTAGE_ARCHLIST="amd64 x86"
+   USE_EXPAND_HIDDEN="KERNEL ELIBC"
+   KERNEL="linux"
+   ELIBC="glibc"
+   BOOTSTRAP_USE="cxx unicode"
+   ```
+   This declares the USE flags `amd64`, `x86`, `kernel_linux`, `elibc_glibc`, `cxx` and `unicode`.
+
+
+##### USE Flag Declaration for EAPI >= 5
+
+Such declaration is done by the mean of two variables:
+ * the variable `IUSE_IMPLICIT` simply list USE flags to be declared.
+
+   **Example**
+   ```
+   IUSE_IMPLICIT="prefix prefix-guest"
+   ```
+   This declares the USE flags `prefix` and `prefix-guest`.
+ * the variable `USE_EXPAND_IMPLICIT` is more complex:
+   it lists variables names that are expanded into USE flags lists to declare.
+  The way a variable name is expanded is as follows:
+   * if that variable name is listed in the variable `USE_EXPAND_UNPREFIXED`,
+      the variable name, prefixed with `USE_EXPAND_VALUES_`, is directly expanded into its contained list
+   * if instead that variable name is listed in the variable `USE_EXPAND`,
+      the variable name, prefixed with `USE_EXPAND_VALUES_`, is expanded into a list of `(lowercase(variable name))_(use flag)`
+      where `use flag` is an element of the variable name's contained list
+
+     **Example**
+     ```
+     USE_EXPAND_IMPLICIT="KERNEL"
+     USE_EXPAND="KERNEL"
+     USE_EXPAND_UNPREFIXED="KERNEL"
+     USE_EXPAND_VALUES_KERNEL="linux"
+     ```
+     This declares the USE flags `kernel_linux` and `linux`.
+
+
+#### SELECTED_USE
+
+The configuration of `SELECTED_USE` is one of the most complex part of portage's configuration system.
+
+
+**======================= TO CONTINUE =======================**
+
+
+##### USE Flag Configuration Restriction
+   Another important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
+    which expands into a list of USE flags that cannot be changed by the user,
+    i.e., all attempts to select or unselect these USE flags by the user are simply discarded.
+   This variable is expanded in a similar fashion to `USE_EXPAND_IMPLICIT`,
+    but at one level higher than this variable (i.e., it can reference `IUSE_IMPLICIT`,
+    `USE_EXPAND_IMPLICIT` or other variables that expand in a way or another into a list of USE flags).
+
+
+
+
+
+
+
+
+
+### The Layered Approach to Configuration
+
+
+
+
+
+
+
+
+
+
+
 
 The previous Section was a brief overview of the characteristics of
  Portage that makes this package manager into a Multi-Software Product line
@@ -500,112 +649,6 @@ Hence, we present here a detailed documentation on two aspects of the portage us
  * how packages are configured using these use flags
 
 ### USE Flag Declaration
-
-
-According to the [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/ebuild.5.html),
- the USE flag declaration (called IUSE), is mostly done in each package declaration individually.
-Here is an excerpt of the documentation:
-> **IUSE**
->
-> This should be a list of any and all USE flags that are leveraged within your build script.
-> The only USE flags that should not be listed here are arch related flags (see KEYWORDS).
-> Beginning with EAPI 1, it is possible to prefix flags with + or - in order to create default settings that respectively enable or disable the corresponding USE flags.
-> For details about USE flag stacking order, refer to the USE_ORDER variable in make.conf(5).
-> Given the default USE_ORDER setting, negative IUSE default settings are effective only for negation of repo-level USE settings, since profile and user configuration settings override them.
-
-However, in reality, many USE flags, not only the ones that are arch related, are implicitly declared in two places:
- * a package's [eclasses](https://devmanual.gentoo.org/eclass-writing/index.html),
-    implicitly declares USE flags for that package, like the different `python_target_*`, `ruby_target_*`, and other similar USE Flags.
-   These implicit definitions are expanded into the `IUSE` variable by the egencache tool,
-    and so we can simply use the files in [metadata/md5-cache](https://wiki.gentoo.org/wiki//usr/portage/metadata/md5-cache)  (like `emerge` does)
-    to get all these USE flags, in addition to the ones explicitly declared by the package.
- * The `make.defaults` files in the [portage's profile](https://wiki.gentoo.org/wiki/Profile_(Portage)),
-    are *bash<sup>1</sup>* script files (see [portage's manpage](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html))
-    that implicitly declares system-wide USE flags (i.e., for all packages),
-    like the different `kernel_*`, `elibc_*`, and other USE flags, including the arch-related ones.
-   The [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/portage.5.html)
-    vaguely describe how several variables are involved in the implicit declaration of USE flags,
-    however it does not corresponds to the reality.
-   I actually had to look up the [actual implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1852)
-    of the IUSE variable construction to know how USE flags are implicitly declared.
-
-#### USE Flag Declaration in a `make.defaults` file
-
-This file declares two sets of USE flags,
- one for the packages with EAPI equal or lower than 4
- and one for the packages with EAPI equal or greater than 5.
-
-##### USE Flag Declaration for EAPI <= 4
-
-We did not find any information on this subject in the portage documentation,
- so I describes how the [implementation](https://github.com/gentoo/portage/blob/232a45d02e526ac4bdb4c5806432ff4b58d8cdc7/pym/portage/package/ebuild/config.py#L1882) generates the list.
-
-The USE flags are declared with the following variables:
- * `ARCH`: this variable contains the name of the architecture of the host machine (e.g., amd64), which is included in the list of declared USE flags
- * `PORTAGE_ARCHLIST`: this variables declares a list of architecture names, which are included in the list of declared USE flags
- * `USE_EXPAND_HIDDEN`: this variable contains a list of other variables names, themselves containing a list of USE flags to declare.
-    This variable is thus expanded into a list of USE flag to declare, of the form`(lowercase(variable name))_(use flag)`
-     where `variable_name` is an element of the list contained in  `USE_EXPAND_HIDDEN` and `use flag` is an element of the variable name's contained list.
- * `BOOTSTRAP_USE`: this variables contains a list of USE flag to declare for creating a bootstrap image of portage.
-    These USE flags are also declared for the packages with an EAPI <= 4.
-
-   **Example**
-   ```
-   ARCH="amd64"
-   PORTAGE_ARCHLIST="amd64 x86"
-   USE_EXPAND_HIDDEN="KERNEL ELIBC"
-   KERNEL="linux"
-   ELIBC="glibc"
-   BOOTSTRAP_USE="cxx unicode"
-   ```
-   This declares the USE flags `amd64`, `x86`, `kernel_linux`, `elibc_glibc`, `cxx` and `unicode`.
-
-
-##### USE Flag Declaration for EAPI >= 5
-
-Such declaration is done by the mean of two variables:
- * the variable `IUSE_IMPLICIT` simply list USE flags to be declared.
-
-   **Example**
-   ```
-   IUSE_IMPLICIT="prefix prefix-guest"
-   ```
-   This declares the USE flags `prefix` and `prefix-guest`.
-* the variable `USE_EXPAND_IMPLICIT` is more complex:
-   it lists variables names that are expanded into USE flags lists to declare.
-  The way a variable name is expanded is as follows:
-   * if that variable name is listed in the variable `USE_EXPAND_UNPREFIXED`,
-      the variable name, prefixed with `USE_EXPAND_VALUES_`, is directly expanded into its contained list
-   * if instead that variable name is listed in the variable `USE_EXPAND`,
-      the variable name, prefixed with `USE_EXPAND_VALUES_`, is expanded into a list of `(lowercase(variable name))_(use flag)`
-      where `use flag` is an element of the variable name's contained list
-
-     **Example**
-     ```
-     USE_EXPAND_IMPLICIT="KERNEL"
-     USE_EXPAND="KERNEL"
-     USE_EXPAND_UNPREFIXED="KERNEL"
-     USE_EXPAND_VALUES_KERNEL="linux"
-     ```
-     This declares the USE flags `kernel_linux` and `linux`.
-
-   Another important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
-    which expands into a list of USE flags that cannot be changed by the user,
-    i.e., all attempts to select or unselect these USE flags by the user are simply discarded.
-   This variable is expanded in a similar fashion to `USE_EXPAND_IMPLICIT`,
-    but at one level higher than this variable (i.e., it can reference `IUSE_IMPLICIT`,
-    `USE_EXPAND_IMPLICIT` or other variables that expand in a way or another into a list of USE flags).
-
-   Finally, portage's profile contains several `make.defaults` files.
-   The ones that are considered in the declaration of the USE flags depends on the profile configuration,
-    as discussed in the [documentation](https://wiki.gentoo.org/wiki/Profile_(Portage)).
-
-
-<sup>1</sup>: More precisely, the `make.defaults` file supports a small subset of bash-like terminal language,
- as described in the `make.conf` [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html).
-The actual parser of the `make.defaults` and similar files uses [shlex](https://docs.python.org/3/library/shlex.html)
- and is defined in [portage/util](https://github.com/gentoo/portage/blob/master/pym/portage/util/__init__.py)
- and in [portage/package/ebuild/config.py](https://github.com/gentoo/portage/blob/master/pym/portage/package/ebuild/config.py).
 
 
 ### Package Configuration with Use Flags
@@ -867,7 +910,13 @@ package.unmask is applied after package.mask
 
 
 
-# Portage: Semantics of Feature Model Constraints
+# Portage: Semantics
+
+
+### Atom Matching
+
+
+### Semantics of Feature Model Constraints
 
 Consider the constraint syntax in the DEPEND variable of a package, as described in [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
 This syntax, starting from EAPI=2, allows for Use dependencies, i.e., when specifying a dependency, one can specify which use flags must be selected or unselected for that dependency.
