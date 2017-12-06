@@ -380,10 +380,6 @@ sudo docker rmi jacopomauro/hyportage
   however possible to install it also on the same Gentoo Machine provided that all the HyPortage dependencies
   are met. 
 
-## Assumptions
-
-* Licenses are not considered.
-
 ## Limitations
 
 This tool, being a prototype in a research project, has many limitations and most probably bugs
@@ -396,4 +392,5 @@ This tool, being a prototype in a research project, has many limitations and mos
   By default, the tool first states what must be installed and then what must be removed.
 - This tool does not ask for the recompilation of packages with the slot `:=` dependency 
   (this is however managed by portage itself when our installation script calls emerge).
+- Licenses are not considered.
 - The incrementality of the translation process needs further testing.
