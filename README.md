@@ -19,7 +19,7 @@ The list of packages to install and uninstall are saved in a bash script,
 and the use flag configuration is saved in a `package.use` file. The bash script can be executed to
 install the desired packages.
 
-Note that HyPortage when a package can not be installed will worn the user that can also use the tool in
+Note that HyPortage when a package can not be installed will warn the user that can also use the tool in
 the explain modality to understand why the desired configuration can not be reached.
 
 This work is based on the theory of Software Product Line and Multi-Software Product Line,
