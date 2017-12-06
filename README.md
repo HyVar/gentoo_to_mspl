@@ -111,12 +111,8 @@ If it is the first time the guest or the host are used, the necessary scripts ne
 This can be done by running
 
 ```
-<<<<<<< HEAD
-bash hyportage.sh sync_guest
-=======
 bash hyportage.sh setup_guest
 bash hyportage.sh setup_host
->>>>>>> translator
 ```
 
 The password and the location of the guest VM can be configured in the hyportage.sh script.
@@ -368,7 +364,7 @@ To clean up the Docker installation of HyPortage the following commands can be u
 ```
 sudo docker stop hyportage_container
 sudo docker rm hyportage_container
-sudo docker rmi jacopomauro/portage
+sudo docker rmi jacopomauro/hyportage
 ```
 
 ## Additional Notes
