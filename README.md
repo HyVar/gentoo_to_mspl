@@ -264,7 +264,7 @@ By default, our tool suppose that the executable `hyvar-rec` can be called, but 
     Note that the paths in the command cannot contain spaces.
  2. `--hyvarrec-url` specifies the url of an HyVarRec server.
 
-#### Exploration
+### Exploration Modality
 
 By default, HyPortage installs only installable packages (that are stable and not masked) with the use flag
 configuration as specified by the user.
