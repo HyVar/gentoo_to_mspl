@@ -77,7 +77,8 @@ The functions are:
 - `hyportage.sh emerge`: acts like gentoo's `emerge -p`, except that it generates a installation script
    and a package.use file. These files are stored in the host/data/hyportage directory.
 - `hyportage.sh install`: copy the generated installation script and package.use file to the guest VM,
-   and executes the scripts thus performing the installation.
+   and executes the scripts thus performing the installation.\
+  **Warning**: before executing this function, please read the [limitation section](#limitations).
 
 ### Usage Example
 
