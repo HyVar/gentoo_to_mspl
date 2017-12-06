@@ -13,8 +13,10 @@ HyPortage is a tool that allows a correct and complete dependency resolution in 
 HyPortage works by abstracting the portage tree and the user configuration
 (i.e., the files in /etc/portage) into some data that is then combined with the user
 request to solve the dependencies.
+In particular, package dependencies are translated into [SMT constraints](https://en.wikipedia.org/wiki/Satisfiability_modulo_theories),
+  and a backend solver guarantees the correctness and completeness of the result.
 The list of packages to install and uninstall are saved in a bash script,
-and the use flag configuration is saved in a package.use file. The bash script can be executed to
+and the use flag configuration is saved in a `package.use` file. The bash script can be executed to
 install the desired packages.
 
 Note that HyPortage when a package can not be installed will worn the user that can also use the tool in
@@ -25,7 +27,9 @@ and the fact that portage is a Multi-Sofware Product Line. HyPortage uses the
 [HyVarRec](https://github.com/HyVar/hyvar-rec) reconfigurator 
 as back-end solver.
 
-## Tool installation by using Docker
+## Tool installation
+
+### Using Docker
 
 HyPortage can be deployed by using the [Docker](https://www.docker.com/) container technology.
 Docker supports a huge variety of OS. In the following we assume that it is correctly installed on
@@ -39,6 +43,17 @@ sudo docker pull jacopomauro/hyportage
 
 For more information related to Docker and how to use it we invite the reader to the documentation at 
 [https://www.docker.com/](https://www.docker.com/).
+
+
+### Cloning the repository
+
+The HyPortage source code can also be directly installed on a computer, by cloning this repository.
+HyPortage is implemented in [bash](https://www.gnu.org/software/bash/) and [Python2.7](https://www.python.org/) and has the following dependencies:
+ 1. ssh
+ 2. rsync
+ 3. python 2.7 packages (installable with `pip install`): click, lrparsing, z3-solver
+ 4. [HyVarRec](https://github.com/HyVar/hyvar-rec) reconfigurator
+The executable of HyPortage is the `hyportage.sh` bash script.
 
 ## Tool Usage
 
@@ -96,7 +111,7 @@ Please verity to have access to the VM. As example this can be obtained as follo
 ssh -p 9022 -o PubkeyAuthentication=no osboxes@localhost
 ```
 
-If the VM is reachable then we can start the host VM to run HyPortage.
+Finally, if the docker installation was chosen then we can start the host VM to run HyPortage.
 This can be done by creating a Docker container as follows.
 
 ```
@@ -131,7 +146,7 @@ GUEST_PWD_USER="osboxes.org"
 Please make sure that the guest VM may be reached by the host VM by running the ssh command before 
 running the previous two commands.
 
-Note that clean_guest and clean_host commands can also be
+Note that `clean_guest` and `clean_host` commands can also be
 run to start fresh in case the system has been previously used for other reconfiguration attempts.
  
 ### Getting data from the guest VM
@@ -375,8 +390,7 @@ sudo docker rmi jacopomauro/hyportage
 * The generation of a new configuration requires the solving of an NP-hard problem. In the worst case it
   may require a long time to be performed but in our test it took only few minutes.
 
-* Docker was used to simplify the installation of HyPortage. We assume by default that this tool is installed
-  in a different VM because it requires the installation of different packages and the Z3 SMT solver. It is
+* In our [Tool Usage](#tool-usage) section, we considered two OS/Systems because HyPortage requires the installation of different packages and the Z3 SMT solver. It is
   however possible to install it also on the same Gentoo Machine provided that all the HyPortage dependencies
   are met. 
 
@@ -385,6 +399,8 @@ sudo docker rmi jacopomauro/hyportage
 This tool, being a prototype in a research project, has many limitations and most probably bugs
 - As previously discussed, the installation and error messages could greatly be improved.
   However, this would require a lot of engineering work.
+- Currently, HyPortage always generates a `package.use` file, even if it is not necessary (.e.g, when the `use` exploration modality is not activated), and does not generate a `package.accept_keywords` nor a `package.unmask` file when it should.
+  This limitation can be solved quickly.
 - This tool does not consider the different stages of package installation, and merges together the dependencies,
    the runtime dependencies and the p-dependencies.
 - This tool does not manage the order of package installation/removal. For instance, to install gnome, our tool 
