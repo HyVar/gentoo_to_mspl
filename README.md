@@ -49,10 +49,10 @@ For more information related to Docker and how to use it we invite the reader to
 
 The HyPortage source code can also be directly installed on a computer, by cloning this repository.
 HyPortage is implemented in [bash](https://www.gnu.org/software/bash/) and [Python2.7](https://www.python.org/) and has the following dependencies:
- 1. ssh
- 2. rsync
- 3. python 2.7 packages (installable with `pip install`): click, lrparsing, z3-solver
- 4. [HyVarRec](https://github.com/HyVar/hyvar-rec) reconfigurator
+ - [ssh](https://www.ssh.com/ssh/), [sshpass](https://www.cyberciti.biz/faq/noninteractive-shell-script-ssh-password-provider/)
+ - [rsync](https://rsync.samba.org/)
+ - python 2.7 packages (installable with `pip install`): [click](http://click.pocoo.org), [lrparsing](http://lrparsing.sourceforge.net/doc/html/), [z3-solver](https://z3prover.github.io/api/html/z3.html), [pysmt](https://github.com/pysmt/pysmt) and [requests](http://docs.python-requests.org)
+ - [HyVarRec](https://github.com/HyVar/hyvar-rec)
 
 The executable of HyPortage is the `hyportage.sh` bash script.
 
