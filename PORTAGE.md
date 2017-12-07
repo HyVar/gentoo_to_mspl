@@ -256,7 +256,13 @@ It is described in portage with 6 information:
  - [**DEPEND**](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
    This variable contains a constraint stating for every product of the package,
    which other packages are required during (or in conflict with) the installation of the current package.
-   For instance, the DEPEND variable of the `sudo` package is
+   A core aspect in the definition of a package's dependency is the notion of [*atom*](https://dev.gentoo.org/~zmedico/portage/doc/man/ebuild.5.html).
+   An atom is a kind of [*pattern*](https://en.wikipedia.org/wiki/Pattern_matching) used to represent a set of packages,
+   and is essential in portage, as explicitly listing all packages related to a dependency is unmaintainable.
+   We invite the interested reader to look at the [documentation](https://devmanual.gentoo.org/general-concepts/dependencies/index.html).
+   It is moreover important to note that *atoms* also are a core element in the way portage implements package configuration, as discussed in the [portage configuration's implementation section](#portage-layered-configuration).
+   \
+   The DEPEND variable of the `sudo` package is
    ```
    pam? ( virtual/pam ) skey? ( >=sys-auth/skey-1.1.5-r1 ) ldap? ( >=net-nds/openldap-2.1.30-r1 dev-libs/cyrus-sasl ) sys-libs/zlib sys-devel/bison
    ```
@@ -355,7 +361,7 @@ Among all the information described in the previous section, only the
 For the sake of clarity, and because the way portage configures package is quite complex,
 we structure our presentation in two main parts:
  we first give an overview of the mechanisms used by portage to configure each information individually,
- and in a second step we discussed the layered structure of this configuration.
+ and in a second step we discuss how these mechanisms are implemented in the layered structure of portage's configuration system.
 
 ### Overview per Variable
 
@@ -388,8 +394,8 @@ However, in reality, many USE flags, not only the ones that are arch related, ar
     of the IUSE variable construction to know how USE flags are implicitly declared in a `make.defaults` file,
     which depends on the package's EAPI variable.
 
-<sup>1</sup>: More precisely, the `make.defaults` file supports a small subset of bash-like terminal language,
- as described in the `make.conf` [documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html).
+<sup>1</sup>: More precisely, the `make.defaults` file supports a small subset of the bash scripting language,
+ as described in the [`make.conf` documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html).
 The actual parser of the `make.defaults` and similar files uses [shlex](https://docs.python.org/3/library/shlex.html)
  and is defined in [portage/util](https://github.com/gentoo/portage/blob/master/pym/portage/util/__init__.py)
  and in [portage/package/ebuild/config.py](https://github.com/gentoo/portage/blob/master/pym/portage/package/ebuild/config.py).
@@ -451,93 +457,17 @@ Such declaration is done by the mean of two variables:
 
 #### SELECTED_USE
 
-The configuration of `SELECTED_USE` is one of the most complex part of portage's configuration system.
 
-
-**======================= TO CONTINUE =======================**
-
-
-##### USE Flag Configuration Restriction
-   Another important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
-    which expands into a list of USE flags that cannot be changed by the user,
-    i.e., all attempts to select or unselect these USE flags by the user are simply discarded.
-   This variable is expanded in a similar fashion to `USE_EXPAND_IMPLICIT`,
-    but at one level higher than this variable (i.e., it can reference `IUSE_IMPLICIT`,
-    `USE_EXPAND_IMPLICIT` or other variables that expand in a way or another into a list of USE flags).
-
-
-
-
-
-
-
-
-
-### The Layered Approach to Configuration
-
-
-
-
-
-
-
-
-
-
-
-
-The previous Section was a brief overview of the characteristics of
- Portage that makes this package manager into a Multi-Software Product line
- (i.e., a collection of inter-dependent Software Product Lines).
-However, Portage and its packages are far more complex than what I just presented,
- and can be configured in many different ways.
-In this Section, I will skip the configuration of a package's compilation and installation in the system,
- but I will try to give a complete overview of all the other configurable data related to a Portage's package,
- and of Portage itself and the user can configure these data.
-
-## Package Configurable Data
-
-Here is the list of data that can be configured in a Portage's package.
-We will go over how these data can actually be configured in the next Section.
-
-#### USE Flags Declaration
-
-Interestingly, even if the Feature Model of a package cannot really be changed
- (it is not possible to change the value of the `REQUIRED_USE` and `*DEPEND` variables),
- it is possible to extend its declared USE flags (i.e., its list of features).
-
-The motivation for such extension is that many packages's Feature Model
- have similar features that are usually configured (selected or not selected)
- in the same way. For instance, features talking about the system's kernel,
- or its hardware architecture.
-Such features are thus implicitly declared and configured by Portage itself
- for all of its packages.
-And using the same mechanism, it is possible for the user to do the same.
-
-
-
-#### USE Flags Configuration
-
-Like for a classic Feature Model, a *product* for Portage's package is a set of selected USE flags (*features*),
- and all the USE flags not in this set are considered not-selected.
-However, Portage's way to construct a product is using what I call *set manipulations*:
- we start with the empty product (i.e., an empty set of feature),
- and different configuration files state what to add and to remove to this set.
-For instance, consider the following set manipulation, that removes `mysql`, adds `berkdb`, removes `kde` and adds `gtk`:
-```
--mysql berkdb -kde gtk
-```
-Applying this set manipulation on the product `mysql ssl`, we get the product `ssl berkdb gtk`.
-Note that the removal of a feature that is not present in the set (here `kde`) is silently skipped.
-
-
-A package's product in Portage is constructed using 5 different USE flag set, each of them modifiable via *set manipulations*:
+As discussed before, the `SELECTED_USE` is not an explicit variable in portage and corresponds to
+ the selected *product* of the package, i.e., the a set of its selected USE flags.
+This product cannot be directly stated in portage, which instead uses five sets of USE flags to define the `SELECTED_USE`:
  - `use` is the base USE flag set
- - `use.force` is the set of USE flags that are always added to the package's `use` set
- - `use.stable.force` is the set of USE flags that are added to the package's set only if it is <a href="#def_stable">*stable*</a>
- - `use.mask` is the set of USE flags that are always removed from the package's `use` set
- - `use.stable.mask` is the set of USE flags that are removed from the package's set only if it is <a href="#def_stable">*stable*</a>
-Note that the sets `use.*` are applied on the `use` set in the order we described them.
+ - `use.force` is the set of USE flags that are always added to the package's `SELECTED_USE`
+ - `use.stable.force` is the set of USE flags that are added to the package's `SELECTED_USE` only if it is stable
+ - `use.mask` is the set of USE flags that are always removed from the package's `SELECTED_USE`
+ - `use.stable.mask` is the set of USE flags that are removed from the package's `SELECTED_USE` only if it is stable
+
+Note that the sets `use.*` are applied on `SELECTED_USE` in the order we described them.
 In particular, the `*.mask` sets override all the USE flags added by the `*.force` sets.
 
 **Example**
@@ -551,39 +481,58 @@ use.stable.mask = python_targets_pypy
 ```
 This results in the product `ssl berkdb gtk amd64 kernel-linux elibc-glibc`.
 
-#### Keyword Configuration
 
-One important property of a Portage's package is if
- it can be installed in the current hardware architecture.
-This information is given by two configurable variables:
- - [`KEYWORDS`](https://wiki.gentoo.org/wiki/KEYWORDS) contains the set of *keywords* (similar to architecture) on which it is safe to install the package
-    (i.e., it can be compiled and run on that architecture)
- - [`ACCEPT_KEYWORDS`](https://wiki.gentoo.org/wiki/ACCEPT_KEYWORDS/en) contains the set of keywords that the current hardware supports.
-These two sets can be changed with a *set manipulation*, like a package's product.
-Note that there are two kind of keywords:
- a *stable keyword* is the name of an architecture, e.g., `x86` or `amd64`;
- a *testing keyword* is the name of an architecture, prefixed with `~` to state that this package can be installed on that architecture, but isn't fully tested.
+\
+Portage constructs these five sets using what we call *USE flag set manipulation*.
+Conceptually, every package starts with these sets empty, and then operations can be applied to them in order to modify them.
+These operations are:
+ - `U`: this operation adds the USE flag `U` in the set
+ - `-U`: this operation removes the USE flag `U` from the set
+ - `-*`: this operation empties the set
 
-
-We have the two following definition related to keywords:
-<dl>
-<dt> Installable</dt>
-<dd>A package is <em>installable</em> if the intersection of
- its set of keywords and accept_keywords is not empty</dd>
-<dt id="def_stable"> Stable</dt>
-<dd>A package is <em>stable</em> if the intersection of
- its set of keywords and accept_keywords only contains stable keywords</dd>
-</dl>
+For instance, consider the following USE flag set manipulation, that removes `mysql`, adds `berkdb`, removes `kde` and adds `gtk`:
+```
+-mysql berkdb -kde gtk
+```
+Applying this set manipulation on the product `mysql ssl`, we get the product `ssl berkdb gtk`.
+Note that the removal of a feature that is not present in the set (here `kde`) is silently skipped.
 
 
+\
+Finally, an important variable of an `make.defaults` bash scripts is `PROFILE_ONLY_VARIABLES`
+ which expands into a list of USE flags that cannot be changed by the user,
+ i.e., all attempts to select or unselect these USE flags by the user are simply discarded.
+This variable is expanded in a similar fashion to `USE_EXPAND_IMPLICIT` (as discussed in the [IUSE section](#iuse)),
+ but at one level higher than this variable (i.e., it can reference `IUSE_IMPLICIT`,
+ `USE_EXPAND_IMPLICIT` or other variables that expand in a way or another into a list of USE flags).
 
-#### Package Masking
 
-Finally, it is possible to mask a package, i.e., to make it non installable independently from its supported architecture.
-The set of masked packages is defined by two sets that can be changed via sets manipulations:
- - [`mask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Masking_a_package) is the set of packages that are masked
- - [`unmask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Unmasking_a_package) is the set of packages that are removed from the `mask` set.
-Note that these masking sets are not sets of packages, but sets of *atoms* that correspond to sets of packages.
+#### KEYWORDS
+
+As previously discussed, the `KEYWORDS` of a package can be modified, even if this functionality should be considered deprecated.
+The modification is done via what we call *keyword set manipulation* that is a sequence of simple operation:
+ - `K`: this operation adds the keyword `K` in the set
+ - `*`: this operation adds all stable keywords to the set
+ - `~*`: this operation adds all testing keywords to the set
+ - `-K`: this operation removes the keyword `K` from the set (or does nothing if `K` is not present in the set)
+ - `-*`: this operation empties the set
+
+Note that the semantics of these operations is different from elements that can be used in the definition of the `KEYWORDS` variable itself.
+For instance, the term `-*` can be used in the defintion of  `KEYWORDS`,
+ but in this case this symbol does not empties the `KEYWORDS` set.
+At the moment, we don't know the semantics of this symbol, as the [documentation](https://wiki.gentoo.org/wiki/KEYWORDS) is vague and our tests on the behavior of portage was not conclusive.
+
+#### ACCEPT_KEYWORDS
+
+The `ACCEPT_KEYWORDS` variable is manipulated in the same way as the `KEYWORDS`, with the same operations.
+
+#### MASK
+
+Similarly to the `SELECTED_USE`, the masked status of a package is defined from two sets of *atoms*:
+ - [`mask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Masking_a_package) lists the atoms (i.e., sets of packages) that are masked
+ - [`unmask`](https://wiki.gentoo.org/wiki/Knowledge_Base:Unmasking_a_package) lists the atoms that are unmasked.
+
+Hence, a package is masked if and only if there is an atom in the `mask` list that matches it, while no atom in the `unmask` list matches it.
 
 **Example**
 Consider the following sets:
@@ -594,10 +543,27 @@ umask: >=sys-kernel/genkernel-3.5.0.5
 Here, all packages of the groups `sys-fs/eudev` and `sys-fs/udev` are masked,
  and so are the packages of the group `sys-kernel/genkernel` whose version is less than `3.5.0.5`.
 
+\
+As previously, portage constructs these sets by assuming them initially empty, and then applying user-defined *masking set manipulations* on them.
+These operations are direct:
+ - `A`: this operation adds the atom `A` in the set
+ - `-A`: this operation removes the atom `A` from the set (or does nothing if `A` is not present in the set)
+
+
+#### ACCEPT_LICENSE
+
+As this variable is the responsibility of only the user (who accepts or not the license of a package in order to install it),
+ this variable can only be stated (not modified) by the user, and contains the list of accepted licenses for this package.
 
 
 
-## Modular Package Configuration
+
+### Portage Layered Configuration
+
+
+
+**======================= TO CONTINUE =======================**
+
 
 The different data we discussed previously are configured by portage and the user in seven steps.
 The steps are well-defined, but the order in which they are applied can be configured by setting the `USE_ORDER` variable.
