@@ -53,6 +53,7 @@ HyPortage is implemented in [bash](https://www.gnu.org/software/bash/) and [Pyth
  2. rsync
  3. python 2.7 packages (installable with `pip install`): click, lrparsing, z3-solver
  4. [HyVarRec](https://github.com/HyVar/hyvar-rec) reconfigurator
+
 The executable of HyPortage is the `hyportage.sh` bash script.
 
 ## Tool Usage
@@ -408,6 +409,6 @@ This tool, being a prototype in a research project, has many limitations and mos
   states that `=sys-fs/eudev-3.1.5` must be removed but does not say when.
   By default, the tool first states what must be installed and then what must be removed.
 - This tool does not ask for the recompilation of packages with the slot `:=` dependency 
-  (this is however managed by portage itself when our installation script calls emerge).
+  (this is however managed by portage itself when our installation script calls `emerge`).
 - Licenses are not considered.
 - The incrementality of the translation process needs further testing.

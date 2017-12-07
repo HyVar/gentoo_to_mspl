@@ -238,12 +238,12 @@ It is described in portage with 6 information:
     As we just discussed, this is the list of the default features of this package.
     Note that `sendmail` is prefixed with `+`, that states that the default product of this package (most probably) contains that feature.
     Note also that this variable lists the *default* features of the package:
-    *implicit* features can be added to it by the portage or user profile, as discussed in the [USE flag configuration](#use-flags-configuration).
+    *implicit* features can be added to it by the portage or user profile, as discussed in the [USE flag configuration](#iuse).
  - **SELECTED_USE**
    To the best of our knowledge, this information is not explicitly named in the portage documentation,
    and corresponds to the product (i.e. the set of USE flags) that is installed when installing the package.
    This product is not directly stated by the user (it is not possible to write something like `SELECTED_USE=<list of USE flags`),
-   but is constructed in several steps, as discussed in the [package configuration section](#configuration-of-a-package).
+   but is constructed in several steps, as discussed in the [package configuration section](#selected-use).
  - [**REQUIRED_USE**](https://dev.gentoo.org/~zmedico/portage/doc/portage.html#package-ebuild-eapi-4-metadata-required-use)
    This variable contains a constraint that states what are the valid products of the package,
    i.e. how the USE flags can be selected for this package.
@@ -520,7 +520,7 @@ The modification is done via what we call *keyword set manipulation* that is a s
 Note that the semantics of these operations is different from elements that can be used in the definition of the `KEYWORDS` variable itself.
 For instance, the term `-*` can be used in the defintion of  `KEYWORDS`,
  but in this case this symbol does not empties the `KEYWORDS` set.
-At the moment, we don't know the semantics of this symbol, as the [documentation](https://wiki.gentoo.org/wiki/KEYWORDS) is vague and our tests on the behavior of portage was not conclusive.
+At the moment, we don't know the semantics of this symbol, as the [documentation](https://wiki.gentoo.org/wiki/KEYWORDS) is vague and our tests on the behavior of portage were not conclusive.
 
 #### ACCEPT_KEYWORDS
 
