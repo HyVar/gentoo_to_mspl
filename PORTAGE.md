@@ -561,8 +561,9 @@ As this variable is the responsibility of only the user (who accepts or not the 
 ### Portage Layered Configuration
 
 
-
-**======================= TO CONTINUE =======================**
+***
+**THIS SECTION NEEDS TO BE REFACTORED**
+***
 
 
 The different data we discussed previously are configured by portage and the user in seven steps.
@@ -597,7 +598,7 @@ Let briefly overview these steps, in their default order:
 
 
 
-## Profile Layer
+#### Profile Layer
 
 
 In this section, we give a brief and precise summary of many information scattered in the portage's documentation,
@@ -605,7 +606,7 @@ In this section, we give a brief and precise summary of many information scatter
 In some cases, the information presented here are the result of exhaustive testing,
  as the available documentation did not describe the behavior of portage in certain cases.
 
-## USE Flags Declaration and Selection
+#### USE Flags Declaration and Selection
 
 USE Flag declaration and selection is a core part of portage, as presented in its [documentation](https://wiki.gentoo.org/wiki/USE_flag).
 They are the core of a package configuration during its installation.
@@ -614,10 +615,10 @@ Hence, we present here a detailed documentation on two aspects of the portage us
  * how the use flags are declared
  * how packages are configured using these use flags
 
-### USE Flag Declaration
+##### USE Flag Declaration
 
 
-### Package Configuration with Use Flags
+##### Package Configuration with Use Flags
 
 While the USE flags declaration in portage is quite intricate,
  the USE flag selection (i.e., stating for which package which USE flag is selected and which is not)
@@ -634,7 +635,7 @@ We consequently structure the presentation of Package Configuration in two parts
  * how they are combined to build the configuration of each package
 
 
-#### USE Flag Selection Declaration
+###### USE Flag Selection Declaration
 
 A global overview of where USE flag selections are declared can be found in
  the [make.conf documentation](https://dev.gentoo.org/~zmedico/portage/doc/man/make.conf.5.html)
@@ -683,7 +684,7 @@ Let briefly overview these locations, in their loading order:
    USE="unicode -pcre" emerge -av sys-apps/less 
    ```
 
-##### USE Flag Selection Declaration in Profile
+###### USE Flag Selection Declaration in Profile
 
 The USE flag selection done in the two parts from the portage profile (**repo** and **defaults**)
  is based on a similar file structure.
@@ -693,7 +694,7 @@ The difference is that the **defaults** part is recursive, based on the `parent`
 We structure he presentation of the files that take part in the USE flag selection in the profile
  in three parts: the Core files, the force and mask files, and the Stable files.
 
-###### Core Files
+####### Core Files
 
  * `make.defaults`: we already discussed this file in the USE flag declaration section,
     and this file is also used to declare system-wide USE flag selection, based on other bash variables.
@@ -834,7 +835,7 @@ In the previous items,
  `negatively selected` meant that the use flag is unselected (or seletected if guarded by -) for every packages that contain it;
 
 
-#### USE Flag Selection Combination
+##### USE Flag Selection Combination
 TODO: structure these data in an understandable way.
 
 well, the structure of this document is not perfect, as the composition of the information is global to a profile, and thus include information about use selection, but also per package use selection and package masking.
@@ -866,13 +867,13 @@ I still need to check with package.keywords and package.accept_keywords:
 
 package.use package.use.force package.use.mask
 
-## Package Visibility
+#### Package Visibility
 
-### Package Masking
+##### Package Masking
 
 package.unmask is applied after package.mask
 
-### Package Keywords
+##### Package Keywords
 
 
 
@@ -895,7 +896,7 @@ The [documentation](https://devmanual.gentoo.org/general-concepts/dependencies/i
  presents how to specify dependencies to other packages using atoms and informally discusses their semantics
  but does not go into details into the matching of version.
 Indeed, package name must follow a naming convention described in the [ebuild file format documentation](https://devmanual.gentoo.org/ebuild-writing/file-format/index.html)
- where the syntax of version is explicitly stated to be `complicated`.
+ where the syntax of version is explicitly stated to be *complicated*.
 Consequently, comparing versions is difficult.
 
 The syntax of versions is as follows:
