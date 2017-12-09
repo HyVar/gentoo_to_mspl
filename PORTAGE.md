@@ -878,26 +878,113 @@ package.unmask is applied after package.mask
 
 # Portage: Semantics
 
+The semantics of the constraints in the `REQUIRED_USE` and the `*DEPEND` variables are in most part direct and well [documented](https://devmanual.gentoo.org/general-concepts/dependencies/index.html).
+Three points are however not entirely covered in that documentation:
+  few operators are not described, atom matching has some subtleties, and the corner cases of [USE dependencies](https://devmanual.gentoo.org/general-concepts/dependencies/index.html#built-with-use-dependencies) are not discussed.
+
+### Constraint Operators
+
+Two operators are missing from the main documentation, but are actually described in the [documentation about EAPI](https://devmanual.gentoo.org/ebuild-writing/eapi/index.html)
+
+* `^^` is the xor operator (exactly one constraint in the following group must be satisfied),
+* `??` is the one-max operator (at most one constraint in the following group can be satisfied).
 
 ### Atom Matching
 
+The [documentation](https://devmanual.gentoo.org/general-concepts/dependencies/index.html)
+ presents how to specify dependencies to other packages using atoms and informally discusses their semantics
+ but does not go into details into the matching of version.
+Indeed, package name must follow a naming convention described in the [ebuild file format documentation](https://devmanual.gentoo.org/ebuild-writing/file-format/index.html)
+ where the syntax of version is explicitly stated to be `complicated`.
+Consequently, comparing versions is difficult.
 
-### Semantics of Feature Model Constraints
+The syntax of versions is as follows:
+```
+VERSION ::= NUMBER ('.' NUMBER)* ( '_' SUFFIX)* ('-r' REVISION)?
+NUMBER ::= digit+
+SUFFIX ::= RELEASE_KIND NUMBER?
+RELEASE_KIND ::= alpha | beta | pre | rc | p
+REVISION ::= NUMBER
+```
+
+The following description of the Portage matching function is the result of our tests, and might be slightly erroneous.
+Given two versions `v1` and `v2`, the matching function
+ first splits these strings w.r.t. the separators '.', '_' and '-r'.
+It then iterates over the two lists in parallel, and returns at the first point the two compared elements are different
+  (we describes how the elements of the lists are pair-wise compared using python pseudo-code):
+* `NUMBER_1` vs `NUMBER_2`: note that if the number start with `0`, they are considered fractional
+  ```python
+  if (NUMBER_1[0] == '0') or (NUMBER_2[0] == '0'):
+    float_1 = float("0." + NUMBER_1)
+    float_2 = float("0." + NUMBER_2)
+    if float_1 < float_2: return "v1 is lesser than v2"
+    elif float_1 > float_2: return "v1 is greater than v2"
+  else:
+    int_1 = int(NUMBER_1)
+    int_2 = int(NUMBER_2)
+    if int_1 < int_2: return "v1 is lesser than v2"
+    elif int_1 > int_2: return "v1 is greater than v2"
+  ```
+* (`SUFFIX_1` or `REVISION_1`) vs `NUMBER_2`:
+  ```python
+  return "v1 is lesser than v2"
+  ```
+* `NUMBER_1` vs (`SUFFIX_2` or `REVISION_2`):
+  ```python
+  return "v1 is greater than v2"
+  ```
+* `RELEASE_KIND_1 NUMBER_1` vs `RELEASE_KIND_2 NUMBER_2`:
+  ```python
+  if RELEASE_KIND_1 != RELEASE_KIND_2:
+    return "we have alpha < beta < pre < rc < p"
+  else:
+    if (NUMBER_1 != None) and (NUMBER_2 != None):
+      int_1 = int(NUMBER_1)
+      int_2 = int(NUMBER_2)
+      if int_1 < int_2: return "v1 is lesser than v2"
+      elif int_1 > int_2: return "v1 is greater than v2"
+    elif NUMBER_1 != None:
+      return "v1 is greater than v2"
+    elif NUMBER_2 != None:
+      return "v1 is lesser than v2"
+
+  ```
+* `RELEASE_KIND_1 NUMBER_1` vs  `REVISION_2`
+  ```python
+  return "v1 is lesser than v2"
+  ```
+* `REVISION_1` vs `RELEASE_KIND_2 NUMBER_2`:
+  ```python
+  return "v1 is greater than v2"
+  ```
+* `REVISION_1` vs `REVISION_2`:
+  ```python
+  int_1 = int(REVISION_1)
+  int_2 = int(REVISION_2)
+  if int_1 < int_2: return "v1 is lesser than v2"
+  elif int_1 > int_2: return "v1 is greater than v2"
+  ```
+
+Our implementation of this comparison function (function `compare_version` in [core_data.py](https://github.com/HyVar/gentoo_to_mspl/blob/master/guest/hyvar/core_data.py))
+ follows this description but compares each character of the versions individually for efficiency.
+
+### Semantics of USE dependencies
 
 Consider the constraint syntax in the DEPEND variable of a package, as described in [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
-This syntax, starting from EAPI=2, allows for Use dependencies, i.e., when specifying a dependency, one can specify which use flags must be selected or unselected for that dependency.
+This syntax, starting from EAPI=2, allows for USE dependencies,
+ i.e., when specifying a dependency, one can specify which USE flags must be selected or unselected for that dependency.
 The documentation is clear for simple examples:
  for instance `app-misc/foo[bar,-baz]` means that `app-misc/foo` must be installed with the use flag `bar` selected, and `baz` unselected.
 
 However, when the constraints  mixes *compact forms* and *use dependency defaults*, the documentation fails to describes what they mean.
 Hence, we list here how use dependencies in portage can be translated in unambiguous constraints.
 We consider the following:
- - the use flag in the selection is called `my-feature`
- - the predicate corresponding to this feature in the local package, if it exists, is `feature-local`
- - the predicate corresponding to this feature in the external package, if it exists,  is `feature-external`
+ - the USE flag in the selection is called `my-feature`
+ - the predicate corresponding to this USE flag being selected in the local package, if it exists, is `feature-local`
+ - the predicate corresponding to this USE flag being selected in the external package, if it exists,  is `feature-external`
 
 
-**1. If use flag is present in the external package**
+**1. If the USE flag `my-feature` is present in the external package**
 
 | Selection | Constraint |
 |-----------|------------|
@@ -909,7 +996,7 @@ We consider the following:
 | `!my-feature=` , `!my-feature(+)=` , `!my-feature(-)=` | `feature-local <=> (not feature-external)` |
 
 
-**2. If use flag is NOT present in the external package**
+**2. If the USE flag `my-feature` is *NOT* present in the external package**
 
 | Selection | Constraint |
 |-----------|------------|
