@@ -194,11 +194,10 @@ def compare_extra_len(s):
 	else: return True
 
 
-def get_int(s):
-	i = 0
-	lens = len(s)
+def get_int_len(s, lens, start):
+	i = start
 	while (i < lens) and s[i].isdigit(): i = i + 1
-	return int(s[:i])
+	return i
 
 
 def compare_version(s1, s2):
@@ -237,9 +236,11 @@ def compare_version(s1, s2):
 			elif s2[i] == '0': return 1
 			elif number_alternative_mode: return ord(s1[i]) - ord(s2[i])
 			else:  # 2. check the integer part
-				n1 = get_int(s1[i:])
-				n2 = get_int(s2[i:])
-				return n1 - n2
+				int_len_1 = get_int_len(s1, len1, i)
+				int_len_2 = get_int_len(s2, len2, i)
+				if int_len_1 < int_len_2: return -1
+				elif int_len_1 > int_len_2: return 1
+				else: return ord(s1[i]) - ord(s2[i])
 		else:
 			# captures "1*" > ".*", "1*" > "_*" and "1*" > "-*", in any context
 			if s1[i].isdigit(): return 1
