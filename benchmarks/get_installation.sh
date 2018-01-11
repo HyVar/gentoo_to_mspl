@@ -10,10 +10,10 @@ PACKAGE_UNMASK="/etc/portage/package.unmask"
 PACKAGE_KEYWORDS="/etc/portage/package.accept_keywords"
 WORLD="/var/lib/portage/world"
 
-[ -a "${PACKAGE_USE}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_USE}
-[ -a "${PACKAGE_UNMASK}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_UNMASK}
-[ -a "${PACKAGE_KEYWORDS}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_KEYWORDS}
-[ -a "${WORLD}" ] && zip ${ARCHIVE_NAME} ${WORLD}
+[ -e "${PACKAGE_USE}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_USE}
+[ -e "${PACKAGE_UNMASK}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_UNMASK}
+[ -e "${PACKAGE_KEYWORDS}" ] && zip -r ${ARCHIVE_NAME} ${PACKAGE_KEYWORDS}
+[ -e "${WORLD}" ] && zip ${ARCHIVE_NAME} ${WORLD}
 
 
 TMP_FILE_NAME="/tmp/${ARCHIVE_NAME}"
