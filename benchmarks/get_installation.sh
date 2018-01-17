@@ -17,7 +17,7 @@ WORLD="/var/lib/portage/world"
 
 
 TMP_FILE_NAME="/tmp/${ARCHIVE_NAME}"
-echo $(ls -ld /usr/portage) > ${TMP_FILE_NAME}
+echo $(ls -ld --time-style=long-iso /usr/portage) > ${TMP_FILE_NAME}
 echo $(ls -l /etc/portage/make.profile) >> ${TMP_FILE_NAME}
 source /etc/portage/make.conf
 echo "USE=\"${USE}\"" >> ${TMP_FILE_NAME}
