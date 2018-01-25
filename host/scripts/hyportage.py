@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-
+import sys
 import os
 import utils
 import logging
@@ -260,7 +260,6 @@ def main(
 		if has_changed_config: hyportage_db.save_configuration(path_configuration, save_modality)
 		if has_changed_hyportage: hyportage_db.save_hyportage(path_db_hyportage, save_modality)
 
-		return None
 
 	##########################################################################
 	# 6. RUN RECONFIGURE IF NECESSARY
@@ -285,7 +284,7 @@ def main(
 		if solution is None:
 			logging.error("Non valid configuration found")
 			logging.error("exiting")
-			return
+			sys.exit(-1)
 
 		if verbose >= 3:
 			path_new_configuration = os.path.join(dir_install, "new_configuration.pickle")
@@ -302,6 +301,7 @@ def main(
 	# cleanup, because of Python GC bugs...
 	concurrent_map = None
 	smt_encoding.cleanup()
+	sys.exit(0)
 
 
 ##
@@ -310,5 +310,4 @@ if __name__ == "__main__":
 	if os.name == 'nt':
 		multiprocessing.freeze_support()
 	main()
-	print("14")
 

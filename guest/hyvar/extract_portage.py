@@ -13,8 +13,8 @@ import core_data
 
 __author__ = "Michael Lienhardt"
 __copyright__ = "Copyright 2017, Michael Lienhardt"
-__license__ = "ISC"
-__version__ = "0.1"
+__license__ = "GPL3"
+__version__ = "0.5"
 __maintainer__ = "Michael Lienhardt"
 __email__ = "michael lienhardt@laposte.net"
 __status__ = "Prototype"
@@ -523,9 +523,13 @@ def load_keyword_list():
 
 
 def load_installed_package_uses(package_path):
+	try:
 		with open(os.path.join(package_path, "USE"), 'r') as f:
 			uses = set(f.read().split())
 		return uses
+	except IOError:
+		sys.stderr.write("Warning: in path \"" + package_path + "\", no file USE found\n")
+		return None
 
 
 def load_installed_packages():

@@ -1,12 +1,11 @@
 #!/usr/bin/python
-import re
 
 __author__ = "Michael Lienhardt and Jacopo Mauro"
 __copyright__ = "Copyright 2017, Michael Lienhardt and Jacopo Mauro"
-__license__ = "ISC"
-__version__ = "0.1"
-__maintainer__ = "Michael Lienhardt and Jacopo Mauro"
-__email__ = "michael lienhardt@laposte.net & mauro.jacopo@gmail.com"
+__license__ = "GPL3"
+__version__ = "0.5"
+__maintainer__ = "Michael Lienhardt"
+__email__ = "michael lienhardt@laposte.net"
 __status__ = "Prototype"
 
 

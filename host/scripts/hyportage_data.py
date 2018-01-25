@@ -189,7 +189,7 @@ class SPL(object):
 	@property
 	def use_selection_full(self):
 		if self.__use_selection_full is None:
-			if self.name in hyportage_db.installed_packages:  # TODO: this if is not true with the --newuse option
+			if hyportage_db.installed_packages.get(self.name) is not None:  # TODO: this if is not true with the --newuse option
 				self.__use_selection_full = hyportage_db.installed_packages[self.name]
 			else:
 				self.__use_selection_full = hyportage_db.mspl_config.get_use_flags(

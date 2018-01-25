@@ -35,7 +35,7 @@ def get_egencache_files(path):
 	returns the set of portage files to load
 	"""
 	files = []
-	for root, dirnames, filenames in os.walk(path):
+	for root, dirnames, filenames in os.walk(path, followlinks=True):
 		for filename in filenames:
 			path_file = os.path.join(root, filename)
 			files.append(path_file)
