@@ -548,7 +548,14 @@ def load_installed_packages():
 ######################################################################
 # load the world file
 def load_world_file():
-	return set(map(core_data.pattern_create_from_atom, parse_configuration_file(input_file_user_world)))
+	atom_list = parse_configuration_file(input_file_user_world)
+	clean_atom_list = []
+	for atom in atom_list:
+		if "::" in atom:
+			logging.warning("the atom \"" + atom + "\" is tagged with a repository annotation. trimming it")
+			clean_atom_list.append(atom.split("::", 1)[0])
+		else: clean_atom_list.append(atom)
+	return set(map(core_data.pattern_create_from_atom, clean_atom_list))
 
 
 ######################################################################

@@ -58,15 +58,13 @@ GENERATED_DATA_FOLDER="${FOLDER}/gen"			# the folder containing the hyportage ge
 MISSING_EBUILD_FOLDER="${FOLDER}/missing_ebuild" # where the user must put the missing .ebuild
 MISSING_EBUILD_FILE="${MISSING_EBUILD_FOLDER}.txt"
 
-TESTS_FOLDER="${FOLDER}/tests/"
-STATISTICS_FILE="${TESTS_FOLDER}/statistics.txt"
-TEST_HYPORTAGE_DIRECT="${TESTS_FOLDER}/hyportage_direct"
-TEST_HYPORTAGE_FLEXIBLE="${TESTS_FOLDER}/hyportage_flexible"
-TEST_PORTAGE_DIRECT="${TESTS_FOLDER}/portage_direct"
+STATISTICS_FILE="${FOLDER}/statistics.txt"
 
 TEST_MODE_TEST_FILE="/var/lib/portage/world"
 
-LOG_FILE="${FOLDER}/log.txt"
+BASE_LOG_FILE="${FOLDER}/log.txt"
+TEST_LOG_FILE="${FOLDER}/log_test.txt"
+LOG_FILE="${BASE_LOG_FILE}"
 
 if [ -n "${PYTHONPATH}" ]; then
 	export PYTHONPATH="${HYVAR_FOLDER}/guest${PATH_SEPARATOR}${PYTHONPATH}"
@@ -89,16 +87,13 @@ function create_empty_file {
 	touch "${1}" || die "could not create empty file \"${1}\""
 	truncate -s 0 "${1}"
 }
-function annotate_output {
-	echo "========================================"
-	echo "$*"
-	echo "======="
-	$@
-}
 function register_in_log {
+	echo "========================================" >> "${LOG_FILE}"
+	echo "$*" >> "${LOG_FILE}"
+	echo "=======" >> "${LOG_FILE}"
 	{
 		time {
-			annotate_output $@
+			$@
 			register_in_log_RETURN_VALUE="$?"
 		}
 	} &>> "${LOG_FILE}"
@@ -388,21 +383,33 @@ function test_hyportage_check_conf {
 	echo "=============================="
 	echo "test: check"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] || die "executing \"test_hyportage_check_conf\" outside the testing environment"
+	LOG_FILE="${TEST_LOG_FILE}"
 	run_hyportage --mode=emerge --portage_files "config_test.pickle" "packages" --generated_install_files "check_emerge.sh" "check_package.use" -vvv -p 2
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/check_new_configuration.pickle"
+	LOG_FILE="${BASE_LOG_FILE}"
 }
 
 function test_get_install_set {
-	[ -n "${PACKAGE_SET_INSTALL}" ] || PACKAGE_SET_INSTALL=$(cat "${ARCHIVE_FOLDER}/var/lib/portage/world")
+	#PACKAGE_SET_INSTALL=$(cat "${ARCHIVE_FOLDER}/var/lib/portage/world")
+	PACKAGE_SET_INSTALL=""
+	LOG_FILE="${TEST_LOG_FILE}"
+	for i in $(cat "${ARCHIVE_FOLDER}/var/lib/portage/world"); do
+		ATOM="${i%%::*}"
+		[ "${ATOM}" != "${i}" ] && echo "Warning: atom \"${i}\" is annotated with a repo id. Removed" >> "${LOG_FILE}"
+		PACKAGE_SET_INSTALL="${PACKAGE_SET_INSTALL} ${ATOM}"
+	done
+	LOG_FILE="${BASE_LOG_FILE}"
 }
 
 function test_hyportage_direct {
 	echo "=============================="
 	echo "test: direct"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] && die "executing \"test_hyportage_direct\" inside the testing environment"
-	test_get_install_set
+	[ -n "${PACKAGE_SET_INSTALL}" ] || test_get_install_set
+	LOG_FILE="${TEST_LOG_FILE}"
 	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" --generated_install_files "direct_emerge.sh" "direct_package.use" -vvv -p 2 ${PACKAGE_SET_INSTALL}
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/direct_new_configuration.pickle"
+	LOG_FILE="${BASE_LOG_FILE}"
 }
 
 
@@ -410,9 +417,11 @@ function test_hyportage_flexible {
 	echo "=============================="
 	echo "test: flexible"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] && die "executing \"test_hyportage_flexible\" inside the testing environment"
-	test_get_install_set
+	[ -n "${PACKAGE_SET_INSTALL}" ] || test_get_install_set
+	LOG_FILE="${TEST_LOG_FILE}"
 	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" --generated_install_files "flexible_emerge.sh" "flexible_package.use" --exploration "use,keywords" -vvv -p 2 ${PACKAGE_SET_INSTALL}
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/flexible_new_configuration.pickle"
+	LOG_FILE="${BASE_LOG_FILE}"
 }
 
 
@@ -420,9 +429,11 @@ function test_portage_direct {
 	echo "=============================="
 	echo "test: portage"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] && die "executing \"test_portage_direct\" inside the testing environment"
-	test_get_install_set
+	[ -n "${PACKAGE_SET_INSTALL}" ] || test_get_install_set
+	LOG_FILE="${TEST_LOG_FILE}"
 	register_in_log emerge -vNp ${PACKAGE_SET_INSTALL}
 	[ "$?" -eq "0" ] && touch "${GENERATED_DATA_FOLDER}/emerge_performed.txt"
+	LOG_FILE="${BASE_LOG_FILE}"
 }
 
 #######################################
@@ -460,7 +471,6 @@ function setup {
 	mkdir -p "${ARCHIVE_FOLDER}" || die "could not create the \"${ARCHIVE_FOLDER}\" folder"
 	mkdir -p "${CONFIG_CONTAINING_FOLDER}/real" || die "could not create the \"${CONFIG_CONTAINING_FOLDER}\" folder"
 	mkdir -p "${CONFIG_CONTAINING_FOLDER}/local/pkg"
-	mkdir -p "${TESTS_FOLDER}"
 	mkdir -p "${MISSING_EBUILD_FOLDER}" || die "could not create \"${MISSING_EBUILD_FOLDER}\" folder"
 	mkdir -p "${GENERATED_DATA_FOLDER}" || die "could not create \"${GENERATED_DATA_FOLDER}\" folder"
 
@@ -494,7 +504,7 @@ function tests {
 }
 
 function clean {
-	restore_original_repo
+	restore_original_config
 }
 
 function all {

@@ -271,7 +271,7 @@ def main(
 		clean_atoms = set()
 		for atom in atoms:
 			if "::" in atom:
-				logging.warning("the atom \"" + atom + "\" is tagged with a repository annotating. trimming it")
+				logging.warning("the atom \"" + atom + "\" is tagged with a repository annotation. trimming it")
 				clean_atoms.add(atom.split("::", 1)[0])
 			else: clean_atoms.add(atom)
 		atoms = clean_atoms
