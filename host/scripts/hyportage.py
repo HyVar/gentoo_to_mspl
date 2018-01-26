@@ -51,7 +51,7 @@ def usage():
 	help='the file in which are saved the hyportage data')
 @click.option(
 	'--generated_install_files', '-u',
-	default=("emerge.sh", "package.use"),
+	default=("emerge.sh", "package.use", "package.unmask", "package.accept_keywords"),
 	help='the file in which are saved the installation script and use flag configuration')
 @click.option(
 	'--verbose', '-v',
@@ -177,9 +177,11 @@ def main(
 
 	path_db_hyportage = os.path.join(dir_hyportage, hyportage_file)
 
-	file_install_script, file_use_flag_configuration = generated_install_files
+	file_install_script, file_use_flag_configuration, file_mask_configuration, file_keywords_configuration = generated_install_files
 	path_install_script = os.path.join(dir_install, file_install_script)
 	path_use_flag_configuration = os.path.join(dir_install, file_use_flag_configuration)
+	path_mask_configuration = os.path.join(dir_install, file_mask_configuration)
+	path_keywords_configuration = os.path.join(dir_install, file_keywords_configuration)
 
 	##########################################################################
 	# 3. COMPUTE WHAT TO DO
@@ -305,7 +307,8 @@ def main(
 
 		# write the installation files
 		reconfigure.generate_installation_files(
-			hyportage_db.mspl, path_install_script, path_use_flag_configuration,
+			hyportage_db.mspl,
+			path_install_script, path_use_flag_configuration, path_mask_configuration, path_keywords_configuration,
 			hyportage_db.config.installed_packages, solution)
 
 	logging.info("Execution succesfully terminated")
