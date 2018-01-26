@@ -5,6 +5,7 @@ import logging
 import itertools
 import z3
 
+import core_data
 import hyportage_constraint_ast
 
 
@@ -379,7 +380,11 @@ def convert_patterns(pattern_repository, id_repository, patterns):
 		new_spls = pattern_repository.get_with_default(pattern).matched_spls
 		spls.update(new_spls)
 		#print(core_data.pattern_to_atom(pattern) + " => " + str([spl.name for spl in new_spls]))
-		constraints.append(smt_or([get_spl_smt(id_repository, spl.name) for spl in new_spls]))
+		constraint = z3.simplify(smt_or([get_spl_smt(id_repository, spl.name) for spl in new_spls]))
+		if z3.is_false(constraint):
+			logging.warning("atom \"" + (core_data.pattern_to_atom(pattern)) + "\" is satisfied by no ebuild")
+			return set(), []
+		constraints.append(constraint)
 	return spls, smt_list_to_strings(constraints)
 
 

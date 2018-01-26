@@ -267,9 +267,21 @@ def main(
 
 	if todo_emerge:
 		logging.info("computing a new system configuration... " + str(atoms))
+		# cleaning the atoms from the repository annotation
+		clean_atoms = set()
+		for atom in atoms:
+			if "::" in atom:
+				logging.warning("the atom \"" + atom + "\" is tagged with a repository annotating. trimming it")
+				clean_atoms.add(atom.split("::", 1)[0])
+			else: clean_atoms.add(atom)
+		atoms = clean_atoms
 		# compute what to install
 		root_spls, request_constraint = reconfigure.process_request(
 			hyportage_db.pattern_repository, hyportage_db.id_repository, hyportage_db.config, atoms)
+
+		if not bool(root_spls):
+			logging.info("nothing to do")
+			sys.exit(0)
 
 		# get the transitive closure of the spls
 		all_spls = reconfigure.get_dependency_transitive_closure(
