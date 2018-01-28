@@ -9,8 +9,8 @@ if [ -n "${WINDIR}" ]; then
 	PATH_SEPARATOR=";"
 else
 	#"LINUX"
-	MY_UNZIP="unzip"
-	MY_UNZIP_OPTION=""
+	MY_UNZIP="tar"
+	MY_UNZIP_OPTION="xfvJ"
 	PATH_SEPARATOR=":"
 fi
 
@@ -44,7 +44,7 @@ if [ -z "$2" ]; then
 fi
 
 ARCHIVE="$(pwd)/$1"
-FOLDER="${ARCHIVE::(-22)}"
+FOLDER="${ARCHIVE%-installation_spec*}"
 OPERATION="$2"
 
 
@@ -57,8 +57,8 @@ GENERATED_DATA_FOLDER="${FOLDER}/gen"			# the folder containing the hyportage ge
 
 MISSING_EBUILD_FOLDER="${FOLDER}/missing_ebuild" # where the user must put the missing .ebuild
 MISSING_EBUILD_FILE="${MISSING_EBUILD_FOLDER}.txt"
-
 STATISTICS_FILE="${FOLDER}/statistics.txt"
+TESTS_PERFORMED_FILE="${FOLDER}/performed_tests.txt"
 
 TEST_MODE_TEST_FILE="/var/lib/portage/world"
 
@@ -100,10 +100,39 @@ function register_in_log {
 	return ${register_in_log_RETURN_VALUE}
 }
 function run_hyportage {
-	register_in_log python "${HYVAR_MAIN_EXE}" "${GENERATED_DATA_FOLDER}" "${GENERATED_DATA_FOLDER}" "${GENERATED_DATA_FOLDER}" --local-solver "${HYVARREC_EXE}" $@
+	[ -n "${HYOUT_DATA_FOLDER}" ] || die "output folder for hyportage is not set"
+	mkdir -p "${HYOUT_DATA_FOLDER}"
+	register_in_log python "${HYVAR_MAIN_EXE}" "${GENERATED_DATA_FOLDER}" "${GENERATED_DATA_FOLDER}" "${HYOUT_DATA_FOLDER}" --local-solver "${HYVARREC_EXE}" $@
 	[ $? -ne "0" ] && [ $1 = "--mode=emerge" ] && register_in_log python "${HYVAR_MAIN_EXE}" "${GENERATED_DATA_FOLDER}" "${GENERATED_DATA_FOLDER}" "${GENERATED_DATA_FOLDER}" --local-solver "${HYVARREC_EXE}" --explain-modality --simplify-mode "individual" $@
 }
-
+function test_hyportage_output {
+	[ -n "${HYOUT_DATA_FOLDER}" ] || die "output folder for hyportage is not set"
+	[ -L "${TEST_MODE_TEST_FILE}" ] || die "we are not in safe mode"
+	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${CONFIG_CONTAINING_FOLDER})" ] || die "the current test mode does not belong to this test"
+	echo "========================================" > "${HYOUT_DATA_FOLDER}/log.txt"
+	echo "$*" >> "${HYOUT_DATA_FOLDER}/log.txt"
+	echo "=======" >> "${HYOUT_DATA_FOLDER}/log.txt"
+	# 1. setting up the configuration files
+	[ -e /etc/portage/package.use ] && mv /etc/portage/package.use /etc/portage/original-package.use
+	[ -e /etc/portage/package.unmask ] && mv /etc/portage/package.unmask /etc/portage/original-package.unmask
+	[ -e /etc/portage/package.accept_keywords ] && mv /etc/portage/package.accept_keywords /etc/portage/original-package.accept_keywords
+	for i in use unmask accept_keywords; do
+		if [ -e "${HYOUT_DATA_FOLDER}/package.$i" ]; then
+			echo "using custom package.$i" >> "${HYOUT_DATA_FOLDER}/log.txt"
+			cp "${HYOUT_DATA_FOLDER}/package.$i" /etc/portage/
+		fi
+	done
+	echo "=======" >> "${HYOUT_DATA_FOLDER}/log.txt"
+	# 2. executing emerge
+	bash "${HYOUT_DATA_FOLDER}/emerge.sh" &>> "${HYOUT_DATA_FOLDER}/log.txt"
+	# 3. cleaning
+	for i in use unmask accept_keywords; do
+		[ -e "/etc/portage/package.$i" ] && rm "/etc/portage/package.$i"
+	done
+	[ -e /etc/portage/original-package.use ] && mv -i /etc/portage/original-package.use /etc/portage/package.use
+	[ -e /etc/portage/original-package.unmask ] && mv -i /etc/portage/original-package.unmask /etc/portage/package.unmask
+	[ -e /etc/portage/original-package.accept_keywords ] && mv -i /etc/portage/original-package.accept_keywords /etc/portage/package.accept_keywords
+}
 
 
 #######################################
@@ -204,8 +233,8 @@ function rebuild_archive_data {
 	echo "=============================="
 	echo "building testing config"
 	# profile
-	PROFILE_INFO=$(head -2 "${METADATA_FILE}" | tail -1)
-	PROFILE_LINK=$(echo ${PROFILE_INFO} | cut -d' ' -f11)
+	PROFILE_INFO="$(head -2 "${METADATA_FILE}" | tail -1)"
+	PROFILE_LINK="${PROFILE_INFO##* }"
 	PROFILE_LINK=${PROFILE_LINK:5}
 	[ -e  "${CONFIG_CONTAINING_FOLDER}/local/make.profile" ] && rm "${CONFIG_CONTAINING_FOLDER}/local/make.profile"
 	[ -e  "${ARCHIVE_FOLDER}/etc/portage/make.profile" ] && rm "${ARCHIVE_FOLDER}/etc/portage/make.profile"	
@@ -317,6 +346,7 @@ function restore_original_config {
 	echo "=============================="
 	echo "disabling the safe_mode"
 	[ -L "${TEST_MODE_TEST_FILE}" ] || die "cannot restore original config: we are not in safe mode"
+	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${FOLDER})" ] || die "the current test mode does not belong to this test"
 	rm "/usr/portage"
 	rm "/etc/portage"
 	rm "/var/lib/portage/world"
@@ -332,7 +362,9 @@ function restore_original_config {
 function switch_repo {
 	echo "=============================="
 	echo "switching portage repo"
-	if [ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${PORTAGE_REPO})" ]; then
+	[ -L "${TEST_MODE_TEST_FILE}" ] || die "cannot switch repo: we are not in safe mode"
+	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${FOLDER})" ] || die "the current test mode does not belong to this test"
+	if [ -n "$(ls -ld /usr/portage | grep ${PORTAGE_REPO})" ]; then
 		rm /usr/portage
 		ln -s "${CONFIG_CONTAINING_FOLDER}/real/usr-portage" /usr/portage
 	else
@@ -368,7 +400,10 @@ function generate_pickle {
 	echo "=============================="
 	echo "generating the .pickle files"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] || die "executing \"generate_pickle\" outside the testing environment"
-	[ ! -e "${GENERATED_DATA_FOLDER}/packages/portage-tree" ] && ln -s "${PORTAGE_REPO}/metadata/md5-cache" "${GENERATED_DATA_FOLDER}/packages/portage-tree"
+	if [ ! -e "${GENERATED_DATA_FOLDER}/packages/portage-tree" ]; then
+		mkdir -p "${GENERATED_DATA_FOLDER}/packages/deprecated"
+		ln -s "${PORTAGE_REPO}/metadata/md5-cache" "${GENERATED_DATA_FOLDER}/packages/portage-tree"
+	fi
 	# we should be in the testing configuration
 	register_in_log python "${HYVAR_GEN_CONFIG_EXE}" "${GENERATED_DATA_FOLDER}"
 	mv "${GENERATED_DATA_FOLDER}/config.pickle" "${GENERATED_DATA_FOLDER}/config_test.pickle"
@@ -376,6 +411,7 @@ function generate_pickle {
 	register_in_log python "${HYVAR_GEN_CONFIG_EXE}" "${GENERATED_DATA_FOLDER}"
 	mv "${GENERATED_DATA_FOLDER}/config.pickle" "${GENERATED_DATA_FOLDER}/config_base.pickle"
 	switch_install
+	HYOUT_DATA_FOLDER="/non-existing-folder/" # just to be on the safe side
 	run_hyportage --mode=update --portage_files "config_test.pickle" "packages" -vvv -p 2
 }
 
@@ -384,9 +420,11 @@ function test_hyportage_check_conf {
 	echo "test: check"
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] || die "executing \"test_hyportage_check_conf\" outside the testing environment"
 	LOG_FILE="${TEST_LOG_FILE}"
-	run_hyportage --mode=emerge --portage_files "config_test.pickle" "packages" --generated_install_files "check_emerge.sh" "check_package.use" -vvv -p 2
+	HYOUT_DATA_FOLDER="${GENERATED_DATA_FOLDER}/check"
+	run_hyportage --mode=emerge --portage_files "config_test.pickle" "packages" -vvv -p 2
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/check_new_configuration.pickle"
 	LOG_FILE="${BASE_LOG_FILE}"
+	echo "check" >> "${TESTS_PERFORMED_FILE}"
 }
 
 function test_get_install_set {
@@ -407,9 +445,12 @@ function test_hyportage_direct {
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] && die "executing \"test_hyportage_direct\" inside the testing environment"
 	[ -n "${PACKAGE_SET_INSTALL}" ] || test_get_install_set
 	LOG_FILE="${TEST_LOG_FILE}"
-	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" --generated_install_files "direct_emerge.sh" "direct_package.use" -vvv -p 2 ${PACKAGE_SET_INSTALL}
+	HYOUT_DATA_FOLDER="${GENERATED_DATA_FOLDER}/direct"
+	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" -vvv -p 2 ${PACKAGE_SET_INSTALL}
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/direct_new_configuration.pickle"
 	LOG_FILE="${BASE_LOG_FILE}"
+	[ -e "${HYOUT_DATA_FOLDER}/emerge.sh" ] && test_hyportage_output
+	echo "direct" >> "${TESTS_PERFORMED_FILE}"
 }
 
 
@@ -419,9 +460,12 @@ function test_hyportage_flexible {
 	[ -n "$(ls -l "${TEST_MODE_TEST_FILE}" | grep ${ARCHIVE_FOLDER})" ] && die "executing \"test_hyportage_flexible\" inside the testing environment"
 	[ -n "${PACKAGE_SET_INSTALL}" ] || test_get_install_set
 	LOG_FILE="${TEST_LOG_FILE}"
-	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" --generated_install_files "flexible_emerge.sh" "flexible_package.use" --exploration "use,keywords" -vvv -p 2 ${PACKAGE_SET_INSTALL}
+	HYOUT_DATA_FOLDER="${GENERATED_DATA_FOLDER}/flexible"
+	run_hyportage --mode=emerge --portage_files "config_base.pickle" "packages" --exploration "use,keywords" -vvv -p 2 ${PACKAGE_SET_INSTALL}
 	[ -e "${GENERATED_DATA_FOLDER}/new_configuration.pickle" ] && mv "${GENERATED_DATA_FOLDER}/new_configuration.pickle" "${GENERATED_DATA_FOLDER}/flexible_new_configuration.pickle"
 	LOG_FILE="${BASE_LOG_FILE}"
+	[ -e "${HYOUT_DATA_FOLDER}/emerge.sh" ] && test_hyportage_output
+	echo "flexible" >> "${TESTS_PERFORMED_FILE}"
 }
 
 
@@ -434,6 +478,7 @@ function test_portage_direct {
 	register_in_log emerge -vNp ${PACKAGE_SET_INSTALL}
 	[ "$?" -eq "0" ] && touch "${GENERATED_DATA_FOLDER}/emerge_performed.txt"
 	LOG_FILE="${BASE_LOG_FILE}"
+	echo "portage" >> "${TESTS_PERFORMED_FILE}"
 }
 
 #######################################
@@ -495,11 +540,12 @@ function metadata {
 
 function tests {
 	[ -e "${GENERATED_DATA_FOLDER}/hyportage.pickle" ] || generate_pickle
-	[ -e "${GENERATED_DATA_FOLDER}/check_emerge.sh" ] || test_hyportage_check_conf
+	touch "${TESTS_PERFORMED_FILE}"
+	[ -n "$(grep check ${TESTS_PERFORMED_FILE})" ] || test_hyportage_check_conf
 	switch_install # switching back to the safe_mode | base_mode
-	[ -e "${GENERATED_DATA_FOLDER}/check_direct.sh" ] || test_hyportage_direct
-	[ -e "${GENERATED_DATA_FOLDER}/check_flexible.sh" ] || test_hyportage_flexible
-	[ -e "${GENERATED_DATA_FOLDER}/emerge_performed.txt" ] || test_portage_direct
+	[ -n "$(grep direct ${TESTS_PERFORMED_FILE})" ] || test_hyportage_direct
+	[ -n "$(grep flexible ${TESTS_PERFORMED_FILE})" ] || test_hyportage_flexible
+	[ -n "$(grep portage ${TESTS_PERFORMED_FILE})" ] || test_portage_direct
     switch_install # switch back
 }
 

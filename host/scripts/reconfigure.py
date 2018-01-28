@@ -368,9 +368,9 @@ def generate_installation_files(
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		if added_spl_names:
-			f.write("emerge -a --newuse " + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
+			f.write("emerge -p --newuse " + " ".join(["=" + spl_name for spl_name in added_spl_names]) + "\n")
 		if removed_spl_names:
-			f.write("emerge --unmerge " + " ".join(["=" + spl_name for spl_name in removed_spl_names]) + "\n")
+			f.write("emerge -p --unmerge " + " ".join(["=" + spl_name for spl_name in removed_spl_names]) + "\n")
 		f.write("\n")
 
 	with open(path_use_flag_configuration, 'w') as f:
@@ -392,8 +392,9 @@ def generate_installation_files(
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		for spl_name in added_spl_names:
-			if not mspl[spl_name].unmasked:
-				f.write("=" + spl_name)
+			f.write("=" + spl_name + "\n")
+			#if not mspl[spl_name].unmasked:
+			#	f.write("=" + spl_name)
 		f.write("\n")
 
 	with open(path_keywords_configuration, 'w') as f:
@@ -401,8 +402,9 @@ def generate_installation_files(
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		for spl_name in added_spl_names:
-			if not mspl[spl_name].unmasked_keyword:
-				f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch)
+			f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch + "\n")
+			#if not mspl[spl_name].unmasked_keyword:
+			#	f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch)
 		f.write("\n")
 
 
