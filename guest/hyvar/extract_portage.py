@@ -7,6 +7,7 @@ import logging
 import subprocess
 import bz2
 import cPickle
+import logging
 
 import core_data
 
@@ -62,6 +63,15 @@ input_file_keyword_list = os.path.realpath("/usr/portage/profiles/arch.list")
 
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
+#logging.info("location portage tree: " + input_dir_portage)
+#logging.info("location installed packages: " + input_dir_portage_installed)
+#logging.info("location user profile: " + input_file_profile_base)
+#logging.info("location selected profile: " + input_file_profile_selected)
+#logging.info("location base user config: " + input_dir_user_configuration)
+#logging.info("location make.conf file: " + input_file_make_conf)
+#logging.info("location world file: " + input_file_user_world)
+#logging.info("location list of keywords: " + input_file_keyword_list)
 
 # output
 
@@ -345,16 +355,18 @@ def get_user_configuration_files_in_path(path):
 	if os.path.isfile(path):
 		return [ path ]
 	elif os.path.isdir(path):
-		filename_list = filter(os.path.isfile, os.listdir(path))
+		print("list of files: " + unicode(os.listdir(path)))
+		filename_list = filter(os.path.isfile, [os.path.join(path, filename) for filename in os.listdir(path)])
 		filename_list.sort()
-		return [ os.path.join(path, filename) for filename in filename_list ]
+		return filename_list
 	else: return []
 
 
 def get_user_configuration(environment):
 	# first is loaded the profile, which is then updated with local definitions
 	# 1. package.use
-	files_package_use = get_user_configuration_files_in_path(os.path.join(input_dir_user_configuration, "package.use"))
+	files_package_use = get_user_configuration_files_in_path(
+		os.path.join(input_dir_user_configuration, "package.use"))
 	pattern_use_selection = core_data.SetManipulationPattern()
 	for filename in files_package_use:
 		pattern_use_selection.update(load_package_use_file(filename))

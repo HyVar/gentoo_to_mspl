@@ -262,7 +262,7 @@ def solve_spls(
 	#tmp = 0
 	for spl in spls:
 		spl_group_names.add(core_data.spl_core_get_spl_group_name(spl.core), spl)
-		included = (spl.unmasked or exploration_mask) and ((spl.is_stable and spl.unmasked_keyword) or exploration_keywords)
+		included = (spl.unmasked or exploration_mask) and (spl.unmasked_keyword or exploration_keywords)
 		if included:
 			#tmp = tmp + 1
 			constraint.extend(spl.smt)
@@ -402,7 +402,8 @@ def generate_installation_files(
 		f.write("# Do not update, any modification on this file will will overwritten by the tool\n")
 		f.write("\n")
 		for spl_name in added_spl_names:
-			f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch + "\n")
+			#f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch + "\n")
+			f.write("=" + spl_name + " **\n")
 			#if not mspl[spl_name].unmasked_keyword:
 			#	f.write("=" + spl_name + " ~" + hyportage_db.mspl_config.arch)
 		f.write("\n")
