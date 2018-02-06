@@ -158,6 +158,7 @@ def decompact_selection_list(id_repository, local_spl_name, spl_name, selection_
 	res = [get_spl_smt(id_repository, spl_name)]
 	for selection in selection_list:
 		use_flag = selection['use']
+		#print("check if spl_name \"" + spl_name +"\" have the use flag \"" + use_flag + "\": " + str(id_repository.exists_use_flag(spl_name, use_flag)))
 		if id_repository.exists_use_flag(spl_name, use_flag):
 			use_smt = get_use_smt(id_repository, spl_name, use_flag)
 			if "prefix" in selection:  # two cases: "-" (not selected), or "!" (compact form)
@@ -221,6 +222,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		self.mspl = mspl
 		self.spl_groups = spl_groups
 		self.spl_name = spl_name
+		self.stack = [ False ]
 
 	def visitRequired(self, ctx):
 		return map(self.visitRequiredEL, ctx)
@@ -257,6 +259,7 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return smt_and(self.visitRequired(ctx['els']))
 
 	def visitDepend(self, ctx):
+		self.stack = [ False ]
 		return map(self.visitDependEL, ctx)
 
 	def visitDependSIMPLE(self, ctx):
@@ -279,14 +282,20 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 		return formula
 
 	def visitDependCONDITION(self, ctx):
-		formulas = self.visitDepend(ctx['els'])
+		self.stack.append(False)
+		formulas = map(self.visitDependEL, ctx['els'])
+		self.stack.pop()
 		use_smt = get_use_smt(self.id_repository, self.spl_name, ctx['condition']['use'])
 		if 'not' in ctx['condition']:
 			use_smt = smt_not(use_smt)
-		return smt_implies(use_smt, smt_and(formulas))
+		if self.stack[-1]: return smt_and(use_smt, smt_and(formulas))
+		else: return smt_implies(use_smt, smt_and(formulas))
+
 
 	def visitDependCHOICE(self, ctx):
+		self.stack.append(True)
 		formulas = map(self.visitDependEL, ctx['els'])
+		self.stack.pop()
 		if ctx["choice"] == "||":  # or
 			return smt_or(formulas)
 		elif ctx["choice"] == "??":  # one-max
@@ -302,7 +311,10 @@ class ASTtoSMTVisitor(hyportage_constraint_ast.ASTVisitor):
 			return smt_false # no formula to be satisfied
 
 	def visitDependINNER(self, ctx):
-		return smt_and(self.visitDepend(ctx['els']))
+		self.stack.append(False)
+		formulas = map(self.visitDependEL, ctx['els'])
+		self.stack.pop()
+		return smt_and(formulas)
 
 
 ######################################################################
