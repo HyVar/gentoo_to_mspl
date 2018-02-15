@@ -952,6 +952,21 @@ It then iterates over the two lists in parallel, and returns at the first point 
 Our implementation of this comparison function (function `compare_version` in [core_data.py](https://github.com/HyVar/gentoo_to_mspl/blob/master/guest/hyvar/core_data.py))
  follows this description but compares each character of the versions individually for efficiency.
 
+### Semantics of USE-Conditional Dependencies
+
+As shown in the dependency syntax, dependencies can be guarded by the selection or non-selection of a USE flag, e.g., `perl? (dev-lang/perl)` means that there is a dependency toward `dev-lang/perl` if the USE flag `perl` is selected.
+Intuitively, the semantics of such a guard is thus an implication: `perl? (dev-lang/perl)` is translated into `perl => dev-lang/perl`.
+However, it is not always the case, as stated in
+ [Section 8.2.3](https://dev.gentoo.org/~ulm/pms/head/pms.html#x1-790008.2.3),
+ [Section 8.2.4](https://dev.gentoo.org/~ulm/pms/head/pms.html#x1-800008.2.4) and
+ [Section 8.2.5](https://dev.gentoo.org/~ulm/pms/head/pms.html#x1-810008.2.5) of the Package Manager Specification (but I didn't see any documentation of this anywhere else).
+This documentation tells us that the USE-conditional acts as an implication when it is in a AND dependency list, but acts as a conjunction when it is in any kind of CHOICE dependency list.
+For instance:
+* `perl? (dev-lang/perl)` translates into `perl => dev-lang/perl`
+* `|| (dev-libs/libgudev !systemd? ( || ( >=sys-fs/udev-208-r1 >=sys-fs/eudev-1.5.3-r1)) )` translates into `dev-libs/libgudev \/ (!systemd /\ (>=sys-fs/udev-208-r1 \/ >=sys-fs/eudev-1.5.3-r1))`. Indeed, if `systemd` is not selected, then `>=sys-fs/udev-208-r1` or `>=sys-fs/eudev-1.5.3-r1` can solve the dependency.
+
+
+
 ### Semantics of USE dependencies
 
 Consider the constraint syntax in the DEPEND variable of a package, as described in [portage documentation](https://devmanual.gentoo.org/general-concepts/dependencies/).
